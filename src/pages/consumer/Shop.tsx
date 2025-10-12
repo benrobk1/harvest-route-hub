@@ -1,11 +1,14 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { ShoppingCart, Search, TrendingDown, TrendingUp, MapPin } from "lucide-react";
+import { ShoppingCart, Search, TrendingDown, TrendingUp, MapPin, Package } from "lucide-react";
+import logo from "@/assets/blue-harvests-logo.jpeg";
 
 const Shop = () => {
+  const navigate = useNavigate();
   const [cart, setCart] = useState<any[]>([]);
 
   const products = [
@@ -50,23 +53,32 @@ const Shop = () => {
       {/* Header */}
       <header className="bg-white border-b sticky top-0 z-10 shadow-soft">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">Blue Harvests</h1>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <MapPin className="h-3 w-3" />
-                <span>Delivering to ZIP 10001</span>
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <img src={logo} alt="Blue Harvests" className="h-12 object-contain" />
+              <div>
+                <h1 className="text-2xl font-bold text-foreground">Blue Harvests</h1>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <MapPin className="h-3 w-3" />
+                  <span>Delivering to ZIP 10001</span>
+                </div>
               </div>
             </div>
-            <Button className="relative">
-              <ShoppingCart className="h-5 w-5 mr-2" />
-              Cart
-              {cart.length > 0 && (
-                <Badge className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 flex items-center justify-center">
-                  {cart.length}
-                </Badge>
-              )}
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => navigate("/consumer/orders")}>
+                <Package className="h-5 w-5 mr-2" />
+                Orders
+              </Button>
+              <Button className="relative">
+                <ShoppingCart className="h-5 w-5 mr-2" />
+                Cart
+                {cart.length > 0 && (
+                  <Badge className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 flex items-center justify-center">
+                    {cart.length}
+                  </Badge>
+                )}
+              </Button>
+            </div>
           </div>
           
           <div className="mt-4 relative">

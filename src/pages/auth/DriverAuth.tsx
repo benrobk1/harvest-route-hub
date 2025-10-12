@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
@@ -12,6 +13,18 @@ const DriverAuth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    licenseNumber: "",
+    vehicleType: "",
+    vehicleMake: "",
+    vehicleYear: "",
+    zipCode: "",
+    availability: "",
+    additionalInfo: "",
+  });
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,17 +40,33 @@ const DriverAuth = () => {
     }, 1500);
   };
 
-  const handleSignup = async (e: React.FormEvent) => {
+  const handleInterestFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    
+    // In a real app, this would send an email to benjaminrk@blueharvests.net
+    console.log("Driver Interest Form Submitted:", formData);
     
     setTimeout(() => {
       setIsLoading(false);
       toast({
-        title: "Application submitted!",
-        description: "We'll review your information and send a 2FA code.",
+        title: "Application Submitted!",
+        description: "Thank you for your interest. We'll contact you at " + formData.email,
       });
-      navigate("/driver/dashboard");
+
+      // Reset form
+      setFormData({
+        name: "",
+        email: "",
+        phone: "",
+        licenseNumber: "",
+        vehicleType: "",
+        vehicleMake: "",
+        vehicleYear: "",
+        zipCode: "",
+        availability: "",
+        additionalInfo: "",
+      });
     }, 1500);
   };
 
@@ -87,43 +116,111 @@ const DriverAuth = () => {
               </TabsContent>
               
               <TabsContent value="signup">
-                <form onSubmit={handleSignup} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="firstName">First Name</Label>
-                      <Input id="firstName" placeholder="John" required />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="lastName">Last Name</Label>
-                      <Input id="lastName" placeholder="Doe" required />
-                    </div>
+                <form onSubmit={handleInterestFormSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="driverName">Full Name</Label>
+                    <Input 
+                      id="driverName" 
+                      placeholder="John Doe" 
+                      required 
+                      value={formData.name}
+                      onChange={(e) => setFormData({...formData, name: e.target.value})}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="signupEmail">Email</Label>
-                    <Input id="signupEmail" type="email" placeholder="you@example.com" required />
+                    <Input 
+                      id="signupEmail" 
+                      type="email" 
+                      placeholder="you@example.com" 
+                      required 
+                      value={formData.email}
+                      onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="phone">Phone Number</Label>
-                    <Input id="phone" type="tel" placeholder="+1 (555) 000-0000" required />
+                    <Input 
+                      id="phone" 
+                      type="tel" 
+                      placeholder="+1 (555) 000-0000" 
+                      required 
+                      value={formData.phone}
+                      onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                    />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="license">Driver's License</Label>
-                    <Input id="license" placeholder="License number" required />
+                    <Label htmlFor="license">Driver&apos;s License Number</Label>
+                    <Input 
+                      id="license" 
+                      placeholder="DL12345678" 
+                      required 
+                      value={formData.licenseNumber}
+                      onChange={(e) => setFormData({...formData, licenseNumber: e.target.value})}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="vehicle">Vehicle Type</Label>
-                    <Input id="vehicle" placeholder="Sedan, SUV, Van, etc." required />
+                    <Input 
+                      id="vehicle" 
+                      placeholder="Sedan, SUV, Truck, etc." 
+                      required 
+                      value={formData.vehicleType}
+                      onChange={(e) => setFormData({...formData, vehicleType: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="vehicleMake">Vehicle Make & Model</Label>
+                    <Input 
+                      id="vehicleMake" 
+                      placeholder="Honda Accord" 
+                      value={formData.vehicleMake}
+                      onChange={(e) => setFormData({...formData, vehicleMake: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="vehicleYear">Vehicle Year</Label>
+                    <Input 
+                      id="vehicleYear" 
+                      placeholder="2020" 
+                      value={formData.vehicleYear}
+                      onChange={(e) => setFormData({...formData, vehicleYear: e.target.value})}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="zipCode">Your ZIP Code</Label>
-                    <Input id="zipCode" placeholder="10001" required maxLength={5} />
+                    <Input 
+                      id="zipCode" 
+                      placeholder="10001" 
+                      required 
+                      maxLength={5}
+                      value={formData.zipCode}
+                      onChange={(e) => setFormData({...formData, zipCode: e.target.value})}
+                    />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="signupPassword">Password</Label>
-                    <Input id="signupPassword" type="password" placeholder="••••••••" required />
+                    <Label htmlFor="availability">Availability</Label>
+                    <Input 
+                      id="availability" 
+                      placeholder="Weekdays, weekends, specific days..." 
+                      value={formData.availability}
+                      onChange={(e) => setFormData({...formData, availability: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="additionalInfo">Additional Information</Label>
+                    <Textarea 
+                      id="additionalInfo" 
+                      placeholder="Tell us about your driving experience..." 
+                      value={formData.additionalInfo}
+                      onChange={(e) => setFormData({...formData, additionalInfo: e.target.value})}
+                    />
+                  </div>
+                  <div className="text-sm text-muted-foreground p-3 bg-muted rounded-lg">
+                    Your application will be sent to benjaminrk@blueharvests.net for review.
                   </div>
                   <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? "Submitting..." : "Apply to Drive"}
+                    {isLoading ? "Submitting..." : "Submit Application"}
                   </Button>
                 </form>
               </TabsContent>

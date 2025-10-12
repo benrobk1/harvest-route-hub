@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
 import { Users, Truck, Sprout, BarChart3 } from "lucide-react";
+import logo from "@/assets/blue-harvests-logo.jpeg";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -46,6 +47,9 @@ const Index = () => {
       {/* Hero Section */}
       <header className="relative overflow-hidden bg-gradient-hero py-20 px-4">
         <div className="container mx-auto max-w-6xl text-center">
+          <div className="flex justify-center mb-8">
+            <img src={logo} alt="Blue Harvests Logo" className="h-32 md:h-40 object-contain" />
+          </div>
           <div className="mb-6 inline-block rounded-full bg-white/20 px-6 py-2 backdrop-blur-sm">
             <span className="text-sm font-medium text-white">Farm Fresh • Local • Sustainable</span>
           </div>

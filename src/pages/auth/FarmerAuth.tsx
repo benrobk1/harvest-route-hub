@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useNavigate } from "react-router-dom";
@@ -12,6 +13,17 @@ const FarmerAuth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    farmName: "",
+    ownerName: "",
+    email: "",
+    phone: "",
+    farmAddress: "",
+    zipCode: "",
+    farmSize: "",
+    produceTypes: "",
+    additionalInfo: "",
+  });
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,17 +39,32 @@ const FarmerAuth = () => {
     }, 1500);
   };
 
-  const handleSignup = async (e: React.FormEvent) => {
+  const handleInterestFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    
+    // In a real app, this would send an email to benjaminrk@blueharvests.net
+    console.log("Farmer Interest Form Submitted:", formData);
     
     setTimeout(() => {
       setIsLoading(false);
       toast({
-        title: "Application submitted!",
-        description: "We'll review your farm information and contact you soon.",
+        title: "Application Submitted!",
+        description: "Thank you for your interest. We'll contact you at " + formData.email,
       });
-      navigate("/farmer/dashboard");
+
+      // Reset form
+      setFormData({
+        farmName: "",
+        ownerName: "",
+        email: "",
+        phone: "",
+        farmAddress: "",
+        zipCode: "",
+        farmSize: "",
+        produceTypes: "",
+        additionalInfo: "",
+      });
     }, 1500);
   };
 
@@ -67,7 +94,7 @@ const FarmerAuth = () => {
             <Tabs defaultValue="login" className="w-full">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="login">Login</TabsTrigger>
-                <TabsTrigger value="signup">Join</TabsTrigger>
+                <TabsTrigger value="signup">Apply</TabsTrigger>
               </TabsList>
               
               <TabsContent value="login">
@@ -87,43 +114,102 @@ const FarmerAuth = () => {
               </TabsContent>
               
               <TabsContent value="signup">
-                <form onSubmit={handleSignup} className="space-y-4">
+                <form onSubmit={handleInterestFormSubmit} className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="farmName">Farm Name</Label>
-                    <Input id="farmName" placeholder="Green Valley Farm" required />
+                    <Input 
+                      id="farmName" 
+                      placeholder="Green Valley Farm" 
+                      required 
+                      value={formData.farmName}
+                      onChange={(e) => setFormData({...formData, farmName: e.target.value})}
+                    />
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="firstName">First Name</Label>
-                      <Input id="firstName" placeholder="John" required />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="lastName">Last Name</Label>
-                      <Input id="lastName" placeholder="Doe" required />
-                    </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="ownerName">Your Name</Label>
+                    <Input 
+                      id="ownerName" 
+                      placeholder="John Smith" 
+                      required 
+                      value={formData.ownerName}
+                      onChange={(e) => setFormData({...formData, ownerName: e.target.value})}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="signupEmail">Email</Label>
-                    <Input id="signupEmail" type="email" placeholder="you@example.com" required />
+                    <Input 
+                      id="signupEmail" 
+                      type="email" 
+                      placeholder="you@example.com" 
+                      required 
+                      value={formData.email}
+                      onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="phone">Phone Number</Label>
-                    <Input id="phone" type="tel" placeholder="+1 (555) 000-0000" required />
+                    <Input 
+                      id="phone" 
+                      type="tel" 
+                      placeholder="+1 (555) 000-0000" 
+                      required 
+                      value={formData.phone}
+                      onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="farmAddress">Farm Address</Label>
-                    <Input id="farmAddress" placeholder="123 Farm Road" required />
+                    <Input 
+                      id="farmAddress" 
+                      placeholder="123 Farm Road" 
+                      required 
+                      value={formData.farmAddress}
+                      onChange={(e) => setFormData({...formData, farmAddress: e.target.value})}
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="zipCode">ZIP Code</Label>
-                    <Input id="zipCode" placeholder="10001" required maxLength={5} />
+                    <Input 
+                      id="zipCode" 
+                      placeholder="10001" 
+                      required 
+                      maxLength={5}
+                      value={formData.zipCode}
+                      onChange={(e) => setFormData({...formData, zipCode: e.target.value})}
+                    />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="signupPassword">Password</Label>
-                    <Input id="signupPassword" type="password" placeholder="••••••••" required />
+                    <Label htmlFor="farmSize">Farm Size (acres)</Label>
+                    <Input 
+                      id="farmSize" 
+                      placeholder="50" 
+                      value={formData.farmSize}
+                      onChange={(e) => setFormData({...formData, farmSize: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="produceTypes">Types of Produce</Label>
+                    <Input 
+                      id="produceTypes" 
+                      placeholder="Tomatoes, lettuce, corn..." 
+                      value={formData.produceTypes}
+                      onChange={(e) => setFormData({...formData, produceTypes: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="additionalInfo">Additional Information</Label>
+                    <Textarea 
+                      id="additionalInfo" 
+                      placeholder="Tell us about your farm..." 
+                      value={formData.additionalInfo}
+                      onChange={(e) => setFormData({...formData, additionalInfo: e.target.value})}
+                    />
+                  </div>
+                  <div className="text-sm text-muted-foreground p-3 bg-muted rounded-lg">
+                    Your application will be sent to benjaminrk@blueharvests.net for review.
                   </div>
                   <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? "Submitting..." : "Join as Farmer"}
+                    {isLoading ? "Submitting..." : "Submit Application"}
                   </Button>
                 </form>
               </TabsContent>

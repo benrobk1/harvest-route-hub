@@ -13,6 +13,7 @@ import Shop from "./pages/consumer/Shop";
 import DriverDashboard from "./pages/driver/Dashboard";
 import FarmerDashboard from "./pages/farmer/Dashboard";
 import AdminDashboard from "./pages/admin/Dashboard";
+import ConsumerOrderTracking from "./pages/consumer/OrderTracking";
 
 const queryClient = new QueryClient();
 
@@ -29,6 +30,7 @@ const App = () => (
           <Route path="/auth/farmer" element={<FarmerAuth />} />
           <Route path="/auth/admin" element={<AdminAuth />} />
           <Route path="/consumer/shop" element={<Shop />} />
+          <Route path="/consumer/orders" element={<ConsumerOrderTracking />} />
           <Route path="/driver/dashboard" element={<DriverDashboard />} />
           <Route path="/farmer/dashboard" element={<FarmerDashboard />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />

@@ -244,9 +244,9 @@ const DriverDashboard = () => {
         <Card className="border-2">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Active Route</CardTitle>
-            <Button>
+            <Button onClick={() => window.location.href = '/driver/route'}>
               <Navigation className="h-4 w-4 mr-2" />
-              Start Navigation
+              View Full Route
             </Button>
           </CardHeader>
           <CardContent>

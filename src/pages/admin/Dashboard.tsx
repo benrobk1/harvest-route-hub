@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Users, Truck, Sprout, DollarSign, TrendingUp, MapPin } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -111,8 +112,20 @@ const AdminDashboard = () => {
     <div className="min-h-screen bg-gradient-earth">
       <header className="bg-white border-b shadow-soft">
         <div className="container mx-auto px-4 py-4">
-          <h1 className="text-2xl font-bold text-foreground">Management Portal</h1>
-          <p className="text-sm text-muted-foreground">Real-time business intelligence and operations</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">Management Portal</h1>
+              <p className="text-sm text-muted-foreground">Real-time business intelligence and operations</p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => window.location.href = '/admin/market-config'}>
+                Market Config
+              </Button>
+              <Button variant="outline" onClick={() => window.location.href = '/admin/products'}>
+                Product Approval
+              </Button>
+            </div>
+          </div>
         </div>
       </header>
 

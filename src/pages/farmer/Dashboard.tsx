@@ -1,15 +1,32 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { DollarSign, Package, TrendingUp, Plus } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { DollarSign, Package, TrendingUp, Plus, Pencil, Trash2 } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatMoney } from "@/lib/formatMoney";
+import { ProductForm } from "@/components/farmer/ProductForm";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 const FarmerDashboard = () => {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [isAddingProduct, setIsAddingProduct] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
 
   // Fetch farmer's farm profile
   const { data: farmProfile } = useQuery({
@@ -127,6 +144,65 @@ const FarmerDashboard = () => {
     enabled: !!farmProfile?.id,
   });
 
+  // Create product mutation
+  const createProduct = useMutation({
+    mutationFn: async (productData: any) => {
+      const { error } = await supabase.from("products").insert({
+        ...productData,
+        price: parseFloat(productData.price),
+        available_quantity: parseInt(productData.available_quantity),
+        farm_profile_id: farmProfile?.id,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["farmer-products"] });
+      toast.success("Product added successfully");
+    },
+    onError: () => {
+      toast.error("Failed to add product");
+    },
+  });
+
+  // Update product mutation
+  const updateProduct = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const { error } = await supabase
+        .from("products")
+        .update({
+          ...data,
+          price: parseFloat(data.price),
+          available_quantity: parseInt(data.available_quantity),
+        })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["farmer-products"] });
+      toast.success("Product updated successfully");
+      setEditingProduct(null);
+    },
+    onError: () => {
+      toast.error("Failed to update product");
+    },
+  });
+
+  // Delete product mutation
+  const deleteProduct = useMutation({
+    mutationFn: async (productId: string) => {
+      const { error } = await supabase.from("products").delete().eq("id", productId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["farmer-products"] });
+      toast.success("Product deleted successfully");
+      setDeletingProductId(null);
+    },
+    onError: () => {
+      toast.error("Failed to delete product");
+    },
+  });
+
   return (
     <div className="min-h-screen bg-gradient-earth">
       <header className="bg-white border-b shadow-soft">
@@ -136,7 +212,7 @@ const FarmerDashboard = () => {
               <h1 className="text-2xl font-bold text-foreground">{farmProfile?.farm_name || 'My Farm'}</h1>
               <p className="text-sm text-muted-foreground">You keep 90% of all sales</p>
             </div>
-            <Button>
+            <Button onClick={() => setIsAddingProduct(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Add Product
             </Button>
@@ -230,7 +306,22 @@ const FarmerDashboard = () => {
                           {product.status === "low" ? "Low Stock" : "Active"}
                         </Badge>
                       </div>
-                      <Button variant="outline" size="sm">Edit</Button>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setEditingProduct(product)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setDeletingProductId(product.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -281,6 +372,55 @@ const FarmerDashboard = () => {
           </CardContent>
         </Card>
       </main>
+
+      <ProductForm
+        open={isAddingProduct}
+        onOpenChange={setIsAddingProduct}
+        onSubmit={async (data) => {
+          await createProduct.mutateAsync(data);
+        }}
+      />
+
+      <ProductForm
+        open={!!editingProduct}
+        onOpenChange={(open) => !open && setEditingProduct(null)}
+        onSubmit={async (data) => {
+          await updateProduct.mutateAsync({ id: editingProduct.id, data });
+        }}
+        defaultValues={
+          editingProduct
+            ? {
+                name: editingProduct.name,
+                description: editingProduct.description || "",
+                price: editingProduct.price.toString(),
+                unit: editingProduct.unit,
+                available_quantity: editingProduct.available_quantity.toString(),
+                image_url: editingProduct.image_url || "",
+              }
+            : undefined
+        }
+        isEdit
+      />
+
+      <AlertDialog open={!!deletingProductId} onOpenChange={(open) => !open && setDeletingProductId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Product</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this product? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deletingProductId && deleteProduct.mutate(deletingProductId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

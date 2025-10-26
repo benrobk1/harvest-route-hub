@@ -14,8 +14,11 @@ import AdminAuth from "./pages/auth/AdminAuth";
 import Shop from "./pages/consumer/Shop";
 import Checkout from "./pages/consumer/Checkout";
 import DriverDashboard from "./pages/driver/Dashboard";
+import RouteDetails from "./pages/driver/RouteDetails";
 import FarmerDashboard from "./pages/farmer/Dashboard";
 import AdminDashboard from "./pages/admin/Dashboard";
+import MarketConfig from "./pages/admin/MarketConfig";
+import ProductApproval from "./pages/admin/ProductApproval";
 import ConsumerOrderTracking from "./pages/consumer/OrderTracking";
 import ConsumerProfile from "./pages/profile/ConsumerProfile";
 import FarmerProfile from "./pages/profile/FarmerProfile";
@@ -64,6 +67,11 @@ const App = () => (
               <DriverDashboard />
             </RoleGate>
           } />
+          <Route path="/driver/route" element={
+            <RoleGate roles={['driver']}>
+              <RouteDetails />
+            </RoleGate>
+          } />
           <Route path="/driver/profile" element={
             <RoleGate roles={['driver']}>
               <DriverProfile />
@@ -84,6 +92,16 @@ const App = () => (
           <Route path="/admin/dashboard" element={
             <RoleGate roles={['admin']}>
               <AdminDashboard />
+            </RoleGate>
+          } />
+          <Route path="/admin/market-config" element={
+            <RoleGate roles={['admin']}>
+              <MarketConfig />
+            </RoleGate>
+          } />
+          <Route path="/admin/products" element={
+            <RoleGate roles={['admin']}>
+              <ProductApproval />
             </RoleGate>
           } />
           

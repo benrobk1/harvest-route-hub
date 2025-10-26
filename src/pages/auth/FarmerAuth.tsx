@@ -13,6 +13,7 @@ const FarmerAuth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [farmerType, setFarmerType] = useState<"lead" | "regular">("regular");
   const [formData, setFormData] = useState({
     farmName: "",
     ownerName: "",
@@ -23,6 +24,8 @@ const FarmerAuth = () => {
     farmSize: "",
     produceTypes: "",
     additionalInfo: "",
+    collectionPointLeadFarmer: "", // for regular farmers
+    collectionPointAddress: "", // for lead farmers
   });
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -64,6 +67,8 @@ const FarmerAuth = () => {
         farmSize: "",
         produceTypes: "",
         additionalInfo: "",
+        collectionPointLeadFarmer: "",
+        collectionPointAddress: "",
       });
     }, 1500);
   };
@@ -115,6 +120,33 @@ const FarmerAuth = () => {
               
               <TabsContent value="signup">
                 <form onSubmit={handleInterestFormSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>I am a:</Label>
+                    <div className="flex gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="farmerType"
+                          value="regular"
+                          checked={farmerType === "regular"}
+                          onChange={(e) => setFarmerType(e.target.value as "lead" | "regular")}
+                          className="w-4 h-4"
+                        />
+                        <span className="text-sm">Farmer (drop-off at collection point)</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="farmerType"
+                          value="lead"
+                          checked={farmerType === "lead"}
+                          onChange={(e) => setFarmerType(e.target.value as "lead" | "regular")}
+                          className="w-4 h-4"
+                        />
+                        <span className="text-sm">Lead Farmer (collection point)</span>
+                      </label>
+                    </div>
+                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="farmName">Farm Name</Label>
                     <Input 
@@ -196,6 +228,32 @@ const FarmerAuth = () => {
                       onChange={(e) => setFormData({...formData, produceTypes: e.target.value})}
                     />
                   </div>
+                  
+                  {farmerType === "regular" && (
+                    <div className="space-y-2">
+                      <Label htmlFor="collectionPointLeadFarmer">Lead Farmer / Collection Point</Label>
+                      <Input 
+                        id="collectionPointLeadFarmer" 
+                        placeholder="Name of lead farmer you'll drop off to" 
+                        value={formData.collectionPointLeadFarmer}
+                        onChange={(e) => setFormData({...formData, collectionPointLeadFarmer: e.target.value})}
+                      />
+                    </div>
+                  )}
+                  
+                  {farmerType === "lead" && (
+                    <div className="space-y-2">
+                      <Label htmlFor="collectionPointAddress">Collection Point Address</Label>
+                      <Input 
+                        id="collectionPointAddress" 
+                        placeholder="Address where farmers will drop off" 
+                        required
+                        value={formData.collectionPointAddress}
+                        onChange={(e) => setFormData({...formData, collectionPointAddress: e.target.value})}
+                      />
+                    </div>
+                  )}
+                  
                   <div className="space-y-2">
                     <Label htmlFor="additionalInfo">Additional Information</Label>
                     <Textarea 

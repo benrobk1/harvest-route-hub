@@ -14,6 +14,10 @@ import DriverDashboard from "./pages/driver/Dashboard";
 import FarmerDashboard from "./pages/farmer/Dashboard";
 import AdminDashboard from "./pages/admin/Dashboard";
 import ConsumerOrderTracking from "./pages/consumer/OrderTracking";
+import ConsumerProfile from "./pages/profile/ConsumerProfile";
+import FarmerProfile from "./pages/profile/FarmerProfile";
+import DriverProfile from "./pages/profile/DriverProfile";
+import FarmProfileView from "./pages/FarmProfileView";
 
 const queryClient = new QueryClient();
 
@@ -31,9 +35,13 @@ const App = () => (
           <Route path="/auth/admin" element={<AdminAuth />} />
           <Route path="/consumer/shop" element={<Shop />} />
           <Route path="/consumer/orders" element={<ConsumerOrderTracking />} />
+          <Route path="/consumer/profile" element={<ConsumerProfile />} />
           <Route path="/driver/dashboard" element={<DriverDashboard />} />
+          <Route path="/driver/profile" element={<DriverProfile />} />
           <Route path="/farmer/dashboard" element={<FarmerDashboard />} />
+          <Route path="/farmer/profile" element={<FarmerProfile />} />
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route path="/farm/:farmId" element={<FarmProfileView />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

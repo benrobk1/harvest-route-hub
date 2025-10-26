@@ -7,7 +7,7 @@ import logo from "@/assets/blue-harvests-logo.jpeg";
 const Index = () => {
   const navigate = useNavigate();
 
-  const stakeholders = [
+  const mainStakeholders = [
     {
       id: "consumer",
       title: "Shop Farm Fresh",
@@ -31,14 +31,6 @@ const Index = () => {
       icon: Sprout,
       color: "earth",
       route: "/auth/farmer",
-    },
-    {
-      id: "admin",
-      title: "Management Portal",
-      description: "Access business metrics, tracking, and operational tools",
-      icon: BarChart3,
-      color: "primary",
-      route: "/auth/admin",
     },
   ];
 
@@ -72,8 +64,8 @@ const Index = () => {
           Get Started
         </h2>
         
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-          {stakeholders.map((stakeholder) => {
+        <div className="grid gap-6 md:grid-cols-3">
+          {mainStakeholders.map((stakeholder) => {
             const Icon = stakeholder.icon;
             return (
               <Card
@@ -139,11 +131,24 @@ const Index = () => {
 
       {/* Footer */}
       <footer className="bg-foreground py-12 px-4 text-white">
-        <div className="container mx-auto max-w-6xl text-center">
-          <h3 className="mb-2 text-2xl font-bold">Blue Harvests</h3>
-          <p className="text-white/70 text-sm">
-            Family Farm Fresh • Locally Traceable • Climate Friendly
-          </p>
+        <div className="container mx-auto max-w-6xl">
+          <div className="text-center mb-6">
+            <h3 className="mb-2 text-2xl font-bold">Blue Harvests</h3>
+            <p className="text-white/70 text-sm">
+              Family Farm Fresh • Locally Traceable • Climate Friendly
+            </p>
+          </div>
+          <div className="flex justify-center">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/auth/admin")}
+              className="text-white/50 hover:text-white/70 text-xs"
+            >
+              <BarChart3 className="h-3 w-3 mr-1" />
+              Staff Portal
+            </Button>
+          </div>
         </div>
       </footer>
     </div>

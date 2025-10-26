@@ -1,0 +1,343 @@
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Sprout, Upload, X } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
+
+const FarmerProfile = () => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLeadFarmer, setIsLeadFarmer] = useState(false);
+  const [profile, setProfile] = useState({
+    full_name: "",
+    email: "",
+    phone: "",
+    farm_name: "",
+    collection_point_address: "",
+    delivery_schedule: [] as string[],
+  });
+
+  const [farmProfile, setFarmProfile] = useState({
+    farm_name: "",
+    description: "",
+    location: "",
+  });
+
+  const daysOfWeek = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+
+  useEffect(() => {
+    loadProfile();
+    checkIfLeadFarmer();
+  }, []);
+
+  const checkIfLeadFarmer = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("role", "lead_farmer")
+      .single();
+
+    setIsLeadFarmer(!!data);
+  };
+
+  const loadProfile = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      navigate("/auth/farmer");
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single();
+
+    if (error) {
+      console.error("Error loading profile:", error);
+      return;
+    }
+
+    if (data) {
+      setProfile({
+        full_name: data.full_name || "",
+        email: data.email || "",
+        phone: data.phone || "",
+        farm_name: data.farm_name || "",
+        collection_point_address: data.collection_point_address || "",
+        delivery_schedule: data.delivery_schedule || [],
+      });
+    }
+
+    // Load farm profile
+    const { data: farmData } = await supabase
+      .from("farm_profiles")
+      .select("*")
+      .eq("farmer_id", user.id)
+      .single();
+
+    if (farmData) {
+      setFarmProfile({
+        farm_name: farmData.farm_name || "",
+        description: farmData.description || "",
+        location: farmData.location || "",
+      });
+    }
+  };
+
+  const handleSavePersonal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        full_name: profile.full_name,
+        phone: profile.phone,
+        farm_name: profile.farm_name,
+        collection_point_address: profile.collection_point_address,
+        delivery_schedule: profile.delivery_schedule,
+      })
+      .eq("id", user.id);
+
+    setIsLoading(false);
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update profile",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Success",
+        description: "Profile updated successfully",
+      });
+    }
+  };
+
+  const handleSaveFarmProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { error } = await supabase
+      .from("farm_profiles")
+      .upsert({
+        farmer_id: user.id,
+        farm_name: farmProfile.farm_name,
+        description: farmProfile.description,
+        location: farmProfile.location,
+      });
+
+    setIsLoading(false);
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update farm profile",
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Success",
+        description: "Farm profile updated successfully",
+      });
+    }
+  };
+
+  const toggleDeliveryDay = (day: string) => {
+    setProfile({
+      ...profile,
+      delivery_schedule: profile.delivery_schedule.includes(day)
+        ? profile.delivery_schedule.filter(d => d !== day)
+        : [...profile.delivery_schedule, day],
+    });
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-earth flex items-center justify-center p-4">
+      <div className="w-full max-w-2xl">
+        <Button
+          variant="ghost"
+          onClick={() => navigate("/farmer/dashboard")}
+          className="mb-6"
+        >
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back to Dashboard
+        </Button>
+
+        <Card className="border-2 shadow-large">
+          <CardHeader className="text-center space-y-2">
+            <div className="mx-auto h-14 w-14 rounded-full bg-earth/10 flex items-center justify-center mb-2">
+              <Sprout className="h-7 w-7 text-earth" />
+            </div>
+            <CardTitle className="text-2xl">Farmer Profile</CardTitle>
+            <CardDescription>
+              Manage your personal and farm information
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="personal" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="personal">Personal Info</TabsTrigger>
+                <TabsTrigger value="farm">Farm Profile</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="personal">
+                <form onSubmit={handleSavePersonal} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="full_name">Full Name</Label>
+                    <Input
+                      id="full_name"
+                      value={profile.full_name}
+                      onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email (Read-only)</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={profile.email}
+                      disabled
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Phone Number</Label>
+                    <Input
+                      id="phone"
+                      type="tel"
+                      value={profile.phone}
+                      onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                      placeholder="+1 (555) 000-0000"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="farm_name">Farm Name</Label>
+                    <Input
+                      id="farm_name"
+                      value={profile.farm_name}
+                      onChange={(e) => setProfile({ ...profile, farm_name: e.target.value })}
+                    />
+                  </div>
+
+                  {isLeadFarmer && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="collection_point_address">Collection Point Address</Label>
+                        <Input
+                          id="collection_point_address"
+                          value={profile.collection_point_address}
+                          onChange={(e) => setProfile({ ...profile, collection_point_address: e.target.value })}
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Delivery Days</Label>
+                        <div className="grid grid-cols-2 gap-3">
+                          {daysOfWeek.map((day) => (
+                            <div key={day} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={day}
+                                checked={profile.delivery_schedule.includes(day)}
+                                onCheckedChange={() => toggleDeliveryDay(day)}
+                              />
+                              <label
+                                htmlFor={day}
+                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 capitalize"
+                              >
+                                {day}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
+
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? "Saving..." : "Save Changes"}
+                  </Button>
+                </form>
+              </TabsContent>
+
+              <TabsContent value="farm">
+                <form onSubmit={handleSaveFarmProfile} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="farm_profile_name">Farm Name</Label>
+                    <Input
+                      id="farm_profile_name"
+                      value={farmProfile.farm_name}
+                      onChange={(e) => setFarmProfile({ ...farmProfile, farm_name: e.target.value })}
+                      placeholder="Your farm's public name"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="location">Location</Label>
+                    <Input
+                      id="location"
+                      value={farmProfile.location}
+                      onChange={(e) => setFarmProfile({ ...farmProfile, location: e.target.value })}
+                      placeholder="City, State"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="description">Farm Description</Label>
+                    <Textarea
+                      id="description"
+                      value={farmProfile.description}
+                      onChange={(e) => setFarmProfile({ ...farmProfile, description: e.target.value })}
+                      placeholder="Tell customers about your farm, practices, and what makes your produce special..."
+                      rows={5}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Farm Photos</Label>
+                    <div className="border-2 border-dashed rounded-lg p-8 text-center">
+                      <Upload className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground">
+                        Photo upload coming soon
+                      </p>
+                    </div>
+                  </div>
+
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? "Saving..." : "Save Farm Profile"}
+                  </Button>
+                </form>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+export default FarmerProfile;

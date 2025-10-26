@@ -12,6 +12,7 @@ import DriverAuth from "./pages/auth/DriverAuth";
 import FarmerAuth from "./pages/auth/FarmerAuth";
 import AdminAuth from "./pages/auth/AdminAuth";
 import Shop from "./pages/consumer/Shop";
+import Checkout from "./pages/consumer/Checkout";
 import DriverDashboard from "./pages/driver/Dashboard";
 import FarmerDashboard from "./pages/farmer/Dashboard";
 import AdminDashboard from "./pages/admin/Dashboard";
@@ -40,6 +41,11 @@ const App = () => (
           <Route path="/consumer/shop" element={
             <RoleGate roles={['consumer']}>
               <Shop />
+            </RoleGate>
+          } />
+          <Route path="/consumer/checkout" element={
+            <RoleGate roles={['consumer']}>
+              <Checkout />
             </RoleGate>
           } />
           <Route path="/consumer/orders" element={

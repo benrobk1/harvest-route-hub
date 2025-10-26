@@ -14,6 +14,155 @@ export type Database = {
   }
   public: {
     Tables: {
+      batch_stops: {
+        Row: {
+          actual_arrival: string | null
+          address: string
+          created_at: string
+          delivery_batch_id: string
+          estimated_arrival: string | null
+          id: string
+          latitude: number | null
+          longitude: number | null
+          notes: string | null
+          order_id: string
+          sequence_number: number
+          status: string
+        }
+        Insert: {
+          actual_arrival?: string | null
+          address: string
+          created_at?: string
+          delivery_batch_id: string
+          estimated_arrival?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          notes?: string | null
+          order_id: string
+          sequence_number: number
+          status?: string
+        }
+        Update: {
+          actual_arrival?: string | null
+          address?: string
+          created_at?: string
+          delivery_batch_id?: string
+          estimated_arrival?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          notes?: string | null
+          order_id?: string
+          sequence_number?: number
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batch_stops_delivery_batch_id_fkey"
+            columns: ["delivery_batch_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_stops_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      cart_items: {
+        Row: {
+          cart_id: string
+          created_at: string
+          id: string
+          product_id: string
+          quantity: number
+          unit_price: number
+          updated_at: string
+        }
+        Insert: {
+          cart_id: string
+          created_at?: string
+          id?: string
+          product_id: string
+          quantity: number
+          unit_price: number
+          updated_at?: string
+        }
+        Update: {
+          cart_id?: string
+          created_at?: string
+          id?: string
+          product_id?: string
+          quantity?: number
+          unit_price?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cart_items_cart_id_fkey"
+            columns: ["cart_id"]
+            isOneToOne: false
+            referencedRelation: "shopping_carts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cart_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      credits_ledger: {
+        Row: {
+          amount: number
+          balance_after: number
+          consumer_id: string
+          created_at: string
+          description: string
+          expires_at: string | null
+          id: string
+          order_id: string | null
+          transaction_type: string
+        }
+        Insert: {
+          amount: number
+          balance_after: number
+          consumer_id: string
+          created_at?: string
+          description: string
+          expires_at?: string | null
+          id?: string
+          order_id?: string | null
+          transaction_type: string
+        }
+        Update: {
+          amount?: number
+          balance_after?: number
+          consumer_id?: string
+          created_at?: string
+          description?: string
+          expires_at?: string | null
+          id?: string
+          order_id?: string | null
+          transaction_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credits_ledger_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delivery_batches: {
         Row: {
           batch_number: number
@@ -64,6 +213,50 @@ export type Database = {
             columns: ["lead_farmer_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_proofs: {
+        Row: {
+          batch_stop_id: string
+          created_at: string
+          delivered_at: string
+          driver_id: string
+          id: string
+          notes: string | null
+          photo_url: string | null
+          recipient_name: string | null
+          signature_url: string | null
+        }
+        Insert: {
+          batch_stop_id: string
+          created_at?: string
+          delivered_at?: string
+          driver_id: string
+          id?: string
+          notes?: string | null
+          photo_url?: string | null
+          recipient_name?: string | null
+          signature_url?: string | null
+        }
+        Update: {
+          batch_stop_id?: string
+          created_at?: string
+          delivered_at?: string
+          driver_id?: string
+          id?: string
+          notes?: string | null
+          photo_url?: string | null
+          recipient_name?: string | null
+          signature_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_proofs_batch_stop_id_fkey"
+            columns: ["batch_stop_id"]
+            isOneToOne: false
+            referencedRelation: "batch_stops"
             referencedColumns: ["id"]
           },
         ]
@@ -137,6 +330,90 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      inventory_reservations: {
+        Row: {
+          consumer_id: string
+          created_at: string
+          expires_at: string
+          id: string
+          order_id: string | null
+          product_id: string
+          quantity: number
+          status: string
+        }
+        Insert: {
+          consumer_id: string
+          created_at?: string
+          expires_at: string
+          id?: string
+          order_id?: string | null
+          product_id: string
+          quantity: number
+          status?: string
+        }
+        Update: {
+          consumer_id?: string
+          created_at?: string
+          expires_at?: string
+          id?: string
+          order_id?: string | null
+          product_id?: string
+          quantity?: number
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_reservations_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_reservations_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      market_configs: {
+        Row: {
+          active: boolean
+          created_at: string
+          cutoff_time: string
+          delivery_days: string[]
+          delivery_fee: number
+          id: string
+          minimum_order: number
+          updated_at: string
+          zip_code: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          cutoff_time?: string
+          delivery_days: string[]
+          delivery_fee: number
+          id?: string
+          minimum_order?: number
+          updated_at?: string
+          zip_code: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          cutoff_time?: string
+          delivery_days?: string[]
+          delivery_fee?: number
+          id?: string
+          minimum_order?: number
+          updated_at?: string
+          zip_code?: string
+        }
+        Relationships: []
       }
       order_items: {
         Row: {
@@ -399,6 +676,65 @@ export type Database = {
             columns: ["driver_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shopping_carts: {
+        Row: {
+          consumer_id: string
+          created_at: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          consumer_id: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          consumer_id?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      transaction_fees: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string | null
+          fee_type: string
+          id: string
+          order_id: string
+          recipient_id: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description?: string | null
+          fee_type: string
+          id?: string
+          order_id: string
+          recipient_id?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string | null
+          fee_type?: string
+          id?: string
+          order_id?: string
+          recipient_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_fees_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
             referencedColumns: ["id"]
           },
         ]

@@ -14,16 +14,431 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      delivery_batches: {
+        Row: {
+          batch_number: number
+          created_at: string | null
+          delivery_date: string
+          driver_id: string | null
+          estimated_duration_minutes: number | null
+          id: string
+          lead_farmer_id: string
+          status: string | null
+          updated_at: string | null
+          zip_codes: string[] | null
+        }
+        Insert: {
+          batch_number: number
+          created_at?: string | null
+          delivery_date: string
+          driver_id?: string | null
+          estimated_duration_minutes?: number | null
+          id?: string
+          lead_farmer_id: string
+          status?: string | null
+          updated_at?: string | null
+          zip_codes?: string[] | null
+        }
+        Update: {
+          batch_number?: number
+          created_at?: string | null
+          delivery_date?: string
+          driver_id?: string | null
+          estimated_duration_minutes?: number | null
+          id?: string
+          lead_farmer_id?: string
+          status?: string | null
+          updated_at?: string | null
+          zip_codes?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_batches_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_batches_lead_farmer_id_fkey"
+            columns: ["lead_farmer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      farm_photos: {
+        Row: {
+          created_at: string | null
+          display_order: number | null
+          farm_profile_id: string
+          id: string
+          photo_url: string
+        }
+        Insert: {
+          created_at?: string | null
+          display_order?: number | null
+          farm_profile_id: string
+          id?: string
+          photo_url: string
+        }
+        Update: {
+          created_at?: string | null
+          display_order?: number | null
+          farm_profile_id?: string
+          id?: string
+          photo_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "farm_photos_farm_profile_id_fkey"
+            columns: ["farm_profile_id"]
+            isOneToOne: false
+            referencedRelation: "farm_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      farm_profiles: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          farm_name: string
+          farmer_id: string
+          id: string
+          location: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          farm_name: string
+          farmer_id: string
+          id?: string
+          location?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          farm_name?: string
+          farmer_id?: string
+          id?: string
+          location?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "farm_profiles_farmer_id_fkey"
+            columns: ["farmer_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_items: {
+        Row: {
+          created_at: string | null
+          id: string
+          order_id: string
+          product_id: string
+          quantity: number
+          subtotal: number
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          order_id: string
+          product_id: string
+          quantity: number
+          subtotal: number
+          unit_price: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          order_id?: string
+          product_id?: string
+          quantity?: number
+          subtotal?: number
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orders: {
+        Row: {
+          consumer_id: string
+          created_at: string | null
+          delivery_batch_id: string | null
+          delivery_date: string
+          id: string
+          status: string | null
+          total_amount: number
+          updated_at: string | null
+        }
+        Insert: {
+          consumer_id: string
+          created_at?: string | null
+          delivery_batch_id?: string | null
+          delivery_date: string
+          id?: string
+          status?: string | null
+          total_amount: number
+          updated_at?: string | null
+        }
+        Update: {
+          consumer_id?: string
+          created_at?: string | null
+          delivery_batch_id?: string | null
+          delivery_date?: string
+          id?: string
+          status?: string | null
+          total_amount?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_delivery_batch"
+            columns: ["delivery_batch_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_consumer_id_fkey"
+            columns: ["consumer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      products: {
+        Row: {
+          available_quantity: number | null
+          created_at: string | null
+          description: string | null
+          farm_profile_id: string
+          id: string
+          image_url: string | null
+          name: string
+          price: number
+          unit: string
+          updated_at: string | null
+        }
+        Insert: {
+          available_quantity?: number | null
+          created_at?: string | null
+          description?: string | null
+          farm_profile_id: string
+          id?: string
+          image_url?: string | null
+          name: string
+          price: number
+          unit: string
+          updated_at?: string | null
+        }
+        Update: {
+          available_quantity?: number | null
+          created_at?: string | null
+          description?: string | null
+          farm_profile_id?: string
+          id?: string
+          image_url?: string | null
+          name?: string
+          price?: number
+          unit?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_farm_profile_id_fkey"
+            columns: ["farm_profile_id"]
+            isOneToOne: false
+            referencedRelation: "farm_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          collection_point_address: string | null
+          collection_point_lead_farmer_id: string | null
+          commission_rate: number | null
+          created_at: string | null
+          delivery_address: string | null
+          delivery_days: string[] | null
+          delivery_schedule: string[] | null
+          email: string
+          farm_name: string | null
+          full_name: string | null
+          id: string
+          license_number: string | null
+          payment_setup_complete: boolean | null
+          phone: string | null
+          updated_at: string | null
+          vehicle_make: string | null
+          vehicle_type: string | null
+          vehicle_year: string | null
+          zip_code: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          collection_point_address?: string | null
+          collection_point_lead_farmer_id?: string | null
+          commission_rate?: number | null
+          created_at?: string | null
+          delivery_address?: string | null
+          delivery_days?: string[] | null
+          delivery_schedule?: string[] | null
+          email: string
+          farm_name?: string | null
+          full_name?: string | null
+          id: string
+          license_number?: string | null
+          payment_setup_complete?: boolean | null
+          phone?: string | null
+          updated_at?: string | null
+          vehicle_make?: string | null
+          vehicle_type?: string | null
+          vehicle_year?: string | null
+          zip_code?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          collection_point_address?: string | null
+          collection_point_lead_farmer_id?: string | null
+          commission_rate?: number | null
+          created_at?: string | null
+          delivery_address?: string | null
+          delivery_days?: string[] | null
+          delivery_schedule?: string[] | null
+          email?: string
+          farm_name?: string | null
+          full_name?: string | null
+          id?: string
+          license_number?: string | null
+          payment_setup_complete?: boolean | null
+          phone?: string | null
+          updated_at?: string | null
+          vehicle_make?: string | null
+          vehicle_type?: string | null
+          vehicle_year?: string | null
+          zip_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_collection_point_lead_farmer_id_fkey"
+            columns: ["collection_point_lead_farmer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      routes: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          delivery_batch_id: string
+          driver_id: string
+          id: string
+          route_data: Json | null
+          started_at: string | null
+          status: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          delivery_batch_id: string
+          driver_id: string
+          id?: string
+          route_data?: Json | null
+          started_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          delivery_batch_id?: string
+          driver_id?: string
+          id?: string
+          route_data?: Json | null
+          started_at?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "routes_delivery_batch_id_fkey"
+            columns: ["delivery_batch_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "routes_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "consumer" | "farmer" | "lead_farmer" | "driver" | "admin"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +565,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["consumer", "farmer", "lead_farmer", "driver", "admin"],
+    },
   },
 } as const

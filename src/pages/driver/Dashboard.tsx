@@ -11,7 +11,7 @@ import { formatMoney } from "@/lib/formatMoney";
 const DriverDashboard = () => {
   const { user } = useAuth();
 
-  // Fetch earnings from delivery fees
+  // Fetch earnings from delivery fees and tips
   const { data: earnings, isLoading: earningsLoading } = useQuery({
     queryKey: ['driver-earnings', user?.id],
     queryFn: async () => {
@@ -20,48 +20,59 @@ const DriverDashboard = () => {
       const weekStart = new Date(now.setDate(now.getDate() - 7)).toISOString();
       const monthStart = new Date(now.setDate(now.getDate() - 30)).toISOString();
 
-      // Get delivery fees from batches
-      const { data: todayBatches } = await supabase
-        .from('delivery_batches')
-        .select('id')
-        .eq('driver_id', user?.id)
+      // Get payouts for driver (includes delivery fees + tips)
+      const { data: todayPayouts } = await supabase
+        .from('payouts')
+        .select('amount, description')
+        .eq('recipient_id', user?.id)
+        .eq('recipient_type', 'driver')
         .gte('created_at', todayStart);
 
-      const { data: weekBatches } = await supabase
-        .from('delivery_batches')
-        .select('id')
-        .eq('driver_id', user?.id)
+      const { data: weekPayouts } = await supabase
+        .from('payouts')
+        .select('amount, description')
+        .eq('recipient_id', user?.id)
+        .eq('recipient_type', 'driver')
         .gte('created_at', weekStart);
 
-      const { data: monthBatches } = await supabase
-        .from('delivery_batches')
-        .select('id')
-        .eq('driver_id', user?.id)
+      const { data: monthPayouts } = await supabase
+        .from('payouts')
+        .select('amount, description')
+        .eq('recipient_id', user?.id)
+        .eq('recipient_type', 'driver')
         .gte('created_at', monthStart);
 
-      // Get transaction fees for delivery
-      const { data: todayFees } = await supabase
-        .from('transaction_fees')
-        .select('amount')
-        .eq('fee_type', 'delivery_fee')
-        .in('order_id', todayBatches?.map(b => b.id) || []);
+      // Get orders with tips for driver
+      const { data: todayOrders } = await supabase
+        .from('orders')
+        .select('tip_amount, delivery_batches!inner(driver_id)')
+        .eq('delivery_batches.driver_id', user?.id)
+        .gte('created_at', todayStart);
 
-      const { data: weekFees } = await supabase
-        .from('transaction_fees')
-        .select('amount')
-        .eq('fee_type', 'delivery_fee')
-        .in('order_id', weekBatches?.map(b => b.id) || []);
+      const { data: weekOrders } = await supabase
+        .from('orders')
+        .select('tip_amount, delivery_batches!inner(driver_id)')
+        .eq('delivery_batches.driver_id', user?.id)
+        .gte('created_at', weekStart);
 
-      const { data: monthFees } = await supabase
-        .from('transaction_fees')
-        .select('amount')
-        .eq('fee_type', 'delivery_fee')
-        .in('order_id', monthBatches?.map(b => b.id) || []);
+      const { data: monthOrders } = await supabase
+        .from('orders')
+        .select('tip_amount, delivery_batches!inner(driver_id)')
+        .eq('delivery_batches.driver_id', user?.id)
+        .gte('created_at', monthStart);
+
+      const todayTips = todayOrders?.reduce((sum, o) => sum + Number(o.tip_amount || 0), 0) || 0;
+      const weekTips = weekOrders?.reduce((sum, o) => sum + Number(o.tip_amount || 0), 0) || 0;
+      const monthTips = monthOrders?.reduce((sum, o) => sum + Number(o.tip_amount || 0), 0) || 0;
+
+      const todayTotal = todayPayouts?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+      const weekTotal = weekPayouts?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+      const monthTotal = monthPayouts?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
 
       return {
-        today: todayFees?.reduce((sum, f) => sum + Number(f.amount), 0) || 0,
-        week: weekFees?.reduce((sum, f) => sum + Number(f.amount), 0) || 0,
-        month: monthFees?.reduce((sum, f) => sum + Number(f.amount), 0) || 0,
+        today: { total: todayTotal, tips: todayTips, deliveryFees: todayTotal - todayTips },
+        week: { total: weekTotal, tips: weekTips, deliveryFees: weekTotal - weekTips },
+        month: { total: monthTotal, tips: monthTips, deliveryFees: monthTotal - monthTips },
       };
     },
     enabled: !!user?.id,
@@ -153,8 +164,10 @@ const DriverDashboard = () => {
                 <Skeleton className="h-10 w-24" />
               ) : (
                 <>
-                  <div className="text-3xl font-bold text-foreground">{formatMoney(earnings?.today || 0)}</div>
-                  <p className="text-xs text-muted-foreground mt-1">100% of delivery fees + tips</p>
+                  <div className="text-3xl font-bold text-foreground">{formatMoney(earnings?.today.total || 0)}</div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Delivery: {formatMoney(earnings?.today.deliveryFees || 0)} + Tips: {formatMoney(earnings?.today.tips || 0)}
+                  </p>
                 </>
               )}
             </CardContent>
@@ -171,7 +184,10 @@ const DriverDashboard = () => {
               {earningsLoading ? (
                 <Skeleton className="h-10 w-24" />
               ) : (
-                <div className="text-3xl font-bold text-foreground">{formatMoney(earnings?.week || 0)}</div>
+                <>
+                  <div className="text-3xl font-bold text-foreground">{formatMoney(earnings?.week.total || 0)}</div>
+                  <p className="text-xs text-muted-foreground mt-1">Including {formatMoney(earnings?.week.tips || 0)} in tips</p>
+                </>
               )}
             </CardContent>
           </Card>
@@ -188,8 +204,10 @@ const DriverDashboard = () => {
                 <Skeleton className="h-10 w-24" />
               ) : (
                 <>
-                  <div className="text-3xl font-bold text-foreground">{formatMoney(earnings?.month || 0)}</div>
-                  <p className="text-xs text-muted-foreground mt-1">{stats?.deliveries || 0} deliveries today</p>
+                  <div className="text-3xl font-bold text-foreground">{formatMoney(earnings?.month.total || 0)}</div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {stats?.deliveries || 0} deliveries | {formatMoney(earnings?.month.tips || 0)} tips
+                  </p>
                 </>
               )}
             </CardContent>

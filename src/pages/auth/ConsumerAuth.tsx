@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ShoppingBag } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,8 +15,17 @@ const passwordSchema = z.string().min(6, "Password must be at least 6 characters
 
 const ConsumerAuth = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [referralCode, setReferralCode] = useState(searchParams.get('ref') || '');
+
+  useEffect(() => {
+    const refParam = searchParams.get('ref');
+    if (refParam) {
+      setReferralCode(refParam);
+    }
+  }, [searchParams]);
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -64,6 +73,7 @@ const ConsumerAuth = () => {
     const phone = formData.get("phone") as string;
     const address = formData.get("address") as string;
     const zipCode = formData.get("zipCode") as string;
+    const referralCodeInput = formData.get("referralCode") as string;
 
     try {
       emailSchema.parse(email);
@@ -92,6 +102,27 @@ const ConsumerAuth = () => {
           .insert({ user_id: data.user.id, role: 'consumer' });
 
         if (roleError) throw roleError;
+
+        // Process referral code if provided
+        if (referralCodeInput) {
+          // Find referrer by code
+          const { data: referrerProfile } = await supabase
+            .from('profiles')
+            .select('id')
+            .eq('referral_code', referralCodeInput.toUpperCase())
+            .single();
+
+          if (referrerProfile) {
+            // Create referral record
+            await supabase
+              .from('referrals')
+              .insert({
+                referrer_id: referrerProfile.id,
+                referee_id: data.user.id,
+                status: 'pending'
+              });
+          }
+        }
       }
 
       toast({
@@ -176,6 +207,20 @@ const ConsumerAuth = () => {
                   <div className="space-y-2">
                     <Label htmlFor="zipCode">ZIP Code</Label>
                     <Input id="zipCode" name="zipCode" placeholder="10001" required maxLength={5} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="referralCode">Referral Code (Optional)</Label>
+                    <Input 
+                      id="referralCode" 
+                      name="referralCode" 
+                      placeholder="BH12345678" 
+                      value={referralCode}
+                      onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                      maxLength={10}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Enter a friend's referral code and they'll get $25 credit when you complete your first order
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="signupPassword">Password</Label>

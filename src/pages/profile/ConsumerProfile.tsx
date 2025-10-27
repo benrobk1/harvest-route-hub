@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SubscriptionManager } from "@/components/consumer/SubscriptionManager";
+import { ReferralManager } from "@/components/consumer/ReferralManager";
 
 const ConsumerProfile = () => {
   const navigate = useNavigate();
@@ -116,6 +117,9 @@ const ConsumerProfile = () => {
 
         {/* Subscription Manager */}
         <SubscriptionManager />
+
+        {/* Referral Manager */}
+        <ReferralManager />
 
         {/* Profile Card */}
         <Card className="border-2 shadow-large">

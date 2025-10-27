@@ -551,6 +551,7 @@ export type Database = {
           delivery_date: string
           id: string
           status: string | null
+          tip_amount: number
           total_amount: number
           updated_at: string | null
         }
@@ -561,6 +562,7 @@ export type Database = {
           delivery_date: string
           id?: string
           status?: string | null
+          tip_amount?: number
           total_amount: number
           updated_at?: string | null
         }
@@ -571,6 +573,7 @@ export type Database = {
           delivery_date?: string
           id?: string
           status?: string | null
+          tip_amount?: number
           total_amount?: number
           updated_at?: string | null
         }
@@ -765,6 +768,7 @@ export type Database = {
           payment_setup_complete: boolean | null
           phone: string | null
           privacy_accepted_at: string | null
+          referral_code: string | null
           rejected_reason: string | null
           stripe_charges_enabled: boolean | null
           stripe_connect_account_id: string | null
@@ -800,6 +804,7 @@ export type Database = {
           payment_setup_complete?: boolean | null
           phone?: string | null
           privacy_accepted_at?: string | null
+          referral_code?: string | null
           rejected_reason?: string | null
           stripe_charges_enabled?: boolean | null
           stripe_connect_account_id?: string | null
@@ -835,6 +840,7 @@ export type Database = {
           payment_setup_complete?: boolean | null
           phone?: string | null
           privacy_accepted_at?: string | null
+          referral_code?: string | null
           rejected_reason?: string | null
           stripe_charges_enabled?: boolean | null
           stripe_connect_account_id?: string | null
@@ -856,6 +862,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      referrals: {
+        Row: {
+          created_at: string
+          credit_amount: number
+          credited_at: string | null
+          id: string
+          referee_first_order_id: string | null
+          referee_id: string
+          referrer_id: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          credit_amount?: number
+          credited_at?: string | null
+          id?: string
+          referee_first_order_id?: string | null
+          referee_id: string
+          referrer_id: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          credit_amount?: number
+          credited_at?: string | null
+          id?: string
+          referee_first_order_id?: string | null
+          referee_id?: string
+          referrer_id?: string
+          status?: string
+        }
+        Relationships: []
       }
       routes: {
         Row: {
@@ -1041,6 +1080,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_referral_code: { Args: never; Returns: string }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

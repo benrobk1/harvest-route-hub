@@ -12,6 +12,7 @@ interface CheckoutRequest {
   delivery_date: string;
   use_credits: boolean;
   payment_method_id?: string;
+  tip_amount?: number;
 }
 
 serve(async (req) => {
@@ -37,9 +38,9 @@ serve(async (req) => {
       });
     }
 
-    const { cart_id, delivery_date, use_credits, payment_method_id }: CheckoutRequest = await req.json();
+    const { cart_id, delivery_date, use_credits, payment_method_id, tip_amount }: CheckoutRequest = await req.json();
 
-    console.log('Checkout request:', { user_id: user.id, cart_id, delivery_date, use_credits, has_payment_method: !!payment_method_id });
+    console.log('Checkout request:', { user_id: user.id, cart_id, delivery_date, use_credits, has_payment_method: !!payment_method_id, tip_amount });
 
     // Initialize Stripe
     const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
@@ -241,7 +242,8 @@ serve(async (req) => {
     const platformFeeRate = 0.10; // 10%
     const platformFee = subtotal * platformFeeRate;
     const deliveryFee = parseFloat(marketConfig.delivery_fee.toString());
-    const totalBeforeCredits = subtotal + platformFee + deliveryFee;
+    const tipAmountValue = tip_amount || 0;
+    const totalBeforeCredits = subtotal + platformFee + deliveryFee + tipAmountValue;
 
     // 10. Handle credits
     let creditsUsed = 0;
@@ -260,7 +262,7 @@ serve(async (req) => {
 
     const totalAmount = totalBeforeCredits - creditsUsed;
 
-    console.log('Payment breakdown:', { subtotal, platformFee, deliveryFee, totalBeforeCredits, creditsUsed, totalAmount });
+    console.log('Payment breakdown:', { subtotal, platformFee, deliveryFee, tipAmount: tipAmountValue, totalBeforeCredits, creditsUsed, totalAmount });
 
     // 11. Validate minimum order
     if (subtotal < parseFloat(marketConfig.minimum_order.toString())) {
@@ -368,6 +370,7 @@ serve(async (req) => {
         consumer_id: user.id,
         delivery_date,
         total_amount: totalAmount,
+        tip_amount: tipAmountValue,
         status: paymentStatus === 'paid' ? 'confirmed' : 'pending'
       })
       .select()
@@ -575,6 +578,69 @@ serve(async (req) => {
       }
     }
 
+    // Process referral credits for first order
+    const { data: existingOrders } = await supabaseClient
+      .from('orders')
+      .select('id')
+      .eq('consumer_id', user.id)
+      .neq('id', order.id)
+      .limit(1);
+
+    const isFirstOrder = !existingOrders || existingOrders.length === 0;
+
+    if (isFirstOrder) {
+      console.log('First order detected, checking for referrals...');
+      
+      // Check if user was referred
+      const { data: referral } = await supabaseClient
+        .from('referrals')
+        .select('*')
+        .eq('referee_id', user.id)
+        .eq('status', 'pending')
+        .single();
+
+      if (referral) {
+        console.log('Referral found, awarding credit to referrer:', referral.referrer_id);
+        
+        // Award credit to referrer
+        const { data: referrerLatestCredit } = await supabaseClient
+          .from('credits_ledger')
+          .select('balance_after')
+          .eq('consumer_id', referral.referrer_id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        const referrerCurrentBalance = referrerLatestCredit?.balance_after || 0;
+        const creditAmount = 25; // $25 referral credit
+        const expirationDate = new Date();
+        expirationDate.setMonth(expirationDate.getMonth() + 6);
+
+        await supabaseClient
+          .from('credits_ledger')
+          .insert({
+            consumer_id: referral.referrer_id,
+            transaction_type: 'earned',
+            amount: creditAmount,
+            balance_after: referrerCurrentBalance + creditAmount,
+            description: `Referral credit: friend completed first order`,
+            expires_at: expirationDate.toISOString()
+          });
+
+        // Update referral status
+        await supabaseClient
+          .from('referrals')
+          .update({
+            status: 'completed',
+            credited_at: new Date().toISOString(),
+            referee_first_order_id: order.id
+          })
+          .eq('id', referral.id);
+
+        console.log(`Awarded $${creditAmount} referral credit to ${referral.referrer_id}`);
+      }
+    }
+
     // 16. Create payout records for Stripe Connect
     if (paymentStatus === 'paid') {
       console.log('Creating payout records...');
@@ -635,14 +701,15 @@ serve(async (req) => {
         description: '10% platform fee'
       });
 
-      // Delivery fee (will be paid to driver later when assigned)
+      // Delivery fee + tip (will be paid to driver later when assigned)
+      const driverTotal = deliveryFee + tipAmountValue;
       payoutInserts.push({
         order_id: order.id,
         recipient_id: null,
         recipient_type: 'driver',
-        amount: deliveryFee,
+        amount: driverTotal,
         status: 'pending',
-        description: 'Delivery fee (to be assigned to driver)'
+        description: `Delivery fee${tipAmountValue > 0 ? ' + $' + tipAmountValue.toFixed(2) + ' tip' : ''} (to be assigned to driver)`
       });
 
       const { error: payoutsError } = await supabaseClient

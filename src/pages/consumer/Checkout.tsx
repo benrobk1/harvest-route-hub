@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Calendar, CreditCard, MapPin, Coins } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { ArrowLeft, Calendar, CreditCard, MapPin, Coins, DollarSign } from "lucide-react";
 import { useCart } from "@/hooks/useCart";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -29,6 +30,8 @@ const Checkout = () => {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
+  const [tipPercentage, setTipPercentage] = useState<number>(0);
+  const [customTip, setCustomTip] = useState<string>("");
 
   const { data: profile } = useQuery({
     queryKey: ['profile', user?.id],
@@ -94,9 +97,15 @@ const Checkout = () => {
   const deliveryFee = marketConfig?.delivery_fee || 7.50;
   const platformFee = cartTotal * 0.10; // 10% platform fee
   const subtotal = cartTotal;
+  
+  // Calculate tip
+  const tipAmount = tipPercentage > 0 
+    ? (subtotal * tipPercentage / 100) 
+    : (customTip ? parseFloat(customTip) || 0 : 0);
+  
   const availableCreditsAmount = credits || 0;
-  const creditsToUse = useCredits ? Math.min(availableCreditsAmount, subtotal + deliveryFee) : 0;
-  const total = Math.max(0, subtotal + deliveryFee - creditsToUse);
+  const creditsToUse = useCredits ? Math.min(availableCreditsAmount, subtotal + deliveryFee + tipAmount) : 0;
+  const total = Math.max(0, subtotal + deliveryFee + tipAmount - creditsToUse);
 
   const createOrder = useMutation({
     mutationFn: async () => {
@@ -111,6 +120,7 @@ const Checkout = () => {
           delivery_date: selectedDate,
           use_credits: useCredits,
           credits_amount: creditsToUse,
+          tip_amount: tipAmount,
         },
       });
 
@@ -244,6 +254,76 @@ const Checkout = () => {
               </CardContent>
             </Card>
 
+            {/* Driver Tip */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <DollarSign className="h-5 w-5" />
+                  Driver Tip (Optional)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  100% of your tip goes directly to your delivery driver
+                </p>
+                
+                {/* Preset Tip Percentages */}
+                <div className="grid grid-cols-4 gap-2">
+                  {[10, 15, 20].map((percent) => (
+                    <Button
+                      key={percent}
+                      variant={tipPercentage === percent ? "default" : "outline"}
+                      onClick={() => {
+                        setTipPercentage(percent);
+                        setCustomTip("");
+                      }}
+                      className="w-full"
+                    >
+                      {percent}%
+                    </Button>
+                  ))}
+                  <Button
+                    variant={customTip ? "default" : "outline"}
+                    onClick={() => {
+                      setTipPercentage(0);
+                      setCustomTip("0");
+                    }}
+                  >
+                    Custom
+                  </Button>
+                </div>
+
+                {/* Custom Tip Input */}
+                {(tipPercentage === 0 || customTip) && (
+                  <div className="space-y-2">
+                    <Label htmlFor="custom-tip">Custom Tip Amount</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                      <Input
+                        id="custom-tip"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        value={customTip}
+                        onChange={(e) => {
+                          setCustomTip(e.target.value);
+                          setTipPercentage(0);
+                        }}
+                        className="pl-7"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {tipAmount > 0 && (
+                  <p className="text-sm font-medium text-primary">
+                    Tip: {formatMoney(tipAmount)}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
             {/* Payment Method */}
             <Card>
               <CardHeader>
@@ -330,6 +410,12 @@ const Checkout = () => {
                     <span>Delivery Fee</span>
                     <span>{formatMoney(deliveryFee)}</span>
                   </div>
+                  {tipAmount > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span>Driver Tip</span>
+                      <span>{formatMoney(tipAmount)}</span>
+                    </div>
+                  )}
                   {useCredits && creditsToUse > 0 && (
                     <div className="flex justify-between text-sm text-green-600">
                       <span className="flex items-center gap-2">

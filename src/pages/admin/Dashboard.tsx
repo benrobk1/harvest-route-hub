@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from "date-fns";
 import { Link } from "react-router-dom";
+import { CreditsManager } from "@/components/admin/CreditsManager";
 
 const AdminDashboard = () => {
   // Fetch metrics
@@ -348,6 +349,11 @@ const AdminDashboard = () => {
               </div>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Credits Management Section */}
+        <div className="mt-8">
+          <CreditsManager />
         </div>
       </main>
     </div>

@@ -14,10 +14,12 @@ export const SubscriptionManager = () => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubscribe = async () => {
+  const handleSubscribe = async (enableTrial: boolean = false) => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase.functions.invoke('create-subscription-checkout');
+      const { data, error } = await supabase.functions.invoke('create-subscription-checkout', {
+        body: { enable_trial: enableTrial }
+      });
       
       if (error) throw error;
       
@@ -82,17 +84,39 @@ export const SubscriptionManager = () => {
                 <li>Track your monthly spending progress</li>
               </ul>
             </div>
-            <Button 
-              onClick={handleSubscribe} 
-              disabled={isLoading}
-              className="w-full"
-              size="lg"
-            >
-              {isLoading ? "Loading..." : "Subscribe Now - $10/month"}
-            </Button>
+            <div className="space-y-2">
+              <Button 
+                onClick={() => handleSubscribe(true)} 
+                disabled={isLoading}
+                className="w-full"
+                size="lg"
+              >
+                {isLoading ? "Loading..." : "Start 2-Month Free Trial"}
+              </Button>
+              <Button 
+                onClick={() => handleSubscribe(false)} 
+                disabled={isLoading}
+                variant="outline"
+                className="w-full"
+                size="lg"
+              >
+                Subscribe Now - $10/month
+              </Button>
+            </div>
           </div>
         ) : (
           <div className="space-y-4">
+            {subscriptionStatus.is_trialing && subscriptionStatus.trial_end && (
+              <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">
+                  🎉 Free Trial Active
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Your trial ends on {new Date(subscriptionStatus.trial_end).toLocaleDateString()}
+                </p>
+              </div>
+            )}
+            
             <div className="bg-primary/5 border border-primary/20 p-4 rounded-lg space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium">Available Credits</span>

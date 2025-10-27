@@ -44,7 +44,12 @@ serve(async (req) => {
     }
     logStep("Stripe customer check", { customerId });
 
-    const session = await stripe.checkout.sessions.create({
+    // Parse request body for trial configuration
+    const body = await req.json().catch(() => ({ enable_trial: false }));
+    const enableTrial = body.enable_trial || false;
+    
+    // Create checkout session with optional trial
+    const sessionConfig: any = {
       customer: customerId,
       customer_email: customerId ? undefined : user.email,
       line_items: [
@@ -56,7 +61,17 @@ serve(async (req) => {
       mode: "subscription",
       success_url: `${req.headers.get("origin")}/consumer/shop?subscription=success`,
       cancel_url: `${req.headers.get("origin")}/consumer/shop?subscription=cancelled`,
-    });
+    };
+
+    // Add 2-month trial if enabled
+    if (enableTrial) {
+      sessionConfig.subscription_data = {
+        trial_period_days: 60, // 2 months
+      };
+      logStep("Trial enabled", { trial_days: 60 });
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionConfig);
 
     logStep("Checkout session created", { sessionId: session.id, url: session.url });
 

@@ -8,6 +8,8 @@ type AppRole = 'admin' | 'farmer' | 'lead_farmer' | 'driver' | 'consumer';
 interface SubscriptionStatus {
   subscribed: boolean;
   subscription_end?: string;
+  is_trialing?: boolean;
+  trial_end?: string;
   monthly_spend: number;
   credits_available: number;
   progress_to_credit: number;

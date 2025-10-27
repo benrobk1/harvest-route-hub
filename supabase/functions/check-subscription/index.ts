@@ -78,11 +78,24 @@ serve(async (req) => {
     });
     const hasActiveSub = subscriptions.data.length > 0;
     let subscriptionEnd = null;
+    let trialEnd = null;
+    let isTrialing = false;
 
     if (hasActiveSub) {
       const subscription = subscriptions.data[0];
       subscriptionEnd = new Date(subscription.current_period_end * 1000).toISOString();
-      logStep("Active subscription found", { subscriptionId: subscription.id, endDate: subscriptionEnd });
+      isTrialing = subscription.status === 'trialing';
+      
+      if (subscription.trial_end) {
+        trialEnd = new Date(subscription.trial_end * 1000).toISOString();
+      }
+      
+      logStep("Active subscription found", { 
+        subscriptionId: subscription.id, 
+        endDate: subscriptionEnd,
+        isTrialing,
+        trialEnd
+      });
 
       // Update local subscription record
       await supabaseClient
@@ -91,9 +104,10 @@ serve(async (req) => {
           consumer_id: user.id,
           stripe_subscription_id: subscription.id,
           stripe_customer_id: customerId,
-          status: 'active',
+          status: isTrialing ? 'trialing' : 'active',
           current_period_start: new Date(subscription.current_period_start * 1000).toISOString(),
           current_period_end: subscriptionEnd,
+          trial_end: trialEnd,
           monthly_spend: localSub?.monthly_spend || 0,
           credits_earned: localSub?.credits_earned || 0,
         }, { onConflict: 'consumer_id' });
@@ -119,6 +133,8 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       subscribed: hasActiveSub,
       subscription_end: subscriptionEnd,
+      is_trialing: isTrialing,
+      trial_end: trialEnd,
       monthly_spend: monthlySpend,
       credits_available: creditsAvailable,
       progress_to_credit: progressToCredit,

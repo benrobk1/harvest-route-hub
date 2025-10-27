@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
+import Stripe from "https://esm.sh/stripe@18.5.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,6 +11,7 @@ interface CheckoutRequest {
   cart_id: string;
   delivery_date: string;
   use_credits: boolean;
+  payment_method_id?: string;
 }
 
 serve(async (req) => {
@@ -35,9 +37,14 @@ serve(async (req) => {
       });
     }
 
-    const { cart_id, delivery_date, use_credits }: CheckoutRequest = await req.json();
+    const { cart_id, delivery_date, use_credits, payment_method_id }: CheckoutRequest = await req.json();
 
-    console.log('Checkout request:', { user_id: user.id, cart_id, delivery_date, use_credits });
+    console.log('Checkout request:', { user_id: user.id, cart_id, delivery_date, use_credits, has_payment_method: !!payment_method_id });
+
+    // Initialize Stripe
+    const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
+      apiVersion: '2025-08-27.basil',
+    });
 
     // 1. Validate delivery address using Mapbox
     const { data: userProfile, error: profileFetchError } = await supabaseClient
@@ -253,6 +260,8 @@ serve(async (req) => {
 
     const totalAmount = totalBeforeCredits - creditsUsed;
 
+    console.log('Payment breakdown:', { subtotal, platformFee, deliveryFee, totalBeforeCredits, creditsUsed, totalAmount });
+
     // 11. Validate minimum order
     if (subtotal < parseFloat(marketConfig.minimum_order.toString())) {
       return new Response(JSON.stringify({ 
@@ -266,7 +275,90 @@ serve(async (req) => {
       });
     }
 
-    // 12. Create order with transaction
+    // 12. Process Stripe payment if amount > 0
+    let paymentIntent: Stripe.PaymentIntent | null = null;
+    let paymentStatus = 'pending';
+
+    if (totalAmount > 0) {
+      console.log('Processing Stripe payment...');
+
+      // Get or create Stripe customer
+      const customers = await stripe.customers.list({ email: user.email!, limit: 1 });
+      let customerId: string;
+
+      if (customers.data.length > 0) {
+        customerId = customers.data[0].id;
+        console.log('Found existing Stripe customer:', customerId);
+      } else {
+        const { data: profile } = await supabaseClient
+          .from('profiles')
+          .select('full_name, phone')
+          .eq('id', user.id)
+          .single();
+
+        const customer = await stripe.customers.create({
+          email: user.email!,
+          name: profile?.full_name || undefined,
+          phone: profile?.phone || undefined,
+          metadata: { supabase_user_id: user.id }
+        });
+        customerId = customer.id;
+        console.log('Created new Stripe customer:', customerId);
+      }
+
+      // Create payment intent
+      const paymentIntentParams: Stripe.PaymentIntentCreateParams = {
+        amount: Math.round(totalAmount * 100), // Convert to cents
+        currency: 'usd',
+        customer: customerId,
+        metadata: {
+          consumer_id: user.id,
+          delivery_date,
+          subtotal: subtotal.toFixed(2),
+          platform_fee: platformFee.toFixed(2),
+          delivery_fee: deliveryFee.toFixed(2),
+          credits_used: creditsUsed.toFixed(2)
+        },
+        automatic_payment_methods: {
+          enabled: true,
+        },
+      };
+
+      // If payment method provided, confirm immediately
+      if (payment_method_id) {
+        paymentIntentParams.payment_method = payment_method_id;
+        paymentIntentParams.confirm = true;
+        paymentIntentParams.return_url = `${req.headers.get('origin')}/consumer/order-tracking`;
+      }
+
+      try {
+        paymentIntent = await stripe.paymentIntents.create(paymentIntentParams);
+        console.log('Payment intent created:', paymentIntent.id, 'status:', paymentIntent.status);
+
+        // Update payment status based on intent status
+        if (paymentIntent.status === 'succeeded') {
+          paymentStatus = 'paid';
+        } else if (paymentIntent.status === 'requires_action') {
+          paymentStatus = 'requires_action';
+        }
+      } catch (stripeError: any) {
+        console.error('Stripe payment failed:', stripeError);
+        return new Response(JSON.stringify({
+          error: 'PAYMENT_FAILED',
+          message: stripeError.message,
+          decline_code: stripeError.decline_code
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    } else {
+      // Order fully covered by credits
+      paymentStatus = 'paid';
+      console.log('Order fully covered by credits');
+    }
+
+    // 13. Create order with transaction
     console.log('Creating order...');
     
     // Create order
@@ -276,17 +368,48 @@ serve(async (req) => {
         consumer_id: user.id,
         delivery_date,
         total_amount: totalAmount,
-        status: 'pending'
+        status: paymentStatus === 'paid' ? 'confirmed' : 'pending'
       })
       .select()
       .single();
 
     if (orderError || !order) {
       console.error('Order creation failed:', orderError);
+      // If payment was made, we should handle this carefully
+      if (paymentIntent && paymentIntent.status === 'succeeded') {
+        console.error('CRITICAL: Payment succeeded but order creation failed. Payment intent:', paymentIntent.id);
+        // Attempt to refund
+        try {
+          await stripe.refunds.create({ payment_intent: paymentIntent.id });
+          console.log('Refund initiated for failed order');
+        } catch (refundError) {
+          console.error('Refund also failed:', refundError);
+        }
+      }
       throw new Error('Failed to create order');
     }
 
     console.log('Order created:', order.id);
+
+    // Store payment intent record
+    if (paymentIntent) {
+      const { error: piError } = await supabaseClient
+        .from('payment_intents')
+        .insert({
+          stripe_payment_intent_id: paymentIntent.id,
+          order_id: order.id,
+          consumer_id: user.id,
+          amount: totalAmount,
+          status: paymentIntent.status,
+          payment_method: paymentIntent.payment_method as string || null,
+          client_secret: paymentIntent.client_secret,
+          metadata: paymentIntent.metadata
+        });
+
+      if (piError) {
+        console.error('Failed to store payment intent:', piError);
+      }
+    }
 
     // Create order items
     const orderItems = cartItems.map(item => {
@@ -392,7 +515,88 @@ serve(async (req) => {
       }
     }
 
-    // Clear cart
+    // 16. Create payout records for Stripe Connect
+    if (paymentStatus === 'paid') {
+      console.log('Creating payout records...');
+      
+      // Group items by farmer
+      const farmerPayouts = new Map<string, { farmerId: string; amount: number; items: any[] }>();
+      
+      for (const item of cartItems) {
+        const product = item.products as any;
+        const farmProfile = product.farm_profiles as any;
+        const farmerId = farmProfile.farmer_id;
+        const itemSubtotal = product.price * item.quantity;
+        const farmerShare = itemSubtotal * 0.90; // 90% to farmer
+        
+        if (farmerPayouts.has(farmerId)) {
+          const existing = farmerPayouts.get(farmerId)!;
+          existing.amount += farmerShare;
+          existing.items.push(item);
+        } else {
+          farmerPayouts.set(farmerId, {
+            farmerId,
+            amount: farmerShare,
+            items: [item]
+          });
+        }
+      }
+
+      // Create payout records
+      const payoutInserts = [];
+      
+      // Farmer payouts
+      for (const [farmerId, payout] of farmerPayouts.entries()) {
+        // Get farmer's Stripe Connect account
+        const { data: farmerProfile } = await supabaseClient
+          .from('profiles')
+          .select('stripe_connect_account_id, stripe_payouts_enabled')
+          .eq('id', farmerId)
+          .single();
+
+        payoutInserts.push({
+          order_id: order.id,
+          recipient_id: farmerId,
+          recipient_type: 'farmer',
+          amount: payout.amount,
+          stripe_connect_account_id: farmerProfile?.stripe_connect_account_id || null,
+          status: farmerProfile?.stripe_payouts_enabled ? 'pending' : 'pending',
+          description: `Farmer payout for ${payout.items.length} products (90% of subtotal)`
+        });
+      }
+
+      // Platform fee payout
+      payoutInserts.push({
+        order_id: order.id,
+        recipient_id: null,
+        recipient_type: 'platform',
+        amount: platformFee,
+        status: 'completed',
+        description: '10% platform fee'
+      });
+
+      // Delivery fee (will be paid to driver later when assigned)
+      payoutInserts.push({
+        order_id: order.id,
+        recipient_id: null,
+        recipient_type: 'driver',
+        amount: deliveryFee,
+        status: 'pending',
+        description: 'Delivery fee (to be assigned to driver)'
+      });
+
+      const { error: payoutsError } = await supabaseClient
+        .from('payouts')
+        .insert(payoutInserts);
+
+      if (payoutsError) {
+        console.error('Failed to create payout records:', payoutsError);
+      } else {
+        console.log(`Created ${payoutInserts.length} payout records`);
+      }
+    }
+
+    // 17. Clear cart
     const { error: clearError } = await supabaseClient
       .from('cart_items')
       .delete()
@@ -423,13 +627,23 @@ serve(async (req) => {
       console.error('Notification failed (non-blocking):', notifError);
     }
 
-    return new Response(JSON.stringify({
+    const response: any = {
       success: true,
       order_id: order.id,
       total_amount: totalAmount,
       credits_used: creditsUsed,
-      delivery_date
-    }), {
+      delivery_date,
+      payment_status: paymentStatus
+    };
+
+    // Include payment intent details if action required
+    if (paymentIntent && paymentIntent.status === 'requires_action') {
+      response.requires_action = true;
+      response.client_secret = paymentIntent.client_secret;
+      response.payment_intent_id = paymentIntent.id;
+    }
+
+    return new Response(JSON.stringify(response), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

@@ -508,6 +508,109 @@ export type Database = {
           },
         ]
       }
+      payment_intents: {
+        Row: {
+          amount: number
+          client_secret: string | null
+          consumer_id: string
+          created_at: string | null
+          currency: string | null
+          id: string
+          metadata: Json | null
+          order_id: string | null
+          payment_method: string | null
+          status: string
+          stripe_payment_intent_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount: number
+          client_secret?: string | null
+          consumer_id: string
+          created_at?: string | null
+          currency?: string | null
+          id?: string
+          metadata?: Json | null
+          order_id?: string | null
+          payment_method?: string | null
+          status: string
+          stripe_payment_intent_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          client_secret?: string | null
+          consumer_id?: string
+          created_at?: string | null
+          currency?: string | null
+          id?: string
+          metadata?: Json | null
+          order_id?: string | null
+          payment_method?: string | null
+          status?: string
+          stripe_payment_intent_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_intents_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payouts: {
+        Row: {
+          amount: number
+          completed_at: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          order_id: string
+          recipient_id: string
+          recipient_type: string
+          status: string
+          stripe_connect_account_id: string | null
+          stripe_transfer_id: string | null
+        }
+        Insert: {
+          amount: number
+          completed_at?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          order_id: string
+          recipient_id: string
+          recipient_type: string
+          status?: string
+          stripe_connect_account_id?: string | null
+          stripe_transfer_id?: string | null
+        }
+        Update: {
+          amount?: number
+          completed_at?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          order_id?: string
+          recipient_id?: string
+          recipient_type?: string
+          status?: string
+          stripe_connect_account_id?: string | null
+          stripe_transfer_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payouts_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           available_quantity: number | null
@@ -572,6 +675,10 @@ export type Database = {
           license_number: string | null
           payment_setup_complete: boolean | null
           phone: string | null
+          stripe_charges_enabled: boolean | null
+          stripe_connect_account_id: string | null
+          stripe_onboarding_complete: boolean | null
+          stripe_payouts_enabled: boolean | null
           updated_at: string | null
           vehicle_make: string | null
           vehicle_type: string | null
@@ -594,6 +701,10 @@ export type Database = {
           license_number?: string | null
           payment_setup_complete?: boolean | null
           phone?: string | null
+          stripe_charges_enabled?: boolean | null
+          stripe_connect_account_id?: string | null
+          stripe_onboarding_complete?: boolean | null
+          stripe_payouts_enabled?: boolean | null
           updated_at?: string | null
           vehicle_make?: string | null
           vehicle_type?: string | null
@@ -616,6 +727,10 @@ export type Database = {
           license_number?: string | null
           payment_setup_complete?: boolean | null
           phone?: string | null
+          stripe_charges_enabled?: boolean | null
+          stripe_connect_account_id?: string | null
+          stripe_onboarding_complete?: boolean | null
+          stripe_payouts_enabled?: boolean | null
           updated_at?: string | null
           vehicle_make?: string | null
           vehicle_type?: string | null

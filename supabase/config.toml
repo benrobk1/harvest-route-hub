@@ -11,3 +11,15 @@ verify_jwt = false
 
 [functions.send-cutoff-reminders]
 verify_jwt = false
+
+[functions.stripe-connect-onboard]
+verify_jwt = true
+
+[functions.check-stripe-connect]
+verify_jwt = true
+
+[functions.process-payouts]
+verify_jwt = false
+
+[functions.award-credits]
+verify_jwt = false

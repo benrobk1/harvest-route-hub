@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from "date-fns";
+import { Link } from "react-router-dom";
 
 const AdminDashboard = () => {
   // Fetch metrics
@@ -47,12 +48,19 @@ const AdminDashboard = () => {
         .select('*', { count: 'exact', head: true })
         .in('status', ['assigned', 'in_progress']);
 
+      // Count pending approvals
+      const { count: pendingApprovals } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .eq('approval_status', 'pending');
+
       return {
         consumers: consumers || 0,
         drivers: drivers || 0,
         farmers: farmers || 0,
         revenue,
         activeDeliveries: activeDeliveries || 0,
+        pendingApprovals: pendingApprovals || 0,
       };
     },
   });
@@ -123,6 +131,9 @@ const AdminDashboard = () => {
               </Button>
               <Button variant="outline" onClick={() => window.location.href = '/admin/products'}>
                 Product Approval
+              </Button>
+              <Button variant="outline" onClick={() => window.location.href = '/admin/approvals'}>
+                User Approvals
               </Button>
             </div>
           </div>
@@ -198,6 +209,25 @@ const AdminDashboard = () => {
               )}
             </CardContent>
           </Card>
+
+          <Link to="/admin/approvals">
+            <Card className="border-2 hover:shadow-md transition-shadow cursor-pointer">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">Pending Approvals</CardTitle>
+                <Users className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                {metricsLoading ? (
+                  <Skeleton className="h-10 w-24" />
+                ) : (
+                  <>
+                    <div className="text-3xl font-bold text-foreground">{metrics?.pendingApprovals || 0}</div>
+                    <p className="text-xs text-muted-foreground mt-1">Farmers & drivers awaiting approval</p>
+                  </>
+                )}
+              </CardContent>
+            </Card>
+          </Link>
         </div>
 
         {/* Live Delivery Tracking */}

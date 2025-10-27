@@ -10,6 +10,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StripeConnectButton } from "@/components/StripeConnectButton";
 import { PayoutsDashboard } from "@/components/PayoutsDashboard";
+import { DocumentUpload } from "@/components/DocumentUpload";
+import { Badge } from "@/components/ui/badge";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const DriverProfile = () => {
   const navigate = useNavigate();
@@ -23,6 +27,10 @@ const DriverProfile = () => {
     vehicle_make: "",
     vehicle_year: "",
     license_number: "",
+    approval_status: "pending",
+    driver_license_url: null,
+    insurance_url: null,
+    rejected_reason: null,
   });
 
   useEffect(() => {
@@ -56,6 +64,10 @@ const DriverProfile = () => {
         vehicle_make: data.vehicle_make || "",
         vehicle_year: data.vehicle_year || "",
         license_number: data.license_number || "",
+        approval_status: data.approval_status || "pending",
+        driver_license_url: data.driver_license_url,
+        insurance_url: data.insurance_url,
+        rejected_reason: data.rejected_reason,
       });
     }
   };
@@ -118,9 +130,37 @@ const DriverProfile = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {profile.approval_status === 'rejected' && profile.rejected_reason && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>Application Rejected:</strong> {profile.rejected_reason}
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            {profile.approval_status === 'pending' && (
+              <Alert className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Your application is pending approval. Please upload all required documents.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {profile.approval_status === 'approved' && (
+              <Alert className="mb-4 border-green-500">
+                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                <AlertDescription className="text-green-700">
+                  Your account has been approved!
+                </AlertDescription>
+              </Alert>
+            )}
+
             <Tabs defaultValue="personal" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="personal">Personal Info</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="personal">Personal</TabsTrigger>
+                <TabsTrigger value="documents">Documents</TabsTrigger>
                 <TabsTrigger value="payments">Payments</TabsTrigger>
                 <TabsTrigger value="payouts">Payouts</TabsTrigger>
               </TabsList>
@@ -201,6 +241,21 @@ const DriverProfile = () => {
                     {isLoading ? "Saving..." : "Save Changes"}
                   </Button>
                 </form>
+              </TabsContent>
+
+              <TabsContent value="documents" className="space-y-4">
+                <DocumentUpload
+                  userId={profile.email.split('@')[0]}
+                  documentType="driver_license"
+                  currentUrl={profile.driver_license_url || undefined}
+                  onUploadComplete={loadProfile}
+                />
+                <DocumentUpload
+                  userId={profile.email.split('@')[0]}
+                  documentType="insurance"
+                  currentUrl={profile.insurance_url || undefined}
+                  onUploadComplete={loadProfile}
+                />
               </TabsContent>
 
               <TabsContent value="payments">

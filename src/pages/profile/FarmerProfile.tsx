@@ -12,6 +12,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { StripeConnectButton } from "@/components/StripeConnectButton";
 import { PayoutsDashboard } from "@/components/PayoutsDashboard";
+import { DocumentUpload } from "@/components/DocumentUpload";
+import { Badge } from "@/components/ui/badge";
+import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const FarmerProfile = () => {
   const navigate = useNavigate();
@@ -25,6 +29,9 @@ const FarmerProfile = () => {
     farm_name: "",
     collection_point_address: "",
     delivery_schedule: [] as string[],
+    approval_status: "pending",
+    coi_url: null,
+    rejected_reason: null,
   });
 
   const [farmProfile, setFarmProfile] = useState({
@@ -80,6 +87,9 @@ const FarmerProfile = () => {
         farm_name: data.farm_name || "",
         collection_point_address: data.collection_point_address || "",
         delivery_schedule: data.delivery_schedule || [],
+        approval_status: data.approval_status || "pending",
+        coi_url: data.coi_url,
+        rejected_reason: data.rejected_reason,
       });
     }
 
@@ -197,10 +207,38 @@ const FarmerProfile = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {profile.approval_status === 'rejected' && profile.rejected_reason && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  <strong>Application Rejected:</strong> {profile.rejected_reason}
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            {profile.approval_status === 'pending' && (
+              <Alert className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Your application is pending approval. Please upload all required documents.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {profile.approval_status === 'approved' && (
+              <Alert className="mb-4 border-green-500">
+                <CheckCircle2 className="h-4 w-4 text-green-500" />
+                <AlertDescription className="text-green-700">
+                  Your account has been approved!
+                </AlertDescription>
+              </Alert>
+            )}
+
             <Tabs defaultValue="personal" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="personal">Personal</TabsTrigger>
                 <TabsTrigger value="farm">Farm</TabsTrigger>
+                <TabsTrigger value="documents">Documents</TabsTrigger>
                 <TabsTrigger value="payments">Payments</TabsTrigger>
                 <TabsTrigger value="payouts">Payouts</TabsTrigger>
               </TabsList>
@@ -335,6 +373,15 @@ const FarmerProfile = () => {
                     {isLoading ? "Saving..." : "Save Farm Profile"}
                   </Button>
                 </form>
+              </TabsContent>
+
+              <TabsContent value="documents" className="space-y-4">
+                <DocumentUpload
+                  userId={profile.email.split('@')[0]}
+                  documentType="coi"
+                  currentUrl={profile.coi_url || undefined}
+                  onUploadComplete={loadProfile}
+                />
               </TabsContent>
 
               <TabsContent value="payments">

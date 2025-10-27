@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      approval_history: {
+        Row: {
+          approved_by: string | null
+          created_at: string
+          id: string
+          new_status: string
+          previous_status: string
+          reason: string | null
+          user_id: string
+        }
+        Insert: {
+          approved_by?: string | null
+          created_at?: string
+          id?: string
+          new_status: string
+          previous_status: string
+          reason?: string | null
+          user_id: string
+        }
+        Update: {
+          approved_by?: string | null
+          created_at?: string
+          id?: string
+          new_status?: string
+          previous_status?: string
+          reason?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       batch_stops: {
         Row: {
           actual_arrival: string | null
@@ -660,7 +690,11 @@ export type Database = {
       }
       profiles: {
         Row: {
+          approval_status: string | null
+          approved_at: string | null
+          approved_by: string | null
           avatar_url: string | null
+          coi_url: string | null
           collection_point_address: string | null
           collection_point_lead_farmer_id: string | null
           commission_rate: number | null
@@ -668,17 +702,22 @@ export type Database = {
           delivery_address: string | null
           delivery_days: string[] | null
           delivery_schedule: string[] | null
+          driver_license_url: string | null
           email: string
           farm_name: string | null
           full_name: string | null
           id: string
+          insurance_url: string | null
           license_number: string | null
           payment_setup_complete: boolean | null
           phone: string | null
+          privacy_accepted_at: string | null
+          rejected_reason: string | null
           stripe_charges_enabled: boolean | null
           stripe_connect_account_id: string | null
           stripe_onboarding_complete: boolean | null
           stripe_payouts_enabled: boolean | null
+          terms_accepted_at: string | null
           updated_at: string | null
           vehicle_make: string | null
           vehicle_type: string | null
@@ -686,7 +725,11 @@ export type Database = {
           zip_code: string | null
         }
         Insert: {
+          approval_status?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
           avatar_url?: string | null
+          coi_url?: string | null
           collection_point_address?: string | null
           collection_point_lead_farmer_id?: string | null
           commission_rate?: number | null
@@ -694,17 +737,22 @@ export type Database = {
           delivery_address?: string | null
           delivery_days?: string[] | null
           delivery_schedule?: string[] | null
+          driver_license_url?: string | null
           email: string
           farm_name?: string | null
           full_name?: string | null
           id: string
+          insurance_url?: string | null
           license_number?: string | null
           payment_setup_complete?: boolean | null
           phone?: string | null
+          privacy_accepted_at?: string | null
+          rejected_reason?: string | null
           stripe_charges_enabled?: boolean | null
           stripe_connect_account_id?: string | null
           stripe_onboarding_complete?: boolean | null
           stripe_payouts_enabled?: boolean | null
+          terms_accepted_at?: string | null
           updated_at?: string | null
           vehicle_make?: string | null
           vehicle_type?: string | null
@@ -712,7 +760,11 @@ export type Database = {
           zip_code?: string | null
         }
         Update: {
+          approval_status?: string | null
+          approved_at?: string | null
+          approved_by?: string | null
           avatar_url?: string | null
+          coi_url?: string | null
           collection_point_address?: string | null
           collection_point_lead_farmer_id?: string | null
           commission_rate?: number | null
@@ -720,17 +772,22 @@ export type Database = {
           delivery_address?: string | null
           delivery_days?: string[] | null
           delivery_schedule?: string[] | null
+          driver_license_url?: string | null
           email?: string
           farm_name?: string | null
           full_name?: string | null
           id?: string
+          insurance_url?: string | null
           license_number?: string | null
           payment_setup_complete?: boolean | null
           phone?: string | null
+          privacy_accepted_at?: string | null
+          rejected_reason?: string | null
           stripe_charges_enabled?: boolean | null
           stripe_connect_account_id?: string | null
           stripe_onboarding_complete?: boolean | null
           stripe_payouts_enabled?: boolean | null
+          terms_accepted_at?: string | null
           updated_at?: string | null
           vehicle_make?: string | null
           vehicle_type?: string | null

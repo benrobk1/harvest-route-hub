@@ -24,6 +24,10 @@ import ConsumerProfile from "./pages/profile/ConsumerProfile";
 import FarmerProfile from "./pages/profile/FarmerProfile";
 import DriverProfile from "./pages/profile/DriverProfile";
 import FarmProfileView from "./pages/FarmProfileView";
+import PrivacyPolicy from "./pages/legal/PrivacyPolicy";
+import TermsOfService from "./pages/legal/TermsOfService";
+import UserApprovals from "./pages/admin/UserApprovals";
+import { CookieConsent } from "./components/CookieConsent";
 
 const queryClient = new QueryClient();
 
@@ -34,6 +38,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          <CookieConsent />
           <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/consumer/auth" element={<ConsumerAuth />} />
@@ -104,8 +109,15 @@ const App = () => (
               <ProductApproval />
             </RoleGate>
           } />
+          <Route path="/admin/approvals" element={
+            <RoleGate roles={['admin']}>
+              <UserApprovals />
+            </RoleGate>
+          } />
           
           <Route path="/farm/:farmId" element={<FarmProfileView />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<TermsOfService />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
           </Routes>

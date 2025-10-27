@@ -1,0 +1,380 @@
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { useToast } from '@/hooks/use-toast';
+import { CheckCircle2, XCircle, FileText, Eye, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+
+interface UserProfile {
+  id: string;
+  full_name: string;
+  email: string;
+  phone: string;
+  approval_status: string;
+  driver_license_url: string | null;
+  insurance_url: string | null;
+  coi_url: string | null;
+  rejected_reason: string | null;
+  created_at: string;
+  roles: string[];
+}
+
+const UserApprovals = () => {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
+
+  const { data: pendingUsers, isLoading } = useQuery({
+    queryKey: ['pending-users'],
+    queryFn: async () => {
+      const { data: profiles, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .in('approval_status', ['pending', 'rejected'])
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Fetch roles for each user
+      const usersWithRoles = await Promise.all(
+        profiles.map(async (profile) => {
+          const { data: roles } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', profile.id);
+
+          return {
+            ...profile,
+            roles: roles?.map((r) => r.role) || [],
+          };
+        })
+      );
+
+      return usersWithRoles as UserProfile[];
+    },
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          approval_status: 'approved',
+          approved_at: new Date().toISOString(),
+          approved_by: user.id,
+          rejected_reason: null,
+        })
+        .eq('id', userId);
+
+      if (updateError) throw updateError;
+
+      // Log approval history
+      const { error: historyError } = await supabase
+        .from('approval_history')
+        .insert({
+          user_id: userId,
+          previous_status: selectedUser?.approval_status || 'pending',
+          new_status: 'approved',
+          approved_by: user.id,
+        });
+
+      if (historyError) console.error('Failed to log history:', historyError);
+    },
+    onSuccess: () => {
+      toast({
+        title: 'User approved',
+        description: 'The user has been approved successfully',
+      });
+      queryClient.invalidateQueries({ queryKey: ['pending-users'] });
+      setSelectedUser(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Approval failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const rejectMutation = useMutation({
+    mutationFn: async ({ userId, reason }: { userId: string; reason: string }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          approval_status: 'rejected',
+          rejected_reason: reason,
+          approved_by: user.id,
+        })
+        .eq('id', userId);
+
+      if (updateError) throw updateError;
+
+      // Log approval history
+      const { error: historyError } = await supabase
+        .from('approval_history')
+        .insert({
+          user_id: userId,
+          previous_status: selectedUser?.approval_status || 'pending',
+          new_status: 'rejected',
+          reason,
+          approved_by: user.id,
+        });
+
+      if (historyError) console.error('Failed to log history:', historyError);
+    },
+    onSuccess: () => {
+      toast({
+        title: 'User rejected',
+        description: 'The user has been rejected',
+      });
+      queryClient.invalidateQueries({ queryKey: ['pending-users'] });
+      setSelectedUser(null);
+      setRejectionReason('');
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Rejection failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'approved':
+        return <Badge className="bg-green-500">Approved</Badge>;
+      case 'rejected':
+        return <Badge variant="destructive">Rejected</Badge>;
+      default:
+        return <Badge variant="secondary">Pending</Badge>;
+    }
+  };
+
+  const pendingList = pendingUsers?.filter(u => u.approval_status === 'pending') || [];
+  const rejectedList = pendingUsers?.filter(u => u.approval_status === 'rejected') || [];
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-3xl font-bold">User Approvals</h1>
+        <p className="text-muted-foreground">Review and approve farmer and driver applications</p>
+      </div>
+
+      <Tabs defaultValue="pending">
+        <TabsList>
+          <TabsTrigger value="pending">
+            Pending ({pendingList.length})
+          </TabsTrigger>
+          <TabsTrigger value="rejected">
+            Rejected ({rejectedList.length})
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="pending" className="space-y-4">
+          {pendingList.length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center text-muted-foreground">
+                No pending approvals
+              </CardContent>
+            </Card>
+          ) : (
+            pendingList.map((user) => (
+              <Card key={user.id}>
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <CardTitle>{user.full_name}</CardTitle>
+                      <CardDescription>{user.email}</CardDescription>
+                    </div>
+                    {getStatusBadge(user.approval_status)}
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Phone:</span> {user.phone || 'N/A'}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Roles:</span>{' '}
+                      {user.roles.map(r => r.replace('_', ' ')).join(', ')}
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Applied:</span>{' '}
+                      {new Date(user.created_at).toLocaleDateString()}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {user.driver_license_url && (
+                      <a
+                        href={user.driver_license_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-primary hover:underline flex items-center gap-1"
+                      >
+                        <FileText className="h-4 w-4" />
+                        Driver License
+                      </a>
+                    )}
+                    {user.insurance_url && (
+                      <a
+                        href={user.insurance_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-primary hover:underline flex items-center gap-1"
+                      >
+                        <FileText className="h-4 w-4" />
+                        Insurance
+                      </a>
+                    )}
+                    {user.coi_url && (
+                      <a
+                        href={user.coi_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-primary hover:underline flex items-center gap-1"
+                      >
+                        <FileText className="h-4 w-4" />
+                        COI
+                      </a>
+                    )}
+                  </div>
+
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      onClick={() => approveMutation.mutate(user.id)}
+                      disabled={approveMutation.isPending}
+                    >
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                      Approve
+                    </Button>
+
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button
+                          variant="destructive"
+                          onClick={() => setSelectedUser(user)}
+                        >
+                          <XCircle className="mr-2 h-4 w-4" />
+                          Reject
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Reject Application</DialogTitle>
+                          <DialogDescription>
+                            Please provide a reason for rejecting this application
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="reason">Reason</Label>
+                            <Textarea
+                              id="reason"
+                              value={rejectionReason}
+                              onChange={(e) => setRejectionReason(e.target.value)}
+                              placeholder="Explain why this application is being rejected..."
+                              rows={4}
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              onClick={() => {
+                                if (selectedUser) {
+                                  rejectMutation.mutate({
+                                    userId: selectedUser.id,
+                                    reason: rejectionReason,
+                                  });
+                                }
+                              }}
+                              disabled={!rejectionReason || rejectMutation.isPending}
+                              variant="destructive"
+                            >
+                              Confirm Rejection
+                            </Button>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </TabsContent>
+
+        <TabsContent value="rejected" className="space-y-4">
+          {rejectedList.length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center text-muted-foreground">
+                No rejected applications
+              </CardContent>
+            </Card>
+          ) : (
+            rejectedList.map((user) => (
+              <Card key={user.id}>
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <CardTitle>{user.full_name}</CardTitle>
+                      <CardDescription>{user.email}</CardDescription>
+                    </div>
+                    {getStatusBadge(user.approval_status)}
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="p-3 bg-destructive/10 rounded-lg">
+                    <p className="text-sm font-medium mb-1">Rejection Reason:</p>
+                    <p className="text-sm text-muted-foreground">{user.rejected_reason}</p>
+                  </div>
+                  <Button
+                    onClick={() => approveMutation.mutate(user.id)}
+                    disabled={approveMutation.isPending}
+                  >
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    Approve Now
+                  </Button>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+};
+
+export default UserApprovals;

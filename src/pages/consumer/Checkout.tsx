@@ -17,6 +17,7 @@ import { Elements } from "@stripe/react-stripe-js";
 import { stripePromise } from "@/lib/stripe";
 import { PaymentForm } from "@/components/checkout/PaymentForm";
 import { Separator } from "@/components/ui/separator";
+import { Link } from "react-router-dom";
 
 const Checkout = () => {
   const navigate = useNavigate();
@@ -27,6 +28,7 @@ const Checkout = () => {
   const [useCredits, setUseCredits] = useState(false);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const { data: profile } = useQuery({
     queryKey: ['profile', user?.id],
@@ -344,12 +346,35 @@ const Checkout = () => {
                   </div>
                 </div>
 
+                <div className="border-t pt-4 space-y-3">
+                  <div className="flex items-start space-x-2">
+                    <Checkbox
+                      id="terms"
+                      checked={termsAccepted}
+                      onCheckedChange={(checked) => setTermsAccepted(checked as boolean)}
+                    />
+                    <label
+                      htmlFor="terms"
+                      className="text-sm leading-tight cursor-pointer peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                    >
+                      I agree to the{' '}
+                      <Link to="/terms" target="_blank" className="text-primary hover:underline">
+                        Terms of Service
+                      </Link>{' '}
+                      and{' '}
+                      <Link to="/privacy" target="_blank" className="text-primary hover:underline">
+                        Privacy Policy
+                      </Link>
+                    </label>
+                  </div>
+                </div>
+
                 {!clientSecret && (
                   <Button
                     className="w-full"
                     size="lg"
                     onClick={() => createOrder.mutate()}
-                    disabled={!selectedDate || createOrder.isPending}
+                    disabled={!selectedDate || !termsAccepted || createOrder.isPending}
                   >
                     {createOrder.isPending ? 'Processing...' : total === 0 ? 'Complete Order' : 'Proceed to Payment'}
                   </Button>
@@ -358,6 +383,12 @@ const Checkout = () => {
                 {!selectedDate && (
                   <p className="text-sm text-muted-foreground text-center">
                     Please select a delivery date
+                  </p>
+                )}
+                
+                {!termsAccepted && selectedDate && (
+                  <p className="text-sm text-muted-foreground text-center">
+                    Please accept the terms to continue
                   </p>
                 )}
               </CardContent>

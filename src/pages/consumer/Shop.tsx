@@ -1,16 +1,19 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Search, MapPin, Package, User } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Search, MapPin, Package, User, TrendingUp } from "lucide-react";
 import logo from "@/assets/blue-harvests-logo.jpeg";
 import { supabase } from "@/integrations/supabase/client";
 import { useCart } from "@/hooks/useCart";
 import { ProductCard } from "@/components/ProductCard";
 import { CartDrawer } from "@/components/CartDrawer";
 import { formatMoney } from "@/lib/formatMoney";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 
 interface Product {
   id: string;
@@ -30,7 +33,27 @@ interface Product {
 const Shop = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchParams] = useSearchParams();
   const { addToCart } = useCart();
+  const { subscriptionStatus, refreshSubscription } = useAuth();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const subscriptionParam = searchParams.get('subscription');
+    if (subscriptionParam === 'success') {
+      toast({
+        title: "Subscription Active!",
+        description: "Your monthly subscription is now active. Start earning credits!",
+      });
+      refreshSubscription();
+    } else if (subscriptionParam === 'cancelled') {
+      toast({
+        title: "Subscription Cancelled",
+        description: "You can subscribe anytime from your profile.",
+        variant: "destructive",
+      });
+    }
+  }, [searchParams, refreshSubscription, toast]);
 
   const { data: products = [], isLoading } = useQuery({
     queryKey: ['products'],
@@ -102,6 +125,33 @@ const Shop = () => {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
+
+          {/* Subscription Progress Banner */}
+          {subscriptionStatus?.subscribed && (
+            <Card className="mt-4 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
+              <div className="p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-primary" />
+                    <span className="font-medium text-sm">Progress to $10 Credit</span>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-lg font-bold text-primary">
+                      {formatMoney(subscriptionStatus.credits_available)}
+                    </div>
+                    <div className="text-xs text-muted-foreground">Available Credits</div>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Progress value={subscriptionStatus.progress_to_credit} className="h-2" />
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>{formatMoney(subscriptionStatus.monthly_spend)} spent this month</span>
+                    <span>{formatMoney(Math.max(0, 100 - subscriptionStatus.monthly_spend))} to next credit</span>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          )}
         </div>
       </header>
 

@@ -487,7 +487,7 @@ serve(async (req) => {
       }
     }
 
-    // Handle credits
+    // Handle credits redemption
     if (creditsUsed > 0) {
       const { data: latestCredit } = await supabaseClient
         .from('credits_ledger')
@@ -512,6 +512,66 @@ serve(async (req) => {
 
       if (creditError) {
         console.error('Credit redemption failed:', creditError);
+      }
+    }
+
+    // Track monthly spend and auto-apply credits for active subscribers
+    const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
+    const { data: subscription } = await supabaseClient
+      .from('subscriptions')
+      .select('*')
+      .eq('consumer_id', user.id)
+      .single();
+
+    if (subscription && subscription.status === 'active') {
+      // Reset monthly spend if new month
+      let currentSpend = subscription.monthly_spend || 0;
+      if (subscription.monthly_spend_period !== currentMonth) {
+        currentSpend = 0;
+      }
+
+      const newSpend = currentSpend + subtotal;
+      const previousThreshold = Math.floor(currentSpend / 100);
+      const newThreshold = Math.floor(newSpend / 100);
+      
+      // Update subscription with new spend
+      await supabaseClient
+        .from('subscriptions')
+        .update({
+          monthly_spend: newSpend,
+          monthly_spend_period: currentMonth,
+          credits_earned: subscription.credits_earned + (newThreshold - previousThreshold) * 10
+        })
+        .eq('id', subscription.id);
+
+      // Auto-award $10 credit for each $100 spent
+      if (newThreshold > previousThreshold) {
+        const creditsToAward = (newThreshold - previousThreshold) * 10;
+        const { data: latestCredit } = await supabaseClient
+          .from('credits_ledger')
+          .select('balance_after')
+          .eq('consumer_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        const currentCreditBalance = latestCredit?.balance_after || 0;
+        const expirationDate = new Date();
+        expirationDate.setMonth(expirationDate.getMonth() + 6); // Credits expire in 6 months
+
+        await supabaseClient
+          .from('credits_ledger')
+          .insert({
+            consumer_id: user.id,
+            order_id: order.id,
+            transaction_type: 'earned',
+            amount: creditsToAward,
+            balance_after: currentCreditBalance + creditsToAward,
+            description: `Earned $${creditsToAward} credit for spending $${newThreshold * 100}`,
+            expires_at: expirationDate.toISOString()
+          });
+
+        console.log(`Auto-awarded $${creditsToAward} credit for reaching $${newThreshold * 100} in monthly spend`);
       }
     }
 

@@ -8,6 +8,7 @@ import { ArrowLeft, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Checkbox } from "@/components/ui/checkbox";
+import { SubscriptionManager } from "@/components/consumer/SubscriptionManager";
 
 const ConsumerProfile = () => {
   const navigate = useNavigate();
@@ -103,7 +104,7 @@ const ConsumerProfile = () => {
 
   return (
     <div className="min-h-screen bg-gradient-earth flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl">
+      <div className="w-full max-w-2xl space-y-6">
         <Button
           variant="ghost"
           onClick={() => navigate("/consumer/shop")}
@@ -113,6 +114,10 @@ const ConsumerProfile = () => {
           Back to Shop
         </Button>
 
+        {/* Subscription Manager */}
+        <SubscriptionManager />
+
+        {/* Profile Card */}
         <Card className="border-2 shadow-large">
           <CardHeader className="text-center space-y-2">
             <div className="mx-auto h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center mb-2">

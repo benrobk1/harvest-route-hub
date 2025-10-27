@@ -5,6 +5,14 @@ import { useNavigate } from 'react-router-dom';
 
 type AppRole = 'admin' | 'farmer' | 'lead_farmer' | 'driver' | 'consumer';
 
+interface SubscriptionStatus {
+  subscribed: boolean;
+  subscription_end?: string;
+  monthly_spend: number;
+  credits_available: number;
+  progress_to_credit: number;
+}
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
@@ -12,6 +20,8 @@ interface AuthContextType {
   loading: boolean;
   signOut: () => Promise<void>;
   hasRole: (role: AppRole) => boolean;
+  subscriptionStatus: SubscriptionStatus | null;
+  refreshSubscription: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -21,6 +31,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [roles, setRoles] = useState<AppRole[]>([]);
   const [loading, setLoading] = useState(true);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus | null>(null);
 
   useEffect(() => {
     // Set up auth state listener FIRST
@@ -63,12 +74,29 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .eq('user_id', userId);
 
       if (error) throw error;
-      setRoles(data?.map(r => r.role as AppRole) || []);
+      const userRoles = data?.map(r => r.role as AppRole) || [];
+      setRoles(userRoles);
+      
+      // Check subscription status for consumers
+      if (userRoles.includes('consumer')) {
+        await refreshSubscription();
+      }
     } catch (error) {
       console.error('Error fetching roles:', error);
       setRoles([]);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const refreshSubscription = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('check-subscription');
+      if (error) throw error;
+      setSubscriptionStatus(data as SubscriptionStatus);
+    } catch (error) {
+      console.error('Error fetching subscription status:', error);
+      setSubscriptionStatus(null);
     }
   };
 
@@ -82,7 +110,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const hasRole = (role: AppRole) => roles.includes(role);
 
   return (
-    <AuthContext.Provider value={{ user, session, roles, loading, signOut, hasRole }}>
+    <AuthContext.Provider value={{ user, session, roles, loading, signOut, hasRole, subscriptionStatus, refreshSubscription }}>
       {children}
     </AuthContext.Provider>
   );

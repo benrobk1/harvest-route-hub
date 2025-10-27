@@ -10,6 +10,8 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
+import { StripeConnectButton } from "@/components/StripeConnectButton";
+import { PayoutsDashboard } from "@/components/PayoutsDashboard";
 
 const FarmerProfile = () => {
   const navigate = useNavigate();
@@ -196,9 +198,11 @@ const FarmerProfile = () => {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="personal" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="personal">Personal Info</TabsTrigger>
-                <TabsTrigger value="farm">Farm Profile</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="personal">Personal</TabsTrigger>
+                <TabsTrigger value="farm">Farm</TabsTrigger>
+                <TabsTrigger value="payments">Payments</TabsTrigger>
+                <TabsTrigger value="payouts">Payouts</TabsTrigger>
               </TabsList>
 
               <TabsContent value="personal">
@@ -331,6 +335,14 @@ const FarmerProfile = () => {
                     {isLoading ? "Saving..." : "Save Farm Profile"}
                   </Button>
                 </form>
+              </TabsContent>
+
+              <TabsContent value="payments">
+                <StripeConnectButton />
+              </TabsContent>
+
+              <TabsContent value="payouts">
+                <PayoutsDashboard />
               </TabsContent>
             </Tabs>
           </CardContent>

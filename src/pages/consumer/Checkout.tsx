@@ -6,13 +6,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Calendar, CreditCard, MapPin } from "lucide-react";
+import { ArrowLeft, Calendar, CreditCard, MapPin, Coins } from "lucide-react";
 import { useCart } from "@/hooks/useCart";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatMoney } from "@/lib/formatMoney";
 import { useToast } from "@/hooks/use-toast";
 import { format, addDays, startOfDay } from "date-fns";
+import { Elements } from "@stripe/react-stripe-js";
+import { stripePromise } from "@/lib/stripe";
+import { PaymentForm } from "@/components/checkout/PaymentForm";
+import { Separator } from "@/components/ui/separator";
 
 const Checkout = () => {
   const navigate = useNavigate();
@@ -21,6 +25,8 @@ const Checkout = () => {
   const { toast } = useToast();
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [useCredits, setUseCredits] = useState(false);
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
 
   const { data: profile } = useQuery({
     queryKey: ['profile', user?.id],
@@ -86,7 +92,9 @@ const Checkout = () => {
   const deliveryFee = marketConfig?.delivery_fee || 7.50;
   const platformFee = cartTotal * 0.10; // 10% platform fee
   const subtotal = cartTotal;
-  const total = subtotal + deliveryFee;
+  const availableCreditsAmount = credits || 0;
+  const creditsToUse = useCredits ? Math.min(availableCreditsAmount, subtotal + deliveryFee) : 0;
+  const total = Math.max(0, subtotal + deliveryFee - creditsToUse);
 
   const createOrder = useMutation({
     mutationFn: async () => {
@@ -100,6 +108,7 @@ const Checkout = () => {
           cart_id: cart.id,
           delivery_date: selectedDate,
           use_credits: useCredits,
+          credits_amount: creditsToUse,
         },
       });
 
@@ -123,11 +132,17 @@ const Checkout = () => {
       return data;
     },
     onSuccess: (data) => {
-      toast({
-        title: 'Order placed!',
-        description: `Your order has been confirmed for ${format(new Date(data.delivery_date), 'MMM d')}`,
-      });
-      navigate('/consumer/orders');
+      if (data.client_secret) {
+        setClientSecret(data.client_secret);
+        setPaymentIntentId(data.payment_intent_id);
+      } else {
+        // Order completed without payment (fully covered by credits)
+        toast({
+          title: 'Order placed!',
+          description: `Your order has been confirmed for ${format(new Date(data.delivery_date), 'MMM d')}`,
+        });
+        navigate('/consumer/orders');
+      }
     },
     onError: (error: Error) => {
       toast({
@@ -137,6 +152,14 @@ const Checkout = () => {
       });
     },
   });
+
+  const handlePaymentSuccess = () => {
+    toast({
+      title: 'Payment successful!',
+      description: 'Your order has been confirmed.',
+    });
+    navigate('/consumer/orders');
+  };
 
   if (!cart || cartCount === 0) {
     return (
@@ -227,16 +250,50 @@ const Checkout = () => {
                   Payment Method
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground text-sm mb-4">
-                  Payment integration coming soon. Orders will be processed manually.
-                </p>
-                <div className="space-y-3">
-                  <div className="p-3 border rounded-lg">
-                    <p className="font-medium">Cash on Delivery</p>
-                    <p className="text-sm text-muted-foreground">Pay when you receive your order</p>
+              <CardContent className="space-y-4">
+                {availableCreditsAmount > 0 && (
+                  <div className="p-4 bg-muted rounded-lg space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Coins className="h-4 w-4 text-primary" />
+                        <span className="font-medium">Available Credits</span>
+                      </div>
+                      <span className="font-bold">{formatMoney(availableCreditsAmount)}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="use-credits-payment"
+                        checked={useCredits}
+                        onCheckedChange={(checked) => setUseCredits(checked as boolean)}
+                      />
+                      <label
+                        htmlFor="use-credits-payment"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        Use credits for this order
+                      </label>
+                    </div>
+                    {useCredits && creditsToUse > 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        {formatMoney(creditsToUse)} will be applied to this order
+                      </p>
+                    )}
                   </div>
-                </div>
+                )}
+                
+                {clientSecret && total > 0 ? (
+                  <Elements stripe={stripePromise} options={{ clientSecret }}>
+                    <PaymentForm onSuccess={handlePaymentSuccess} amount={total} />
+                  </Elements>
+                ) : total === 0 ? (
+                  <p className="text-sm text-green-600 font-medium">
+                    Order fully covered by credits - no payment required!
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Complete order details to proceed with payment
+                  </p>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -271,40 +328,32 @@ const Checkout = () => {
                     <span>Delivery Fee</span>
                     <span>{formatMoney(deliveryFee)}</span>
                   </div>
-                  {credits && credits > 0 && (
-                    <div className="flex items-center space-x-2 p-3 bg-muted rounded-lg">
-                      <Checkbox
-                        id="use-credits"
-                        checked={useCredits}
-                        onCheckedChange={(checked) => setUseCredits(checked as boolean)}
-                      />
-                      <Label htmlFor="use-credits" className="text-sm cursor-pointer flex-1">
-                        Use {formatMoney(credits)} in available credits
-                      </Label>
+                  {useCredits && creditsToUse > 0 && (
+                    <div className="flex justify-between text-sm text-green-600">
+                      <span className="flex items-center gap-2">
+                        <Coins className="h-4 w-4" />
+                        Credits Applied
+                      </span>
+                      <span>-{formatMoney(creditsToUse)}</span>
                     </div>
                   )}
-                </div>
-
-                <div className="border-t pt-4">
+                  <Separator />
                   <div className="flex justify-between font-bold text-lg">
                     <span>Total</span>
-                    <span>{formatMoney(useCredits && credits ? Math.max(0, total - credits) : total)}</span>
+                    <span>{formatMoney(total)}</span>
                   </div>
-                  {useCredits && credits > 0 && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {formatMoney(Math.min(credits, total))} credits will be applied
-                    </p>
-                  )}
                 </div>
 
-                <Button
-                  className="w-full"
-                  size="lg"
-                  onClick={() => createOrder.mutate()}
-                  disabled={!selectedDate || createOrder.isPending}
-                >
-                  {createOrder.isPending ? 'Processing...' : 'Place Order'}
-                </Button>
+                {!clientSecret && (
+                  <Button
+                    className="w-full"
+                    size="lg"
+                    onClick={() => createOrder.mutate()}
+                    disabled={!selectedDate || createOrder.isPending}
+                  >
+                    {createOrder.isPending ? 'Processing...' : total === 0 ? 'Complete Order' : 'Proceed to Payment'}
+                  </Button>
+                )}
 
                 {!selectedDate && (
                   <p className="text-sm text-muted-foreground text-center">

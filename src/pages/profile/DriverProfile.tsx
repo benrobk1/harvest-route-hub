@@ -7,6 +7,9 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Truck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { StripeConnectButton } from "@/components/StripeConnectButton";
+import { PayoutsDashboard } from "@/components/PayoutsDashboard";
 
 const DriverProfile = () => {
   const navigate = useNavigate();
@@ -115,7 +118,15 @@ const DriverProfile = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSave} className="space-y-4">
+            <Tabs defaultValue="personal" className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="personal">Personal Info</TabsTrigger>
+                <TabsTrigger value="payments">Payments</TabsTrigger>
+                <TabsTrigger value="payouts">Payouts</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="personal">
+                <form onSubmit={handleSave} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="full_name">Full Name</Label>
                 <Input
@@ -186,10 +197,20 @@ const DriverProfile = () => {
                 />
               </div>
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Saving..." : "Save Changes"}
-              </Button>
-            </form>
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading ? "Saving..." : "Save Changes"}
+                  </Button>
+                </form>
+              </TabsContent>
+
+              <TabsContent value="payments">
+                <StripeConnectButton />
+              </TabsContent>
+
+              <TabsContent value="payouts">
+                <PayoutsDashboard />
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
       </div>

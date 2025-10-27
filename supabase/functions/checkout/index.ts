@@ -39,7 +39,49 @@ serve(async (req) => {
 
     console.log('Checkout request:', { user_id: user.id, cart_id, delivery_date, use_credits });
 
-    // 1. Fetch and validate cart
+    // 1. Validate delivery address using Mapbox
+    const { data: userProfile, error: profileFetchError } = await supabaseClient
+      .from('profiles')
+      .select('delivery_address, zip_code')
+      .eq('id', user.id)
+      .single();
+
+    if (profileFetchError || !userProfile?.delivery_address) {
+      return new Response(
+        JSON.stringify({ error: 'MISSING_ADDRESS', message: 'Delivery address not found. Please update your profile.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Geocode and validate address with Mapbox
+    const mapboxToken = Deno.env.get('MAPBOX_PUBLIC_TOKEN');
+    if (mapboxToken) {
+      try {
+        const encodedAddress = encodeURIComponent(userProfile.delivery_address);
+        const response = await fetch(
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedAddress}.json?access_token=${mapboxToken}&limit=1`
+        );
+        
+        if (response.ok) {
+          const data = await response.json();
+          if (!data.features || data.features.length === 0) {
+            return new Response(
+              JSON.stringify({ 
+                error: 'INVALID_ADDRESS', 
+                message: 'Unable to validate delivery address. Please check your address in your profile.' 
+              }),
+              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+          console.log('Address validated:', userProfile.delivery_address);
+        }
+      } catch (error) {
+        console.warn('Address validation failed (non-blocking):', error);
+        // Continue with checkout even if validation fails
+      }
+    }
+
+    // 2. Fetch and validate cart
     const { data: cart, error: cartError } = await supabaseClient
       .from('shopping_carts')
       .select('id, consumer_id')
@@ -53,7 +95,7 @@ serve(async (req) => {
       });
     }
 
-    // 2. Fetch cart items with product details
+    // 3. Fetch cart items with product details
     const { data: cartItems, error: itemsError } = await supabaseClient
       .from('cart_items')
       .select(`
@@ -82,7 +124,7 @@ serve(async (req) => {
       });
     }
 
-    // 3. Get user profile for zip code
+    // 4. Get user profile for zip code
     const { data: profile } = await supabaseClient
       .from('profiles')
       .select('zip_code, delivery_address')
@@ -96,7 +138,7 @@ serve(async (req) => {
       });
     }
 
-    // 4. Fetch market config for user's zip code
+    // 5. Fetch market config for user's zip code
     const { data: marketConfig } = await supabaseClient
       .from('market_configs')
       .select('*')
@@ -114,7 +156,7 @@ serve(async (req) => {
       });
     }
 
-    // 5. Validate delivery date
+    // 6. Validate delivery date
     const deliveryDate = new Date(delivery_date);
     const dayOfWeek = deliveryDate.getDay();
     const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
@@ -129,7 +171,7 @@ serve(async (req) => {
       });
     }
 
-    // 6. Check cutoff time
+    // 7. Check cutoff time
     const now = new Date();
     const tomorrow = new Date(now);
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -152,7 +194,7 @@ serve(async (req) => {
       }
     }
 
-    // 7. Server-side price validation and inventory check
+    // 8. Server-side price validation and inventory check
     let subtotal = 0;
     const insufficientProducts: string[] = [];
 
@@ -188,13 +230,13 @@ serve(async (req) => {
       });
     }
 
-    // 8. Calculate fees
+    // 9. Calculate fees
     const platformFeeRate = 0.10; // 10%
     const platformFee = subtotal * platformFeeRate;
     const deliveryFee = parseFloat(marketConfig.delivery_fee.toString());
     const totalBeforeCredits = subtotal + platformFee + deliveryFee;
 
-    // 9. Handle credits
+    // 10. Handle credits
     let creditsUsed = 0;
     if (use_credits) {
       const { data: latestCredit } = await supabaseClient
@@ -211,7 +253,7 @@ serve(async (req) => {
 
     const totalAmount = totalBeforeCredits - creditsUsed;
 
-    // 10. Validate minimum order
+    // 11. Validate minimum order
     if (subtotal < parseFloat(marketConfig.minimum_order.toString())) {
       return new Response(JSON.stringify({ 
         error: 'BELOW_MINIMUM_ORDER',
@@ -224,7 +266,7 @@ serve(async (req) => {
       });
     }
 
-    // 11. Create order with transaction
+    // 12. Create order with transaction
     console.log('Creating order...');
     
     // Create order

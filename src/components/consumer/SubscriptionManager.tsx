@@ -91,7 +91,7 @@ export const SubscriptionManager = () => {
                 className="w-full"
                 size="lg"
               >
-                {isLoading ? "Loading..." : "Start 2-Month Free Trial"}
+                {isLoading ? "Loading..." : "Start 1-Month Free Trial"}
               </Button>
               <Button 
                 onClick={() => handleSubscribe(false)} 

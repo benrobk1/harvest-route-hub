@@ -72,14 +72,52 @@ const FarmerAuth = () => {
     e.preventDefault();
     setIsLoading(true);
     
-    // In a real app, this would send an email to benjaminrk@blueharvests.net
-    console.log("Farmer Interest Form Submitted:", formData);
-    
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      // Create the user account
+      const { data: authData, error: signupError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: Math.random().toString(36).slice(-12), // Generate random temp password
+        options: {
+          data: {
+            full_name: formData.ownerName,
+            phone: formData.phone,
+            farm_name: formData.farmName,
+          }
+        }
+      });
+
+      if (signupError) throw signupError;
+      if (!authData.user) throw new Error("Failed to create user account");
+
+      // Assign the appropriate role
+      const role = farmerType === "lead" ? "lead_farmer" : "farmer";
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .insert({ 
+          user_id: authData.user.id, 
+          role 
+        });
+
+      if (roleError) throw roleError;
+
+      // Update profile with additional information
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          full_name: formData.ownerName,
+          phone: formData.phone,
+          farm_name: formData.farmName,
+          zip_code: formData.zipCode,
+          collection_point_address: farmerType === "lead" ? formData.collectionPointAddress : null,
+          approval_status: 'pending'
+        })
+        .eq('id', authData.user.id);
+
+      if (profileError) throw profileError;
+
       toast({
         title: "Application Submitted!",
-        description: "Thank you for your interest. We'll contact you at " + formData.email,
+        description: "Thank you! Your application is pending admin approval. Check your email for login instructions.",
       });
 
       // Reset form
@@ -96,7 +134,16 @@ const FarmerAuth = () => {
         collectionPointLeadFarmer: "",
         collectionPointAddress: "",
       });
-    }, 1500);
+    } catch (error: any) {
+      console.error('Farmer application error:', error);
+      toast({
+        title: "Application Failed",
+        description: error.message || "Could not submit application",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

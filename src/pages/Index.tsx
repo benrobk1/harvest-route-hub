@@ -42,9 +42,6 @@ const Index = () => {
           <div className="flex justify-center mb-8">
             <img src={logo} alt="Blue Harvests Logo" className="h-32 md:h-40 object-contain" />
           </div>
-          <h1 className="mb-6 text-5xl md:text-7xl font-bold text-white tracking-tight">
-            Blue Harvests
-          </h1>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             <div className="text-white/90 text-sm">90% to Farmers • 100% of Fees to Drivers</div>
           </div>

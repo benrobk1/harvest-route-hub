@@ -37,11 +37,11 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-gradient-earth">
       {/* Hero Section */}
-      <header className="relative overflow-hidden bg-gradient-hero py-20 px-4">
-        <div className="container mx-auto max-w-6xl text-center">
-          <div className="flex justify-center mb-8">
-            <img src={logo} alt="Blue Harvests Logo" className="h-32 md:h-40 object-contain" />
-          </div>
+      <header className="relative overflow-hidden bg-gradient-hero">
+        <div className="w-full">
+          <img src={logo} alt="Blue Harvests Logo" className="w-full h-auto object-cover" />
+        </div>
+        <div className="container mx-auto max-w-6xl text-center py-8 px-4">
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
             <div className="text-white/90 text-sm">90% to Farmers • 100% of Fees to Drivers</div>
           </div>

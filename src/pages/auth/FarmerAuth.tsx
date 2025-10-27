@@ -25,6 +25,8 @@ const FarmerAuth = () => {
     farmName: "",
     ownerName: "",
     email: "",
+    password: "",
+    confirmPassword: "",
     phone: "",
     farmAddress: "",
     zipCode: "",
@@ -89,10 +91,22 @@ const FarmerAuth = () => {
     setIsLoading(true);
     
     try {
+      // Validate required fields
+      if (!formData.email || !formData.password || !formData.confirmPassword) {
+        throw new Error("Please fill in all required fields");
+      }
+
+      emailSchema.parse(formData.email);
+      passwordSchema.parse(formData.password);
+
+      if (formData.password !== formData.confirmPassword) {
+        throw new Error("Passwords do not match");
+      }
+
       // Create the user account
       const { data: authData, error: signupError } = await supabase.auth.signUp({
         email: formData.email,
-        password: Math.random().toString(36).slice(-12), // Generate random temp password
+        password: formData.password,
         options: {
           data: {
             full_name: formData.ownerName,
@@ -133,7 +147,7 @@ const FarmerAuth = () => {
 
       toast({
         title: "Application Submitted!",
-        description: "Thank you! Your application is pending admin approval. Check your email for login instructions.",
+        description: "You can log in once approved by an admin.",
       });
 
       // Reset form
@@ -141,6 +155,8 @@ const FarmerAuth = () => {
         farmName: "",
         ownerName: "",
         email: "",
+        password: "",
+        confirmPassword: "",
         phone: "",
         farmAddress: "",
         zipCode: "",
@@ -265,6 +281,28 @@ const FarmerAuth = () => {
                       required 
                       value={formData.email}
                       onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password</Label>
+                    <Input 
+                      id="password" 
+                      type="password" 
+                      placeholder="Choose a password (min 6 characters)" 
+                      required 
+                      value={formData.password}
+                      onChange={(e) => setFormData({...formData, password: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmPassword">Confirm Password</Label>
+                    <Input 
+                      id="confirmPassword" 
+                      type="password" 
+                      placeholder="Confirm your password" 
+                      required 
+                      value={formData.confirmPassword}
+                      onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
                     />
                   </div>
                   <div className="space-y-2">

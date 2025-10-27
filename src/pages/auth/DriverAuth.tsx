@@ -23,6 +23,8 @@ const DriverAuth = () => {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
+    password: "",
+    confirmPassword: "",
     phone: "",
     licenseNumber: "",
     vehicleType: "",
@@ -86,20 +88,72 @@ const DriverAuth = () => {
     e.preventDefault();
     setIsLoading(true);
     
-    // In a real app, this would send an email to benjaminrk@blueharvests.net
-    console.log("Driver Interest Form Submitted:", formData);
-    
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      // Validate required fields
+      if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword || 
+          !formData.phone || !formData.licenseNumber || !formData.vehicleType || !formData.zipCode) {
+        throw new Error("Please fill in all required fields");
+      }
+
+      emailSchema.parse(formData.email);
+      passwordSchema.parse(formData.password);
+
+      if (formData.password !== formData.confirmPassword) {
+        throw new Error("Passwords do not match");
+      }
+
+      // Create user account
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            full_name: formData.name,
+          }
+        }
+      });
+
+      if (signUpError) throw signUpError;
+      if (!authData.user) throw new Error("Failed to create user account");
+
+      // Assign driver role
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .insert({
+          user_id: authData.user.id,
+          role: 'driver'
+        });
+
+      if (roleError) throw roleError;
+
+      // Update profile with driver information
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          full_name: formData.name,
+          phone: formData.phone,
+          vehicle_type: formData.vehicleType,
+          vehicle_make: formData.vehicleMake,
+          vehicle_year: formData.vehicleYear,
+          license_number: formData.licenseNumber,
+          zip_code: formData.zipCode,
+          approval_status: 'pending'
+        })
+        .eq('id', authData.user.id);
+
+      if (profileError) throw profileError;
+
       toast({
         title: "Application Submitted!",
-        description: "Thank you for your interest. We'll contact you at " + formData.email,
+        description: "You can log in once approved by an admin.",
       });
 
       // Reset form
       setFormData({
         name: "",
         email: "",
+        password: "",
+        confirmPassword: "",
         phone: "",
         licenseNumber: "",
         vehicleType: "",
@@ -109,7 +163,15 @@ const DriverAuth = () => {
         availability: "",
         additionalInfo: "",
       });
-    }, 1500);
+    } catch (error: any) {
+      toast({
+        title: "Application Failed",
+        description: error.message || "Could not submit application",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -178,6 +240,28 @@ const DriverAuth = () => {
                       required 
                       value={formData.email}
                       onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password</Label>
+                    <Input 
+                      id="password" 
+                      type="password" 
+                      placeholder="Choose a password (min 6 characters)" 
+                      required 
+                      value={formData.password}
+                      onChange={(e) => setFormData({...formData, password: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="confirmPassword">Confirm Password</Label>
+                    <Input 
+                      id="confirmPassword" 
+                      type="password" 
+                      placeholder="Confirm your password" 
+                      required 
+                      value={formData.confirmPassword}
+                      onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
                     />
                   </div>
                   <div className="space-y-2">

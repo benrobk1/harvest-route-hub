@@ -61,10 +61,10 @@ const AppContent = () => {
       <CookieConsent />
       <Routes>
           <Route path="/" element={<Index />} />
-          <Route path="/consumer/auth" element={<ConsumerAuth />} />
-          <Route path="/driver/auth" element={<DriverAuth />} />
-          <Route path="/farmer/auth" element={<FarmerAuth />} />
-          <Route path="/admin/auth" element={<AdminAuth />} />
+          <Route path="/auth/consumer" element={<ConsumerAuth />} />
+          <Route path="/auth/driver" element={<DriverAuth />} />
+          <Route path="/auth/farmer" element={<FarmerAuth />} />
+          <Route path="/auth/admin" element={<AdminAuth />} />
           
           <Route path="/consumer/shop" element={
             <RoleGate roles={['consumer']}>

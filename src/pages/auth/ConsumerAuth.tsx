@@ -8,6 +8,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ShoppingBag } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { z } from "zod";
 
 const emailSchema = z.string().email("Invalid email address");
@@ -17,6 +18,7 @@ const ConsumerAuth = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
+  const { roles } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [referralCode, setReferralCode] = useState(searchParams.get('ref') || '');
 
@@ -45,6 +47,20 @@ const ConsumerAuth = () => {
       });
 
       if (error) throw error;
+
+      // Wait for roles to load
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      // Check if user has consumer role
+      const { data: userRoles } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', (await supabase.auth.getUser()).data.user?.id);
+
+      if (!userRoles?.some(r => r.role === 'consumer')) {
+        await supabase.auth.signOut();
+        throw new Error("Your account doesn't have consumer access");
+      }
 
       toast({
         title: "Welcome back!",

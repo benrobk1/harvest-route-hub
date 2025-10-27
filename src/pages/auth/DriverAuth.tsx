@@ -9,6 +9,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Truck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { z } from "zod";
 
 const emailSchema = z.string().email("Invalid email address");
@@ -17,6 +18,7 @@ const passwordSchema = z.string().min(6, "Password must be at least 6 characters
 const DriverAuth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { roles } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -49,6 +51,20 @@ const DriverAuth = () => {
       });
 
       if (error) throw error;
+
+      // Wait for roles to load
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      // Check if user has driver role
+      const { data: userRoles } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', (await supabase.auth.getUser()).data.user?.id);
+
+      if (!userRoles?.some(r => r.role === 'driver')) {
+        await supabase.auth.signOut();
+        throw new Error("Your account doesn't have driver access");
+      }
 
       toast({
         title: "Welcome back!",

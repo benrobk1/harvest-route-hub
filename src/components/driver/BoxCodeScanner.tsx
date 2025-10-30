@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScanLine, CheckCircle2, XCircle, Package } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface VerifiedOrder {
   orderId: string;
@@ -15,8 +16,21 @@ interface VerifiedOrder {
   items: Array<{ name: string; quantity: number }>;
 }
 
-export const BoxCodeScanner = () => {
+interface BoxCodeScannerProps {
+  mode?: 'loading' | 'delivery';
+  batchId?: string;
+  stopId?: string;
+  onScanComplete?: (orderId: string, boxCode: string) => void;
+}
+
+export const BoxCodeScanner = ({ 
+  mode = 'delivery', 
+  batchId, 
+  stopId, 
+  onScanComplete 
+}: BoxCodeScannerProps) => {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [scannedCode, setScannedCode] = useState("");
   const [verifiedOrder, setVerifiedOrder] = useState<VerifiedOrder | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
@@ -72,8 +86,26 @@ export const BoxCodeScanner = () => {
       };
 
       setVerifiedOrder(verified);
+
+      // Create scan log entry
+      if (user?.id) {
+        await supabase.from('delivery_scan_logs').insert({
+          batch_id: batchId,
+          stop_id: stopId,
+          order_id: order.id,
+          driver_id: user.id,
+          box_code: scannedCode.toUpperCase(),
+          scan_type: mode === 'loading' ? 'loaded' : 'delivered',
+        });
+      }
+
+      // Call callback if provided
+      if (onScanComplete) {
+        onScanComplete(order.id, scannedCode.toUpperCase());
+      }
+
       toast({
-        title: "Box Verified!",
+        title: mode === 'loading' ? "Box Loaded!" : "Box Delivered!",
         description: `Box ${scannedCode} confirmed`,
       });
     } catch (error: any) {
@@ -99,9 +131,13 @@ export const BoxCodeScanner = () => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <ScanLine className="h-5 w-5" />
-          Box Code Verification
+          {mode === 'loading' ? 'Load Box' : 'Verify Delivery'}
         </CardTitle>
-        <CardDescription>Scan or enter box code to verify order contents</CardDescription>
+        <CardDescription>
+          {mode === 'loading' 
+            ? 'Scan box code when loading onto truck' 
+            : 'Scan box code to verify delivery'}
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex gap-2">

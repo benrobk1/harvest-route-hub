@@ -6,8 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BoxCodeScanner } from "@/components/driver/BoxCodeScanner";
-import { Navigation, MapPin, Clock, Package, Phone } from "lucide-react";
+import { Navigation, MapPin, Clock, Package, Phone, AlertCircle } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { useNavigate } from "react-router-dom";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface BatchStop {
   id: string;
@@ -36,6 +38,7 @@ interface BatchStop {
 
 export default function RouteDetails() {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const { data: activeBatch, isLoading } = useQuery({
     queryKey: ["driver-route-details", user?.id],
@@ -94,6 +97,27 @@ export default function RouteDetails() {
     },
     enabled: !!user?.id,
   });
+
+  // Check if boxes have been loaded
+  const { data: loadedBoxes } = useQuery({
+    queryKey: ["loaded-boxes", activeBatch?.id],
+    queryFn: async () => {
+      if (!activeBatch?.id) return [];
+      
+      const { data } = await supabase
+        .from("delivery_scan_logs")
+        .select("box_code")
+        .eq("batch_id", activeBatch.id)
+        .eq("scan_type", "loaded");
+      
+      return data || [];
+    },
+    enabled: !!activeBatch?.id,
+  });
+
+  const totalBoxes = activeBatch?.batch_stops?.length || 0;
+  const loadedCount = loadedBoxes?.length || 0;
+  const allBoxesLoaded = loadedCount === totalBoxes && totalBoxes > 0;
 
   if (isLoading) {
     return (
@@ -160,8 +184,27 @@ export default function RouteDetails() {
       </header>
 
       <main className="container mx-auto px-4 py-8 space-y-6">
-        {/* Box Code Scanner */}
-        <BoxCodeScanner />
+        {/* Box Loading Alert */}
+        {!allBoxesLoaded && (
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Load Boxes Before Starting</AlertTitle>
+            <AlertDescription className="flex items-center justify-between">
+              <span>
+                Scan all boxes when loading ({loadedCount}/{totalBoxes} loaded)
+              </span>
+              <Button 
+                onClick={() => navigate(`/driver/load/${activeBatch.id}`)}
+                size="sm"
+              >
+                Load Boxes
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Box Code Scanner for Delivery */}
+        {allBoxesLoaded && <BoxCodeScanner mode="delivery" batchId={activeBatch.id} />}
 
         {/* Route Stops */}
         <div className="space-y-4">

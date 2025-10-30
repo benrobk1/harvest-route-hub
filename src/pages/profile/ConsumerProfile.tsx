@@ -19,7 +19,9 @@ const ConsumerProfile = () => {
     full_name: "",
     email: "",
     phone: "",
-    delivery_address: "",
+    street_address: "",
+    city: "",
+    state: "",
     zip_code: "",
     delivery_days: [] as string[],
   });
@@ -53,7 +55,9 @@ const ConsumerProfile = () => {
         full_name: data.full_name || "",
         email: data.email || "",
         phone: data.phone || "",
-        delivery_address: data.delivery_address || "",
+        street_address: data.street_address || "",
+        city: data.city || "",
+        state: data.state || "",
         zip_code: data.zip_code || "",
         delivery_days: data.delivery_days || [],
       });
@@ -67,13 +71,18 @@ const ConsumerProfile = () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
+    const fullAddress = `${profile.street_address}, ${profile.city}, ${profile.state} ${profile.zip_code}`;
+
     const { error } = await supabase
       .from("profiles")
       .update({
         full_name: profile.full_name,
         phone: profile.phone,
-        delivery_address: profile.delivery_address,
+        street_address: profile.street_address,
+        city: profile.city,
+        state: profile.state,
         zip_code: profile.zip_code,
+        delivery_address: fullAddress,
         delivery_days: profile.delivery_days,
       })
       .eq("id", user.id);
@@ -166,13 +175,38 @@ const ConsumerProfile = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="delivery_address">Delivery Address</Label>
+                <Label htmlFor="street_address">Street Address</Label>
                 <Input
-                  id="delivery_address"
-                  value={profile.delivery_address}
-                  onChange={(e) => setProfile({ ...profile, delivery_address: e.target.value })}
+                  id="street_address"
+                  value={profile.street_address}
+                  onChange={(e) => setProfile({ ...profile, street_address: e.target.value })}
+                  placeholder="123 Main St, Apt 4B"
                   required
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="city">City</Label>
+                  <Input
+                    id="city"
+                    value={profile.city}
+                    onChange={(e) => setProfile({ ...profile, city: e.target.value })}
+                    placeholder="Springfield"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="state">State</Label>
+                  <Input
+                    id="state"
+                    value={profile.state}
+                    onChange={(e) => setProfile({ ...profile, state: e.target.value.toUpperCase() })}
+                    placeholder="IL"
+                    maxLength={2}
+                    required
+                  />
+                </div>
               </div>
 
               <div className="space-y-2">

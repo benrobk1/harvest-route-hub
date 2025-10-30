@@ -15,6 +15,7 @@ import Shop from "./pages/consumer/Shop";
 import Checkout from "./pages/consumer/Checkout";
 import DriverDashboard from "./pages/driver/Dashboard";
 import RouteDetails from "./pages/driver/RouteDetails";
+import LoadBoxes from "./pages/driver/LoadBoxes";
 import FarmerDashboard from "./pages/farmer/Dashboard";
 import AdminDashboard from "./pages/admin/Dashboard";
 import MarketConfig from "./pages/admin/MarketConfig";
@@ -90,6 +91,11 @@ const AppContent = () => {
           <Route path="/driver/dashboard" element={
             <RoleGate roles={['driver']}>
               <DriverDashboard />
+            </RoleGate>
+          } />
+          <Route path="/driver/load/:batchId" element={
+            <RoleGate roles={['driver']}>
+              <LoadBoxes />
             </RoleGate>
           } />
           <Route path="/driver/route" element={

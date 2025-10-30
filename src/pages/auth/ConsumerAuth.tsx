@@ -98,9 +98,13 @@ const ConsumerAuth = () => {
     const confirmPassword = formData.get("confirmPassword") as string;
     const fullName = formData.get("fullName") as string;
     const phone = formData.get("phone") as string;
-    const address = formData.get("address") as string;
+    const street = formData.get("street") as string;
+    const city = formData.get("city") as string;
+    const state = formData.get("state") as string;
     const zipCode = formData.get("zipCode") as string;
     const referralCodeInput = formData.get("referralCode") as string;
+    
+    const fullAddress = `${street}, ${city}, ${state} ${zipCode}`;
 
     try {
       emailSchema.parse(email);
@@ -118,8 +122,11 @@ const ConsumerAuth = () => {
           data: {
             full_name: fullName,
             phone,
-            delivery_address: address,
+            street_address: street,
+            city,
+            state,
             zip_code: zipCode,
+            delivery_address: fullAddress,
           }
         }
       });
@@ -300,8 +307,18 @@ const ConsumerAuth = () => {
                     <Input id="phone" name="phone" type="tel" placeholder="+1 (555) 000-0000" required />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="address">Delivery Address *</Label>
-                    <Input id="address" name="address" placeholder="123 Main St, Apt 4B" required />
+                    <Label htmlFor="street">Street Address *</Label>
+                    <Input id="street" name="street" placeholder="123 Main St, Apt 4B" required />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="city">City *</Label>
+                      <Input id="city" name="city" placeholder="Springfield" required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="state">State *</Label>
+                      <Input id="state" name="state" placeholder="IL" required maxLength={2} />
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="zipCode">ZIP Code *</Label>

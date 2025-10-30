@@ -8,6 +8,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BoxCodeScanner } from "@/components/driver/BoxCodeScanner";
 import { formatMoney } from "@/lib/formatMoney";
+import { Progress } from "@/components/ui/progress";
+import { getRatingDisplay, MINIMUM_REVIEWS_THRESHOLD } from "@/lib/ratingHelpers";
 
 const DriverDashboard = () => {
   const { user } = useAuth();
@@ -271,11 +273,37 @@ const DriverDashboard = () => {
                   <div className="h-12 w-12 rounded-full bg-warning/10 flex items-center justify-center">
                     <Star className="h-6 w-6 text-warning" />
                   </div>
-                  <div>
-                    <div className="text-2xl font-bold text-foreground">{stats?.rating || '0.0'}</div>
-                    <div className="text-sm text-muted-foreground">
-                      Rating ({stats?.totalRatings || 0} reviews)
-                    </div>
+                  <div className="flex-1">
+                    {(() => {
+                      const ratingDisplay = getRatingDisplay(
+                        Number(stats?.rating || 0), 
+                        stats?.totalRatings || 0
+                      );
+                      
+                      return ratingDisplay.show ? (
+                        <>
+                          <div className="text-2xl font-bold text-foreground">
+                            {ratingDisplay.rating}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            Rating ({ratingDisplay.reviewCount} reviews)
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="text-xl font-bold text-foreground">
+                            Building reputation
+                          </div>
+                          <div className="text-xs text-muted-foreground mb-2">
+                            {ratingDisplay.progress} reviews needed
+                          </div>
+                          <Progress 
+                            value={(ratingDisplay.reviewCount / MINIMUM_REVIEWS_THRESHOLD) * 100} 
+                            className="h-2"
+                          />
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
                 <div className="flex items-center gap-3">

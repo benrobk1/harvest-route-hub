@@ -451,16 +451,41 @@ const FarmerAuth = () => {
                   )}
                   
                   {farmerType === "lead" && (
-                    <div className="space-y-2">
-                      <Label htmlFor="collectionPointAddress">Collection Point Address</Label>
-                      <Input 
-                        id="collectionPointAddress" 
-                        placeholder="Address where farmers will drop off" 
-                        required
-                        value={formData.collectionPointAddress}
-                        onChange={(e) => setFormData({...formData, collectionPointAddress: e.target.value})}
-                      />
-                    </div>
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="collectionStreet">Collection Point Street Address *</Label>
+                        <Input 
+                          id="collectionStreet" 
+                          placeholder="123 Farm Road" 
+                          required
+                          value={formData.collectionPointAddress}
+                          onChange={(e) => setFormData({...formData, collectionPointAddress: e.target.value})}
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="collectionCity">City *</Label>
+                          <Input 
+                            id="collectionCity" 
+                            placeholder="Springfield" 
+                            required
+                            value={formData.farmAddress}
+                            onChange={(e) => setFormData({...formData, farmAddress: e.target.value})}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="collectionState">State *</Label>
+                          <Input 
+                            id="collectionState" 
+                            placeholder="IL" 
+                            required
+                            maxLength={2}
+                            value={formData.farmSize}
+                            onChange={(e) => setFormData({...formData, farmSize: e.target.value.toUpperCase()})}
+                          />
+                        </div>
+                      </div>
+                    </>
                   )}
                   
                   <div className="space-y-2">

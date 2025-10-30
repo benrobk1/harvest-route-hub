@@ -48,6 +48,7 @@ export type Database = {
         Row: {
           actual_arrival: string | null
           address: string
+          city: string | null
           created_at: string
           delivery_batch_id: string
           estimated_arrival: string | null
@@ -57,11 +58,15 @@ export type Database = {
           notes: string | null
           order_id: string
           sequence_number: number
+          state: string | null
           status: string
+          street_address: string | null
+          zip_code: string | null
         }
         Insert: {
           actual_arrival?: string | null
           address: string
+          city?: string | null
           created_at?: string
           delivery_batch_id: string
           estimated_arrival?: string | null
@@ -71,11 +76,15 @@ export type Database = {
           notes?: string | null
           order_id: string
           sequence_number: number
+          state?: string | null
           status?: string
+          street_address?: string | null
+          zip_code?: string | null
         }
         Update: {
           actual_arrival?: string | null
           address?: string
+          city?: string | null
           created_at?: string
           delivery_batch_id?: string
           estimated_arrival?: string | null
@@ -85,7 +94,10 @@ export type Database = {
           notes?: string | null
           order_id?: string
           sequence_number?: number
+          state?: string | null
           status?: string
+          street_address?: string | null
+          zip_code?: string | null
         }
         Relationships: [
           {
@@ -322,6 +334,77 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: true
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_scan_logs: {
+        Row: {
+          batch_id: string | null
+          box_code: string
+          created_at: string
+          driver_id: string
+          id: string
+          latitude: number | null
+          longitude: number | null
+          order_id: string | null
+          scan_type: string
+          scanned_at: string
+          stop_id: string | null
+        }
+        Insert: {
+          batch_id?: string | null
+          box_code: string
+          created_at?: string
+          driver_id: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          order_id?: string | null
+          scan_type: string
+          scanned_at?: string
+          stop_id?: string | null
+        }
+        Update: {
+          batch_id?: string | null
+          box_code?: string
+          created_at?: string
+          driver_id?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          order_id?: string | null
+          scan_type?: string
+          scanned_at?: string
+          stop_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_scan_logs_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_scan_logs_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_scan_logs_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_scan_logs_stop_id_fkey"
+            columns: ["stop_id"]
+            isOneToOne: false
+            referencedRelation: "batch_stops"
             referencedColumns: ["id"]
           },
         ]
@@ -792,10 +875,12 @@ export type Database = {
           approved_at: string | null
           approved_by: string | null
           avatar_url: string | null
+          city: string | null
           coi_url: string | null
           collection_point_address: string | null
           collection_point_lead_farmer_id: string | null
           commission_rate: number | null
+          country: string | null
           created_at: string | null
           delivery_address: string | null
           delivery_days: string[] | null
@@ -812,6 +897,8 @@ export type Database = {
           privacy_accepted_at: string | null
           referral_code: string | null
           rejected_reason: string | null
+          state: string | null
+          street_address: string | null
           stripe_charges_enabled: boolean | null
           stripe_connect_account_id: string | null
           stripe_onboarding_complete: boolean | null
@@ -829,10 +916,12 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           avatar_url?: string | null
+          city?: string | null
           coi_url?: string | null
           collection_point_address?: string | null
           collection_point_lead_farmer_id?: string | null
           commission_rate?: number | null
+          country?: string | null
           created_at?: string | null
           delivery_address?: string | null
           delivery_days?: string[] | null
@@ -849,6 +938,8 @@ export type Database = {
           privacy_accepted_at?: string | null
           referral_code?: string | null
           rejected_reason?: string | null
+          state?: string | null
+          street_address?: string | null
           stripe_charges_enabled?: boolean | null
           stripe_connect_account_id?: string | null
           stripe_onboarding_complete?: boolean | null
@@ -866,10 +957,12 @@ export type Database = {
           approved_at?: string | null
           approved_by?: string | null
           avatar_url?: string | null
+          city?: string | null
           coi_url?: string | null
           collection_point_address?: string | null
           collection_point_lead_farmer_id?: string | null
           commission_rate?: number | null
+          country?: string | null
           created_at?: string | null
           delivery_address?: string | null
           delivery_days?: string[] | null
@@ -886,6 +979,8 @@ export type Database = {
           privacy_accepted_at?: string | null
           referral_code?: string | null
           rejected_reason?: string | null
+          state?: string | null
+          street_address?: string | null
           stripe_charges_enabled?: boolean | null
           stripe_connect_account_id?: string | null
           stripe_onboarding_complete?: boolean | null

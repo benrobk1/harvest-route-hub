@@ -26,9 +26,11 @@ interface Product {
   available_quantity: number;
   image_url: string | null;
   farm_profile_id: string;
+  harvest_date: string | null;
   farm_profiles: {
     id: string;
     farm_name: string;
+    location: string | null;
   };
 }
 
@@ -66,7 +68,8 @@ const Shop = () => {
           *,
           farm_profiles!inner (
             id,
-            farm_name
+            farm_name,
+            location
           )
         `)
         .gt("available_quantity", 0);

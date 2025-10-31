@@ -13,6 +13,7 @@ import { Progress } from "@/components/ui/progress";
 import { getRatingDisplay, MINIMUM_REVIEWS_THRESHOLD } from "@/lib/ratingHelpers";
 import { StripeConnectStatusBanner } from "@/components/StripeConnectStatusBanner";
 import { calculateEstimatedExpenses } from "@/lib/driverEarningsHelpers";
+import { RouteDensityMap } from "@/components/driver/RouteDensityMap";
 
 const DriverDashboard = () => {
   const { user } = useAuth();
@@ -180,6 +181,23 @@ const DriverDashboard = () => {
         totalRatings,
         onTime: onTimePercentage,
       };
+    },
+    enabled: !!user?.id,
+  });
+
+  // Fetch active batch ID for route density map
+  const { data: activeBatch } = useQuery({
+    queryKey: ['driver-active-batch', user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('delivery_batches')
+        .select('id')
+        .eq('driver_id', user?.id)
+        .in('status', ['assigned', 'in_progress'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      return data;
     },
     enabled: !!user?.id,
   });
@@ -386,6 +404,11 @@ const DriverDashboard = () => {
 
         {/* Box Code Scanner */}
         <BoxCodeScanner />
+
+        {/* Route Density Map - Show if there's an active batch */}
+        {activeBatch?.id && activeRoute && activeRoute.length > 0 && (
+          <RouteDensityMap batchId={activeBatch.id} />
+        )}
 
         {/* Active Route */}
         <Card className="border-2">

@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { RoleGate } from "@/components/RoleGate";
+import { InstallPromptToast } from "@/components/InstallPromptToast";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import ConsumerAuth from "./pages/auth/ConsumerAuth";
@@ -60,6 +61,7 @@ const AppContent = () => {
   return (
     <>
       <CookieConsent />
+      <InstallPromptToast />
       <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/auth/consumer" element={<ConsumerAuth />} />

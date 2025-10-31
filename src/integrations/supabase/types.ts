@@ -52,6 +52,7 @@ export type Database = {
           created_at: string
           delivery_batch_id: string
           estimated_arrival: string | null
+          geojson: Json | null
           id: string
           latitude: number | null
           longitude: number | null
@@ -70,6 +71,7 @@ export type Database = {
           created_at?: string
           delivery_batch_id: string
           estimated_arrival?: string | null
+          geojson?: Json | null
           id?: string
           latitude?: number | null
           longitude?: number | null
@@ -88,6 +90,7 @@ export type Database = {
           created_at?: string
           delivery_batch_id?: string
           estimated_arrival?: string | null
+          geojson?: Json | null
           id?: string
           latitude?: number | null
           longitude?: number | null
@@ -827,6 +830,7 @@ export type Database = {
           created_at: string | null
           description: string | null
           farm_profile_id: string
+          harvest_date: string | null
           id: string
           image_url: string | null
           name: string
@@ -839,6 +843,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           farm_profile_id: string
+          harvest_date?: string | null
           id?: string
           image_url?: string | null
           name: string
@@ -851,6 +856,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           farm_profile_id?: string
+          harvest_date?: string | null
           id?: string
           image_url?: string | null
           name?: string
@@ -895,6 +901,7 @@ export type Database = {
           payment_setup_complete: boolean | null
           phone: string | null
           privacy_accepted_at: string | null
+          push_subscription: Json | null
           referral_code: string | null
           rejected_reason: string | null
           state: string | null
@@ -936,6 +943,7 @@ export type Database = {
           payment_setup_complete?: boolean | null
           phone?: string | null
           privacy_accepted_at?: string | null
+          push_subscription?: Json | null
           referral_code?: string | null
           rejected_reason?: string | null
           state?: string | null
@@ -977,6 +985,7 @@ export type Database = {
           payment_setup_complete?: boolean | null
           phone?: string | null
           privacy_accepted_at?: string | null
+          push_subscription?: Json | null
           referral_code?: string | null
           rejected_reason?: string | null
           state?: string | null

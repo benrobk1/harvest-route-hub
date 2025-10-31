@@ -340,7 +340,21 @@ const UserApprovals = () => {
                         )}
                         {user.produce_types && (
                           <div className="col-span-2">
-                            <span className="text-muted-foreground">Produce Types:</span> {user.produce_types}
+                            <span className="text-muted-foreground">Produce Types:</span> 
+                            <div className="mt-1 space-y-1">
+                              {(() => {
+                                try {
+                                  const items = JSON.parse(user.produce_types);
+                                  return items.map((item: {type: string, boxes: number}, idx: number) => (
+                                    <div key={idx} className="text-sm">
+                                      • {item.type}: {item.boxes} boxes/week
+                                    </div>
+                                  ));
+                                } catch {
+                                  return <div className="text-sm">{user.produce_types}</div>;
+                                }
+                              })()}
+                            </div>
                           </div>
                         )}
                         {user.additional_info && (

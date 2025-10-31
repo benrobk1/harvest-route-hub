@@ -25,16 +25,22 @@ This project includes comprehensive testing setup with Vitest and Playwright.
 Run unit tests:
 ```bash
 npm run test
+# or
+npx vitest
 ```
 
 Run tests with UI:
 ```bash
 npm run test:ui
+# or
+npx vitest --ui
 ```
 
 Run tests with coverage:
 ```bash
 npm run test:coverage
+# or
+npx vitest --coverage
 ```
 
 ### Writing Unit Tests
@@ -102,27 +108,75 @@ SENTRY_AUTH_TOKEN=your_auth_token
 
 ## Load Testing
 
-Run batch generation load test:
+The load test validates batch generation performance by creating real test orders in the database.
+
+### Setup
+
+1. Add your service role key to `.env`:
+```bash
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+```
+
+⚠️ **Security Note:** The service role key bypasses RLS and should only be used in local development. Never commit it to version control.
+
+### Run Load Test
+
+```bash
+node scripts/loadtest-batches.js
+```
+
+Or if you've added npm scripts:
 ```bash
 npm run test:load
 ```
+
+### What It Tests
+
+The load test:
+1. ✅ Creates 40 test orders with real NYC addresses
+2. ✅ Calls the `generate-batches` edge function
+3. ✅ Measures performance and validates results
+4. ✅ Automatically cleans up all test data
 
 **Expected Performance:**
 - ✅ 40 addresses batched in < 3 seconds
 - 📦 4 batches created (10 orders per batch)
 - 🎯 ~50ms per address average
-- 🚀 Extrapolated capacity: ~500 orders/hour
+- 🚀 Extrapolated capacity: ~1,300 orders/hour
 
 **Example Output:**
 ```
+🚀 Starting batch generation load test...
+
+📊 Phase 1: Seeding test data...
+✅ Created test consumer: abc-123-def
+✅ Created 40 test orders
+
+📦 Phase 2: Running batch generation...
+
 ✅ LOAD TEST RESULTS:
 ─────────────────────────────────────
 ⏱️  Duration: 1847ms (1.85s)
 📦 Batches created: 4
-🚚 Orders per batch: ~10
+🚚 Orders per batch: 10
 🎯 Avg time per address: 46ms
 ─────────────────────────────────────
 🎉 Performance Target: PASSED (< 3s)
+✨ System can handle 40+ concurrent orders efficiently
+
+📊 Extrapolated Capacity:
+   - 21.7 orders/second
+   - ~1,299 orders/minute
+   - ~77,940 orders/hour
+
+📍 Batch Details:
+   - Batch 1: 10 stops
+   - Batch 2: 10 stops
+   - Batch 3: 10 stops
+   - Batch 4: 10 stops
+
+🧹 Cleaning up test data...
+✅ Cleanup complete
 ```
 
 Performance validated for high-volume order processing.

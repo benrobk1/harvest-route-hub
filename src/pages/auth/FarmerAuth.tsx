@@ -128,6 +128,7 @@ const FarmerAuth = () => {
         email: formData.email,
         password: formData.password,
         options: {
+          emailRedirectTo: `${window.location.origin}/`,
           data: {
             full_name: formData.ownerName,
             phone: formData.phone,
@@ -139,16 +140,6 @@ const FarmerAuth = () => {
       if (signupError) throw signupError;
       if (!authData.user) throw new Error("Failed to create user account");
 
-      // Assign the appropriate role
-      const role = farmerType === "lead" ? "lead_farmer" : "farmer";
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({ 
-          user_id: authData.user.id, 
-          role 
-        });
-
-      if (roleError) throw roleError;
 
       // Build collection point address for lead farmers
       const collectionPointAddress = farmerType === "lead" 
@@ -172,6 +163,10 @@ const FarmerAuth = () => {
           collection_point_address: collectionPointAddress,
           approval_status: 'pending',
           acquisition_channel: acquisitionChannel,
+          applied_role: farmerType === "lead" ? "lead_farmer" : "farmer",
+          farm_size: formData.farmSize,
+          produce_types: formData.produceTypes,
+          additional_info: formData.additionalInfo,
         }, {
           onConflict: 'id'
         });

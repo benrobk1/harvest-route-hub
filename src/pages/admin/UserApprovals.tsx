@@ -34,14 +34,24 @@ interface UserProfile {
   roles: string[];
   // Farmer fields
   farm_name: string | null;
+  street_address: string | null;
+  city: string | null;
+  state: string | null;
   zip_code: string | null;
+  country: string | null;
   collection_point_address: string | null;
+  acquisition_channel: string | null;
+  applied_role: 'farmer' | 'lead_farmer' | null;
+  farm_size: string | null;
+  produce_types: string | null;
+  additional_info: string | null;
   // Driver fields
   vehicle_type: string | null;
   vehicle_make: string | null;
   vehicle_year: string | null;
   license_number: string | null;
 }
+
 
 const UserApprovals = () => {
   const { toast } = useToast();
@@ -119,6 +129,41 @@ const UserApprovals = () => {
         _old_value: { status: selectedUser?.approval_status },
         _new_value: { status: 'approved' },
       });
+
+      // Fetch profile to determine applied role and farm info
+      const { data: profileData, error: profileFetchError } = await supabase
+        .from('profiles')
+        .select('applied_role, farm_name, additional_info, city, state')
+        .eq('id', userId)
+        .single();
+      if (profileFetchError) throw profileFetchError;
+
+      // Assign role based on applied_role (default to 'farmer')
+      const appliedRole = (profileData?.applied_role as 'farmer' | 'lead_farmer') ?? 'farmer';
+      const { error: roleAssignError } = await supabase
+        .from('user_roles')
+        .upsert({ user_id: userId, role: appliedRole }, { onConflict: 'user_id,role' });
+      if (roleAssignError) throw roleAssignError;
+
+      // Ensure a farm profile exists for dropdowns
+      const { data: existingFarm, error: farmCheckError } = await supabase
+        .from('farm_profiles')
+        .select('id')
+        .eq('farmer_id', userId)
+        .maybeSingle();
+      if (farmCheckError) throw farmCheckError;
+
+      if (!existingFarm) {
+        const { error: farmInsertError } = await supabase
+          .from('farm_profiles')
+          .insert({
+            farmer_id: userId,
+            farm_name: profileData?.farm_name || 'Untitled Farm',
+            description: profileData?.additional_info || null,
+            location: [profileData?.city, profileData?.state].filter(Boolean).join(', ') || null,
+          });
+        if (farmInsertError) throw farmInsertError;
+      }
     },
     onSuccess: () => {
       toast({
@@ -272,12 +317,40 @@ const UserApprovals = () => {
                         <div>
                           <span className="text-muted-foreground">Farm Name:</span> {user.farm_name || 'N/A'}
                         </div>
+                        {user.street_address && (
+                          <div className="col-span-2">
+                            <span className="text-muted-foreground">Farm Address:</span> {user.street_address}
+                          </div>
+                        )}
                         <div>
-                          <span className="text-muted-foreground">ZIP Code:</span> {user.zip_code || 'N/A'}
+                          <span className="text-muted-foreground">City/State/ZIP:</span> {[user.city, user.state, user.zip_code].filter(Boolean).join(', ') || 'N/A'}
                         </div>
                         {user.roles.includes('lead_farmer') && user.collection_point_address && (
                           <div className="col-span-2">
                             <span className="text-muted-foreground">Collection Point:</span> {user.collection_point_address}
+                          </div>
+                        )}
+                        <div>
+                          <span className="text-muted-foreground">Applied Role:</span> {user.applied_role?.replace('_', ' ') || 'farmer'}
+                        </div>
+                        {user.farm_size && (
+                          <div>
+                            <span className="text-muted-foreground">Farm Size:</span> {user.farm_size}
+                          </div>
+                        )}
+                        {user.produce_types && (
+                          <div className="col-span-2">
+                            <span className="text-muted-foreground">Produce Types:</span> {user.produce_types}
+                          </div>
+                        )}
+                        {user.additional_info && (
+                          <div className="col-span-2">
+                            <span className="text-muted-foreground">Additional Info:</span> {user.additional_info}
+                          </div>
+                        )}
+                        {user.acquisition_channel && (
+                          <div>
+                            <span className="text-muted-foreground">Heard About Us:</span> {user.acquisition_channel}
                           </div>
                         )}
                       </>

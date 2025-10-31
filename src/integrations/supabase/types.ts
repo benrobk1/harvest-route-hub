@@ -994,6 +994,8 @@ export type Database = {
       profiles: {
         Row: {
           acquisition_channel: string | null
+          additional_info: string | null
+          applied_role: string | null
           approval_status: string | null
           approved_at: string | null
           approved_by: string | null
@@ -1011,6 +1013,7 @@ export type Database = {
           driver_license_url: string | null
           email: string
           farm_name: string | null
+          farm_size: string | null
           full_name: string | null
           id: string
           insurance_url: string | null
@@ -1018,6 +1021,7 @@ export type Database = {
           payment_setup_complete: boolean | null
           phone: string | null
           privacy_accepted_at: string | null
+          produce_types: string | null
           push_subscription: Json | null
           referral_code: string | null
           rejected_reason: string | null
@@ -1041,6 +1045,8 @@ export type Database = {
         }
         Insert: {
           acquisition_channel?: string | null
+          additional_info?: string | null
+          applied_role?: string | null
           approval_status?: string | null
           approved_at?: string | null
           approved_by?: string | null
@@ -1058,6 +1064,7 @@ export type Database = {
           driver_license_url?: string | null
           email: string
           farm_name?: string | null
+          farm_size?: string | null
           full_name?: string | null
           id: string
           insurance_url?: string | null
@@ -1065,6 +1072,7 @@ export type Database = {
           payment_setup_complete?: boolean | null
           phone?: string | null
           privacy_accepted_at?: string | null
+          produce_types?: string | null
           push_subscription?: Json | null
           referral_code?: string | null
           rejected_reason?: string | null
@@ -1088,6 +1096,8 @@ export type Database = {
         }
         Update: {
           acquisition_channel?: string | null
+          additional_info?: string | null
+          applied_role?: string | null
           approval_status?: string | null
           approved_at?: string | null
           approved_by?: string | null
@@ -1105,6 +1115,7 @@ export type Database = {
           driver_license_url?: string | null
           email?: string
           farm_name?: string | null
+          farm_size?: string | null
           full_name?: string | null
           id?: string
           insurance_url?: string | null
@@ -1112,6 +1123,7 @@ export type Database = {
           payment_setup_complete?: boolean | null
           phone?: string | null
           privacy_accepted_at?: string | null
+          produce_types?: string | null
           push_subscription?: Json | null
           referral_code?: string | null
           rejected_reason?: string | null

@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Truck, Package, Calendar } from 'lucide-react';
+import { Truck, Package, Calendar, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const BatchAdjustments = () => {
   const { toast } = useToast();
@@ -106,11 +107,19 @@ const BatchAdjustments = () => {
     );
   }
 
+  const navigate = useNavigate();
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Batch Adjustments</h1>
-        <p className="text-muted-foreground">Manually adjust delivery batches and reassign drivers</p>
+      <div className="flex items-center gap-4">
+        <Button variant="outline" size="sm" onClick={() => navigate('/admin/dashboard')}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Dashboard
+        </Button>
+        <div>
+          <h1 className="text-3xl font-bold">Batch Adjustments</h1>
+          <p className="text-muted-foreground">Manually adjust delivery batches and reassign drivers</p>
+        </div>
       </div>
 
       <div className="space-y-4">

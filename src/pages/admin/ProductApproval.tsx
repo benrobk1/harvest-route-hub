@@ -10,9 +10,10 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { toast } from "sonner";
-import { ChevronDown, MapPin, User, Package, CheckCircle, XCircle } from "lucide-react";
+import { ChevronDown, MapPin, User, Package, CheckCircle, XCircle, ArrowLeft } from "lucide-react";
 import { formatMoney } from "@/lib/formatMoney";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 interface Product {
   id: string;
@@ -141,10 +142,21 @@ export default function ProductApproval() {
     setOpenFarmers(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const navigate = useNavigate();
+
   return (
     <div className="min-h-screen bg-gradient-earth">
       <header className="bg-white border-b shadow-soft">
         <div className="container mx-auto px-4 py-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate("/admin/dashboard")}
+            className="mb-2"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
           <h1 className="text-2xl font-bold text-foreground">Product Approval</h1>
           <p className="text-sm text-muted-foreground">
             Review and manage farmer products by collection point

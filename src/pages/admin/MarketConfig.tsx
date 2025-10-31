@@ -9,8 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import { Plus, Pencil, Save, X } from "lucide-react";
+import { Plus, Pencil, Save, X, ArrowLeft } from "lucide-react";
 import { formatMoney } from "@/lib/formatMoney";
+import { useNavigate } from "react-router-dom";
 
 interface MarketConfig {
   id: string;
@@ -76,10 +77,21 @@ export default function MarketConfig() {
     },
   });
 
+  const navigate = useNavigate();
+
   return (
     <div className="min-h-screen bg-gradient-earth">
       <header className="bg-white border-b shadow-soft">
         <div className="container mx-auto px-4 py-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate("/admin/dashboard")}
+            className="mb-2"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold text-foreground">Market Configuration</h1>

@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { formatDistanceToNow } from "date-fns";
-import { Eye } from "lucide-react";
+import { Eye, ArrowLeft } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 interface AuditLogEntry {
   id: string;
@@ -82,8 +83,16 @@ const AuditLog = () => {
     return <div className="flex items-center justify-center min-h-screen">Loading audit log...</div>;
   }
 
+  const navigate = useNavigate();
+
   return (
     <div className="container mx-auto p-6">
+      <div className="mb-6">
+        <Button variant="outline" size="sm" onClick={() => navigate('/admin/dashboard')}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Dashboard
+        </Button>
+      </div>
       <Card>
         <CardHeader>
           <CardTitle>Admin Audit Log</CardTitle>

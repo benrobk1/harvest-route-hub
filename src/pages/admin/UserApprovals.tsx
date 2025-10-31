@@ -17,7 +17,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { CheckCircle2, XCircle, FileText, Eye, Loader2 } from 'lucide-react';
+import { CheckCircle2, XCircle, FileText, Eye, Loader2, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 interface UserProfile {
@@ -216,9 +216,15 @@ const UserApprovals = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">User Approvals</h1>
-        <p className="text-muted-foreground">Review and approve farmer and driver applications</p>
+      <div className="flex items-center gap-4">
+        <Button variant="outline" size="sm" onClick={() => navigate('/admin/dashboard')}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Dashboard
+        </Button>
+        <div>
+          <h1 className="text-3xl font-bold">User Approvals</h1>
+          <p className="text-muted-foreground">Review and approve farmer and driver applications</p>
+        </div>
       </div>
 
       <Tabs defaultValue="pending">

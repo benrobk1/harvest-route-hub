@@ -2,13 +2,16 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 import { formatMoney } from '@/lib/formatMoney';
-import { DollarSign, TrendingUp, Users, Percent } from 'lucide-react';
+import { DollarSign, TrendingUp, Users, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell } from 'recharts';
 
 const COLORS = ['#10b981', '#3b82f6'];
 
 const AnalyticsAndFinancials = () => {
+  const navigate = useNavigate();
   const { data, isLoading } = useQuery({
     queryKey: ['analytics-financials'],
     queryFn: async () => {
@@ -74,10 +77,19 @@ const AnalyticsAndFinancials = () => {
 
   return (
     <div className="space-y-6">
-      <div><h1 className="text-3xl font-bold">Analytics & Financial Reports</h1><p className="text-muted-foreground">Comprehensive business metrics and financial health</p></div>
+      <div className="flex items-center gap-4">
+        <Button variant="outline" size="sm" onClick={() => navigate('/admin/dashboard')}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Dashboard
+        </Button>
+        <div>
+          <h1 className="text-3xl font-bold">Analytics & Financial Reports</h1>
+          <p className="text-muted-foreground">Comprehensive business metrics and financial health</p>
+        </div>
+      </div>
       
       <Tabs defaultValue="financial">
-        <TabsList><TabsTrigger value="financial">Financial Overview</TabsTrigger><TabsTrigger value="customers">Customer Analytics</TabsTrigger><TabsTrigger value="operations">Operations</TabsTrigger></TabsList>
+        <TabsList><TabsTrigger value="financial">Financial Overview</TabsTrigger><TabsTrigger value="customers">Customer Analytics</TabsTrigger></TabsList>
         
         <TabsContent value="financial" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -99,13 +111,6 @@ const AnalyticsAndFinancials = () => {
           </div>
           <Card><CardHeader><CardTitle>Customer Growth</CardTitle></CardHeader><CardContent><ResponsiveContainer width="100%" height={350}><LineChart data={data?.monthlyTrends || []}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="month" /><YAxis yAxisId="left" /><YAxis yAxisId="right" orientation="right" /><Tooltip /><Line yAxisId="left" type="monotone" dataKey="revenue" stroke="hsl(var(--primary))" strokeWidth={2} name="Revenue" /><Line yAxisId="right" type="monotone" dataKey="customers" stroke="hsl(var(--earth))" strokeWidth={2} name="Customers" /></LineChart></ResponsiveContainer></CardContent></Card>
           <Card><CardHeader><CardTitle>Acquisition by Channel</CardTitle></CardHeader><CardContent><ResponsiveContainer width="100%" height={300}><BarChart data={data?.cacByChannel || []}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="channel" /><YAxis /><Tooltip formatter={(value) => formatMoney(Number(value))} /><Bar dataKey="avgValue" fill="hsl(var(--primary))" name="Avg Customer Value" /></BarChart></ResponsiveContainer></CardContent></Card>
-        </TabsContent>
-
-        <TabsContent value="operations" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-3">
-            <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Orders Completed</CardTitle><TrendingUp className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{data?.ordersCount || 0}</div></CardContent></Card>
-            <Card><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">Avg Order Value</CardTitle><DollarSign className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{formatMoney(data?.ordersCount ? (data.totalRevenue / data.ordersCount) : 0)}</div></CardContent></Card>
-          </div>
         </TabsContent>
       </Tabs>
     </div>

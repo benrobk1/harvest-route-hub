@@ -18,7 +18,8 @@ import {
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { formatMoney } from '@/lib/formatMoney';
-import { AlertCircle, CheckCircle2, Clock, XCircle } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Clock, XCircle, ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface Dispute {
   id: string;
@@ -183,11 +184,19 @@ const Disputes = () => {
     );
   }
 
+  const navigate = useNavigate();
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Disputes & Refunds</h1>
-        <p className="text-muted-foreground">Manage customer disputes and process refunds</p>
+      <div className="flex items-center gap-4">
+        <Button variant="outline" size="sm" onClick={() => navigate('/admin/dashboard')}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Dashboard
+        </Button>
+        <div>
+          <h1 className="text-3xl font-bold">Disputes & Refunds</h1>
+          <p className="text-muted-foreground">Manage customer disputes and process refunds</p>
+        </div>
       </div>
 
       <Tabs defaultValue="open">

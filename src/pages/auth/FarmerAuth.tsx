@@ -158,7 +158,9 @@ const FarmerAuth = () => {
       // Update profile with additional information
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({
+        .upsert({
+          id: authData.user.id,
+          email: formData.email,
           full_name: formData.ownerName,
           phone: formData.phone,
           farm_name: formData.farmName,
@@ -170,8 +172,9 @@ const FarmerAuth = () => {
           collection_point_address: collectionPointAddress,
           approval_status: 'pending',
           acquisition_channel: acquisitionChannel,
-        })
-        .eq('id', authData.user.id);
+        }, {
+          onConflict: 'id'
+        });
 
       if (profileError) throw profileError;
 

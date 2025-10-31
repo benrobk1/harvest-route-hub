@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Package } from "lucide-react";
+import { ArrowLeft, Package, Coins } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -59,9 +59,29 @@ const ConsumerOrderTracking = () => {
 
       const ratedOrderIds = new Set(ratings?.map(r => r.order_id) || []);
 
+      // Get credits earned/used for each order
+      const { data: creditsData } = await supabase
+        .from('credits_ledger')
+        .select('order_id, amount, transaction_type')
+        .in('order_id', orderIds);
+
+      const creditsMap = new Map();
+      creditsData?.forEach(credit => {
+        if (!creditsMap.has(credit.order_id)) {
+          creditsMap.set(credit.order_id, { earned: 0, used: 0 });
+        }
+        if (credit.transaction_type === 'earned') {
+          creditsMap.get(credit.order_id).earned += Number(credit.amount);
+        } else if (credit.transaction_type === 'redeemed') {
+          creditsMap.get(credit.order_id).used += Math.abs(Number(credit.amount));
+        }
+      });
+
       return data?.map(order => ({
         ...order,
         hasRating: ratedOrderIds.has(order.id),
+        creditsEarned: creditsMap.get(order.id)?.earned || 0,
+        creditsUsed: creditsMap.get(order.id)?.used || 0,
       })) || [];
     },
     enabled: !!user?.id,
@@ -158,6 +178,17 @@ const ConsumerOrderTracking = () => {
                         <div className="flex justify-between text-sm text-green-600">
                           <span>Driver Tip:</span>
                           <span className="font-medium">{formatMoney(Number(order.tip_amount))}</span>
+                        </div>
+                      )}
+                      {order.creditsUsed > 0 && (
+                        <div className="flex justify-between text-sm text-green-600">
+                          <span>Credits Applied:</span>
+                          <span className="font-medium">-{formatMoney(order.creditsUsed)}</span>
+                        </div>
+                      )}
+                      {order.creditsEarned > 0 && (
+                        <div className="p-2 bg-green-50 dark:bg-green-950 rounded mt-2 text-sm text-green-700 dark:text-green-300">
+                          <strong>+${order.creditsEarned.toFixed(2)}</strong> credit earned from this order (available next month)
                         </div>
                       )}
                     </div>

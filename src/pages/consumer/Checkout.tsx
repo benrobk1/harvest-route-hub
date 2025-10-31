@@ -81,6 +81,21 @@ const Checkout = () => {
     enabled: !!profile?.zip_code,
   });
 
+  const { data: subscriptionStatus } = useQuery({
+    queryKey: ['subscription', user?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('consumer_id', user!.id)
+        .maybeSingle();
+
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!user,
+  });
+
   // Generate available delivery dates (next 7 days)
   const availableDates = Array.from({ length: 7 }, (_, i) => {
     const date = addDays(startOfDay(new Date()), i + 1);
@@ -443,6 +458,22 @@ const Checkout = () => {
                     <span>{formatMoney(total)}</span>
                   </div>
                 </div>
+
+                {/* Credits Earning Preview */}
+                {subtotal >= 100 && subscriptionStatus?.status === 'active' && (
+                  <div className="p-3 bg-green-50 dark:bg-green-950 rounded-lg border border-green-200 dark:border-green-800">
+                    <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-300">
+                      <TrendingUp className="h-4 w-4" />
+                      <span className="font-medium">
+                        This order qualifies for $10 credit next month!
+                      </span>
+                    </div>
+                    <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                      You've spent {formatMoney(subscriptionStatus.monthly_spend || 0)} this month. 
+                      Orders $100+ each month earn $10 revolving credit.
+                    </p>
+                  </div>
+                )}
 
                 <div className="border-t pt-4 space-y-3">
                   <div className="flex items-start space-x-2">

@@ -136,11 +136,11 @@ const AdminDashboard = () => {
               <p className="text-sm text-muted-foreground">Real-time business intelligence and operations</p>
             </div>
             <div className="grid gap-2 md:grid-cols-6 lg:grid-cols-11">
-              <Button variant="outline" size="sm" onClick={() => navigate('/admin/user-approvals')}>Approvals</Button>
-              <Button variant="outline" size="sm" onClick={() => navigate('/admin/product-approval')}>Products</Button>
+              <Button variant="outline" size="sm" onClick={() => navigate('/admin/approvals')}>Approvals</Button>
+              <Button variant="outline" size="sm" onClick={() => navigate('/admin/products')}>Products</Button>
               <Button variant="outline" size="sm" onClick={() => navigate('/admin/disputes')}>Disputes</Button>
               <Button variant="outline" size="sm" onClick={() => navigate('/admin/market-config')}>Markets</Button>
-              <Button variant="outline" size="sm" onClick={() => navigate('/admin/batch-adjustments')}>Batches</Button>
+              <Button variant="outline" size="sm" onClick={() => navigate('/admin/batches')}>Batches</Button>
               <Button variant="outline" size="sm" onClick={() => navigate('/admin/analytics-financials')}>Analytics</Button>
               <Button variant="outline" size="sm" onClick={() => navigate('/admin/audit-log')}>Audit Log</Button>
               <Button variant="outline" size="sm" onClick={() => navigate('/admin/farm-affiliations')}>Affiliations</Button>
@@ -157,7 +157,7 @@ const AdminDashboard = () => {
 
       <main className="container mx-auto px-4 py-8 space-y-8">
         {/* Pending Approvals - Single Card */}
-        <Link to="/admin/user-approvals">
+        <Link to="/admin/approvals">
           <Card className="border-2 hover:shadow-md transition-shadow cursor-pointer">
             <CardHeader>
               <CardTitle>Pending Approvals</CardTitle>

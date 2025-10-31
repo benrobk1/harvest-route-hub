@@ -1,9 +1,10 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, Truck, Sprout, DollarSign, TrendingUp, MapPin } from "lucide-react";
+import { Users, Truck, Sprout, DollarSign, TrendingUp, MapPin, FileText } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -16,6 +17,8 @@ import { FarmAffiliationManager } from "@/components/admin/FarmAffiliationManage
 import { TaxDocumentGenerator } from "@/components/admin/TaxDocumentGenerator";
 
 const AdminDashboard = () => {
+  const navigate = useNavigate();
+  
   // Fetch metrics
   const { data: metrics, isLoading: metricsLoading } = useQuery({
     queryKey: ['admin-metrics'],

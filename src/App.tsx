@@ -24,6 +24,8 @@ import Analytics from "./pages/admin/Analytics";
 import AuditLog from "./pages/admin/AuditLog";
 import MarketConfig from "./pages/admin/MarketConfig";
 import ProductApproval from "./pages/admin/ProductApproval";
+import FarmAffiliations from "./pages/admin/FarmAffiliations";
+import TaxDocuments from "./pages/admin/TaxDocuments";
 import ConsumerOrderTracking from "./pages/consumer/OrderTracking";
 import ConsumerProfile from "./pages/profile/ConsumerProfile";
 import FarmerProfile from "./pages/profile/FarmerProfile";
@@ -173,6 +175,16 @@ const AppContent = () => {
           <Route path="/admin/financials" element={
             <RoleGate roles={['admin']}>
               <FinancialReports />
+            </RoleGate>
+          } />
+          <Route path="/admin/farm-affiliations" element={
+            <RoleGate roles={['admin']}>
+              <FarmAffiliations />
+            </RoleGate>
+          } />
+          <Route path="/admin/tax-documents" element={
+            <RoleGate roles={['admin']}>
+              <TaxDocuments />
             </RoleGate>
           } />
           

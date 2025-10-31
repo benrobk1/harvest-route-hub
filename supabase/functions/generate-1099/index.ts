@@ -115,7 +115,7 @@ serve(async (req) => {
     
     if (profile.tax_address) {
       const addressLines = profile.tax_address.split('\n');
-      addressLines.forEach((line, i) => {
+      addressLines.forEach((line: string, i: number) => {
         page.drawText(line, { 
           x: 350, 
           y: height - 165 - (i * 15), 
@@ -150,7 +150,10 @@ serve(async (req) => {
     
     const pdfBytes = await pdfDoc.save();
     
-    return new Response(pdfBytes, {
+    // Convert to plain Uint8Array for Response compatibility
+    const buffer = new Uint8Array(pdfBytes);
+    
+    return new Response(buffer, {
       headers: {
         ...corsHeaders,
         'Content-Type': 'application/pdf',

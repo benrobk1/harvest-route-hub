@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { StripeConnectButton } from "@/components/StripeConnectButton";
 import { PayoutsDashboard } from "@/components/PayoutsDashboard";
 import { DocumentUpload } from "@/components/DocumentUpload";
+import { TaxInformationForm } from "@/components/TaxInformationForm";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -238,11 +239,12 @@ const FarmerProfile = () => {
             )}
 
             <Tabs defaultValue="personal" className="w-full">
-              <TabsList className="grid w-full grid-cols-5">
+              <TabsList className="grid w-full grid-cols-6">
                 <TabsTrigger value="personal">Personal</TabsTrigger>
                 <TabsTrigger value="farm">Farm</TabsTrigger>
                 <TabsTrigger value="documents">Documents</TabsTrigger>
                 <TabsTrigger value="payments">Payments</TabsTrigger>
+                <TabsTrigger value="tax">Tax Info</TabsTrigger>
                 <TabsTrigger value="payouts">Payouts</TabsTrigger>
               </TabsList>
 
@@ -400,6 +402,10 @@ const FarmerProfile = () => {
 
               <TabsContent value="payments">
                 <StripeConnectButton />
+              </TabsContent>
+
+              <TabsContent value="tax">
+                <TaxInformationForm />
               </TabsContent>
 
               <TabsContent value="payouts">

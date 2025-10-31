@@ -13,9 +13,8 @@ import { BatchConsolidation } from "@/components/farmer/BatchConsolidation";
 import { StripeConnectSimple } from "@/components/farmer/StripeConnectSimple";
 import { BulkEditDialog } from "@/components/farmer/BulkEditDialog";
 import { MultiFarmDashboard } from "@/components/farmer/MultiFarmDashboard";
-import { PayoutHistoryChart } from "@/components/PayoutHistoryChart";
-import { PayoutDetailsTable } from "@/components/PayoutDetailsTable";
-import { TaxInformationForm } from "@/components/TaxInformationForm";
+import { WeeklyInventoryReview } from "@/components/farmer/WeeklyInventoryReview";
+import { LeadFarmerInfoCard } from "@/components/farmer/LeadFarmerInfoCard";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -63,6 +62,20 @@ const FarmerDashboard = () => {
   });
 
   const isLeadFarmer = userRoles?.includes('lead_farmer');
+
+  // Fetch user profile for collection point lead farmer
+  const { data: userProfile } = useQuery({
+    queryKey: ['user-profile', user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('collection_point_lead_farmer_id')
+        .eq('id', user?.id)
+        .single();
+      return data;
+    },
+    enabled: !!user?.id && !isLeadFarmer,
+  });
 
   // Fetch earnings (including lead farmer commission if applicable)
   const { data: earnings, isLoading: earningsLoading } = useQuery({
@@ -269,6 +282,18 @@ const FarmerDashboard = () => {
               Profile
             </Button>
             <StripeConnectSimple variant="button" />
+            {isLeadFarmer && (
+              <>
+                <Button variant="outline" onClick={() => window.location.href = '/farmer/customer-analytics'}>
+                  <TrendingUp className="h-4 w-4 mr-2" />
+                  Analytics
+                </Button>
+                <Button variant="outline" onClick={() => window.location.href = '/farmer/affiliated-farmers'}>
+                  <User className="h-4 w-4 mr-2" />
+                  Affiliated Farmers
+                </Button>
+              </>
+            )}
             <Button variant="outline" onClick={() => setIsBulkEditOpen(true)}>
               <FileSpreadsheet className="h-4 w-4 mr-2" />
               Bulk Import/Edit
@@ -286,6 +311,9 @@ const FarmerDashboard = () => {
         {/* Stripe Connect Status Banner */}
         <StripeConnectSimple variant="banner" />
 
+        {/* Weekly Inventory Review */}
+        {farmProfile?.id && <WeeklyInventoryReview farmProfileId={farmProfile.id} />}
+
         {/* Multi-Farm Dashboard for Lead Farmers */}
         {isLeadFarmer && <MultiFarmDashboard />}
 
@@ -295,6 +323,11 @@ const FarmerDashboard = () => {
             <h2 className="text-xl font-semibold mb-4">Batch Consolidation</h2>
             <BatchConsolidation />
           </div>
+        )}
+
+        {/* Lead Farmer Info Card for Regular Farmers */}
+        {!isLeadFarmer && userProfile?.collection_point_lead_farmer_id && (
+          <LeadFarmerInfoCard leadFarmerId={userProfile.collection_point_lead_farmer_id} />
         )}
 
         {/* Earnings Overview */}
@@ -371,7 +404,13 @@ const FarmerDashboard = () => {
         <Card className="border-2">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Product Inventory</CardTitle>
-            <Button variant="outline" size="sm">Manage All</Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => window.location.href = '/farmer/inventory'}
+            >
+              Manage All
+            </Button>
           </CardHeader>
           <CardContent>
             {productsLoading ? (
@@ -423,13 +462,6 @@ const FarmerDashboard = () => {
             )}
           </CardContent>
         </Card>
-
-        {/* Payout History */}
-        <PayoutHistoryChart recipientType="farmer" />
-        <PayoutDetailsTable recipientType="farmer" />
-
-        {/* Tax Information */}
-        <TaxInformationForm />
 
         {/* Recent Orders */}
         <Card className="border-2">

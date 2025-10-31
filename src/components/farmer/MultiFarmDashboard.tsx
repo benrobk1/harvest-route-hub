@@ -1,5 +1,6 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -116,9 +117,16 @@ export function MultiFarmDashboard() {
             </Card>
           </div>
           
-          <div className="space-y-4">
-            <h3 className="font-semibold">Affiliated Farms</h3>
-            {affiliatedFarms.map((affiliation) => (
+        <div className="space-y-4">
+          <h3 className="font-semibold">Affiliated Farms</h3>
+          <Button 
+            variant="outline" 
+            onClick={() => window.location.href = '/farmer/affiliated-farmers'}
+            className="w-full mb-4"
+          >
+            View All Affiliated Farmers
+          </Button>
+          {affiliatedFarms.slice(0, 3).map((affiliation) => (
               <Card key={affiliation.id}>
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">

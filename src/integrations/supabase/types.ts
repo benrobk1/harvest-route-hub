@@ -937,6 +937,7 @@ export type Database = {
           harvest_date: string | null
           id: string
           image_url: string | null
+          last_reviewed_at: string | null
           name: string
           price: number
           unit: string
@@ -953,6 +954,7 @@ export type Database = {
           harvest_date?: string | null
           id?: string
           image_url?: string | null
+          last_reviewed_at?: string | null
           name: string
           price: number
           unit: string
@@ -969,6 +971,7 @@ export type Database = {
           harvest_date?: string | null
           id?: string
           image_url?: string | null
+          last_reviewed_at?: string | null
           name?: string
           price?: number
           unit?: string

@@ -19,6 +19,9 @@ import AvailableRoutes from "./pages/driver/AvailableRoutes";
 import RouteDetails from "./pages/driver/RouteDetails";
 import LoadBoxes from "./pages/driver/LoadBoxes";
 import FarmerDashboard from "./pages/farmer/Dashboard";
+import CustomerAnalytics from "./pages/farmer/CustomerAnalytics";
+import AffiliatedFarmers from "./pages/farmer/AffiliatedFarmers";
+import InventoryManagement from "./pages/farmer/InventoryManagement";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AnalyticsAndFinancials from "./pages/admin/AnalyticsAndFinancials";
 import AdminRoles from "./pages/admin/AdminRoles";
@@ -126,6 +129,21 @@ const AppContent = () => {
           <Route path="/farmer/dashboard" element={
             <RoleGate roles={['farmer', 'lead_farmer']}>
               <FarmerDashboard />
+            </RoleGate>
+          } />
+          <Route path="/farmer/customer-analytics" element={
+            <RoleGate roles={['lead_farmer']}>
+              <CustomerAnalytics />
+            </RoleGate>
+          } />
+          <Route path="/farmer/affiliated-farmers" element={
+            <RoleGate roles={['lead_farmer']}>
+              <AffiliatedFarmers />
+            </RoleGate>
+          } />
+          <Route path="/farmer/inventory" element={
+            <RoleGate roles={['farmer', 'lead_farmer']}>
+              <InventoryManagement />
             </RoleGate>
           } />
           <Route path="/farmer/profile" element={

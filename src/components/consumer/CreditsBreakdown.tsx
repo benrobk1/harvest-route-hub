@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Coins, TrendingUp, Calendar, AlertCircle } from "lucide-react";
 import { formatMoney } from "@/lib/formatMoney";
+import { calculateAvailableNextMonth } from "@/lib/creditsHelpers";
 
 export const CreditsBreakdown = () => {
   const { user } = useAuth();
@@ -29,14 +30,8 @@ export const CreditsBreakdown = () => {
       const currentBalance = ledger?.[0]?.balance_after || 0;
       const monthlySpend = subscription?.monthly_spend || 0;
       
-      // Calculate credits earned this month
-      const currentMonth = new Date().toISOString().slice(0, 7);
-      const earnedThisMonth = ledger
-        ?.filter(entry => 
-          entry.created_at.startsWith(currentMonth) && 
-          entry.transaction_type === 'earned'
-        )
-        .reduce((sum, entry) => sum + Number(entry.amount), 0) || 0;
+      // Calculate credits earned this month (using helper)
+      const earnedThisMonth = calculateAvailableNextMonth(ledger || []);
 
       // Credits available next month (earned this month)
       const availableNextMonth = earnedThisMonth;

@@ -11,6 +11,7 @@ import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Sprout, Info } from 'lucide-react';
 import { formatMoney } from '@/lib/formatMoney';
+import { calculateRevenueSplit } from '@/lib/deliveryFeeHelpers';
 
 interface PriceBreakdownDrawerProps {
   price: number;
@@ -28,9 +29,7 @@ export const PriceBreakdownDrawer = ({
   // - 5% platform fee (covers operations, support, infrastructure)
   // - 5% delivery fee (covers driver payouts, route optimization)
   // This model is transparent to consumers and shown in UI to build trust
-  const farmerShare = price * 0.90;
-  const platformFee = price * 0.05;
-  const deliveryFee = price * 0.05;
+  const { farmerShare, platformFee, deliveryFee } = calculateRevenueSplit(price);
 
   return (
     <Drawer>

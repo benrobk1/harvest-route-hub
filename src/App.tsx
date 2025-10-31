@@ -15,10 +15,13 @@ import AdminAuth from "./pages/auth/AdminAuth";
 import Shop from "./pages/consumer/Shop";
 import Checkout from "./pages/consumer/Checkout";
 import DriverDashboard from "./pages/driver/Dashboard";
+import AvailableRoutes from "./pages/driver/AvailableRoutes";
 import RouteDetails from "./pages/driver/RouteDetails";
 import LoadBoxes from "./pages/driver/LoadBoxes";
 import FarmerDashboard from "./pages/farmer/Dashboard";
 import AdminDashboard from "./pages/admin/Dashboard";
+import Analytics from "./pages/admin/Analytics";
+import AuditLog from "./pages/admin/AuditLog";
 import MarketConfig from "./pages/admin/MarketConfig";
 import ProductApproval from "./pages/admin/ProductApproval";
 import ConsumerOrderTracking from "./pages/consumer/OrderTracking";
@@ -95,12 +98,17 @@ const AppContent = () => {
               <DriverDashboard />
             </RoleGate>
           } />
+          <Route path="/driver/available-routes" element={
+            <RoleGate roles={['driver']}>
+              <AvailableRoutes />
+            </RoleGate>
+          } />
           <Route path="/driver/load/:batchId" element={
             <RoleGate roles={['driver']}>
               <LoadBoxes />
             </RoleGate>
           } />
-          <Route path="/driver/route" element={
+          <Route path="/driver/active-route" element={
             <RoleGate roles={['driver']}>
               <RouteDetails />
             </RoleGate>
@@ -125,6 +133,16 @@ const AppContent = () => {
           <Route path="/admin/dashboard" element={
             <RoleGate roles={['admin']}>
               <AdminDashboard />
+            </RoleGate>
+          } />
+          <Route path="/admin/analytics" element={
+            <RoleGate roles={['admin']}>
+              <Analytics />
+            </RoleGate>
+          } />
+          <Route path="/admin/audit-log" element={
+            <RoleGate roles={['admin']}>
+              <AuditLog />
             </RoleGate>
           } />
           <Route path="/admin/market-config" element={

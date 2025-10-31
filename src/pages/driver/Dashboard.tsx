@@ -2,7 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { DollarSign, Package, TrendingUp, Star, Navigation, Clock, Printer } from "lucide-react";
+import { DollarSign, Package, TrendingUp, Star, Navigation, Clock, Printer, MapPin } from "lucide-react";
 import { format } from "date-fns";
 import { generateRouteManifestPDF, type RouteManifestData } from '@/lib/pdfGenerator';
 import { useToast } from "@/hooks/use-toast";
@@ -19,7 +19,6 @@ import { RouteDensityMap } from "@/components/driver/RouteDensityMap";
 import { PayoutHistoryChart } from "@/components/PayoutHistoryChart";
 import { PayoutDetailsTable } from "@/components/PayoutDetailsTable";
 import { TaxInformationForm } from "@/components/TaxInformationForm";
-import { AvailableRoutes } from "@/components/driver/AvailableRoutes";
 import { useNavigate } from "react-router-dom";
 import { User } from "lucide-react";
 
@@ -520,54 +519,78 @@ const DriverDashboard = () => {
         {/* Tax Information */}
         <TaxInformationForm />
 
-        {/* Available Routes - Drivers can claim unassigned batches */}
-        <AvailableRoutes />
-
-        {/* Active Route - Simplified Overview */}
-        <Card className="border-2">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Active Route</CardTitle>
-            {activeRoute && activeRoute.length > 0 && (
-              <Button onClick={() => navigate('/driver/route')}>
-                <Navigation className="h-4 w-4 mr-2" />
-                View Full Route
-              </Button>
-            )}
-          </CardHeader>
-          <CardContent>
-            {routeLoading ? (
-              <Skeleton className="h-24 w-full" />
-            ) : activeRoute && activeRoute.length > 0 ? (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-4 border rounded-lg bg-primary/5">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Next Stop</p>
-                    <p className="font-semibold text-foreground text-lg">{activeRoute[0].customer}</p>
-                    <p className="text-sm text-muted-foreground mt-1">{activeRoute[0].address}</p>
-                  </div>
-                  <Badge variant="secondary" className="text-base px-3 py-1">
-                    {activeRoute.length} stops
-                  </Badge>
-                </div>
-                <Button className="w-full" size="lg" onClick={() => navigate('/driver/route')}>
-                  <Navigation className="h-5 w-5 mr-2" />
-                  Start Deliveries
-                </Button>
-                
-                {/* Route Density Map - Show if there's an active batch */}
-                {activeBatch?.id && (
-                  <div className="mt-4">
-                    <RouteDensityMap batchId={activeBatch.id} />
-                  </div>
-                )}
-              </div>
-            ) : (
-              <p className="text-center text-muted-foreground py-8">
-                No active route. Claim a route from available batches above to start deliveries.
+        {/* Route Navigation Cards */}
+        <div className="grid gap-6 md:grid-cols-2">
+          <Card className="border-2 hover:border-primary transition-colors cursor-pointer" onClick={() => navigate('/driver/available-routes')}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <MapPin className="h-5 w-5 text-primary" />
+                Available Routes
+              </CardTitle>
+              <CardDescription>Browse and claim delivery batches</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                View upcoming delivery batches and claim routes that fit your schedule
               </p>
-            )}
-          </CardContent>
-        </Card>
+              <Button className="w-full">
+                Browse Routes
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card className="border-2 hover:border-primary transition-colors cursor-pointer" onClick={() => navigate('/driver/active-route')}>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Navigation className="h-5 w-5 text-success" />
+                Active Route
+              </CardTitle>
+              <CardDescription>
+                {activeRoute && activeRoute.length > 0 ? 'In progress' : 'No active route'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {routeLoading ? (
+                <Skeleton className="h-20 w-full" />
+              ) : activeRoute && activeRoute.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-muted-foreground">Next Stop</p>
+                      <p className="font-semibold">{activeRoute[0].customer}</p>
+                    </div>
+                    <Badge variant="secondary">{activeRoute.length} stops</Badge>
+                  </div>
+                  <Button className="w-full" variant="default">
+                    <Navigation className="h-4 w-4 mr-2" />
+                    Start Deliveries
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Claim a route from available batches to start deliveries
+                  </p>
+                  <Button className="w-full" variant="outline" disabled>
+                    No Active Route
+                  </Button>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Route Density Map - Show if there's an active batch */}
+        {activeBatch?.id && (
+          <Card className="border-2">
+            <CardHeader>
+              <CardTitle>Route Overview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <RouteDensityMap batchId={activeBatch.id} />
+            </CardContent>
+          </Card>
+        )}
       </main>
     </div>
   );

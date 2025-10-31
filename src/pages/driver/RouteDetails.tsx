@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { BoxCodeScanner } from "@/components/driver/BoxCodeScanner";
 import { Navigation, MapPin, Clock, Package, Phone, AlertCircle, FileText } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { format, formatDistanceToNow } from "date-fns";
 import { generateRouteManifestPDF, type RouteManifestData } from '@/lib/pdfGenerator';
 import { useNavigate } from "react-router-dom";
@@ -219,10 +220,19 @@ export default function RouteDetails() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={handleDownloadManifest}>
-                <FileText className="h-4 w-4 mr-2" />
-                Download Paper Backup
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" onClick={handleDownloadManifest}>
+                      <FileText className="h-4 w-4 mr-2" />
+                      Download Paper Backup
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Print route manifest for offline backup</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <Button>
                 <Navigation className="h-4 w-4 mr-2" />
                 Start Navigation

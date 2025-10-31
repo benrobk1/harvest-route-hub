@@ -36,6 +36,7 @@ import FarmProfileView from "./pages/FarmProfileView";
 import PrivacyPolicy from "./pages/legal/PrivacyPolicy";
 import TermsOfService from "./pages/legal/TermsOfService";
 import UserApprovals from "./pages/admin/UserApprovals";
+import UserSearch from "./pages/admin/UserSearch";
 import Disputes from "./pages/admin/Disputes";
 import BatchAdjustments from "./pages/admin/BatchAdjustments";
 import Install from "./pages/Install";
@@ -171,6 +172,11 @@ const AppContent = () => {
           <Route path="/admin/approvals" element={
             <RoleGate roles={['admin']}>
               <UserApprovals />
+            </RoleGate>
+          } />
+          <Route path="/admin/user-search" element={
+            <RoleGate roles={['admin']}>
+              <UserSearch />
             </RoleGate>
           } />
           <Route path="/admin/disputes" element={

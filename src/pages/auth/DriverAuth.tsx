@@ -151,6 +151,8 @@ const DriverAuth = () => {
           zip_code: formData.zipCode,
           approval_status: 'pending',
           acquisition_channel: acquisitionChannel,
+          delivery_days: formData.availability ? [formData.availability] : null,
+          additional_info: formData.additionalInfo || null,
         })
         .eq('id', authData.user.id);
 

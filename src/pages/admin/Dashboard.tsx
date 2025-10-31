@@ -135,8 +135,9 @@ const AdminDashboard = () => {
               <h1 className="text-2xl font-bold text-foreground">Management Portal</h1>
               <p className="text-sm text-muted-foreground">Real-time business intelligence and operations</p>
             </div>
-            <div className="grid gap-2 md:grid-cols-6 lg:grid-cols-11">
+            <div className="grid gap-2 md:grid-cols-6 lg:grid-cols-12">
               <Button variant="outline" size="sm" onClick={() => navigate('/admin/approvals')}>Approvals</Button>
+              <Button variant="outline" size="sm" onClick={() => navigate('/admin/user-search')}>User Search</Button>
               <Button variant="outline" size="sm" onClick={() => navigate('/admin/products')}>Products</Button>
               <Button variant="outline" size="sm" onClick={() => navigate('/admin/disputes')}>Disputes</Button>
               <Button variant="outline" size="sm" onClick={() => navigate('/admin/market-config')}>Markets</Button>

@@ -40,6 +40,7 @@ interface UserProfile {
   zip_code: string | null;
   country: string | null;
   collection_point_address: string | null;
+  collection_point_lead_farmer_id: string | null;
   acquisition_channel: string | null;
   applied_role: 'farmer' | 'lead_farmer' | null;
   farm_size: string | null;
@@ -50,6 +51,7 @@ interface UserProfile {
   vehicle_make: string | null;
   vehicle_year: string | null;
   license_number: string | null;
+  delivery_days: string[] | null;
 }
 
 
@@ -383,6 +385,21 @@ const UserApprovals = () => {
                         <div>
                           <span className="text-muted-foreground">ZIP Code:</span> {user.zip_code || 'N/A'}
                         </div>
+                        {user.delivery_days && user.delivery_days.length > 0 && (
+                          <div>
+                            <span className="text-muted-foreground">Availability:</span> {user.delivery_days.join(', ')}
+                          </div>
+                        )}
+                        {user.additional_info && (
+                          <div className="col-span-2">
+                            <span className="text-muted-foreground">Additional Info:</span> {user.additional_info}
+                          </div>
+                        )}
+                        {user.acquisition_channel && (
+                          <div>
+                            <span className="text-muted-foreground">Heard About Us:</span> {user.acquisition_channel}
+                          </div>
+                        )}
                       </>
                     )}
                     

@@ -10,21 +10,22 @@ export const useInstallPrompt = () => {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
 
   useEffect(() => {
-    // Check visit count
-    const visitCount = parseInt(localStorage.getItem('visitCount') || '0');
-    localStorage.setItem('visitCount', (visitCount + 1).toString());
+    // Only increment visit count once per browser session
+    const hasIncrementedThisSession = sessionStorage.getItem('visitCountIncremented');
+    
+    if (!hasIncrementedThisSession) {
+      const visitCount = parseInt(localStorage.getItem('visitCount') || '0');
+      localStorage.setItem('visitCount', (visitCount + 1).toString());
+      sessionStorage.setItem('visitCountIncremented', 'true');
+    }
 
-    // Check if mobile device
+    const visitCount = parseInt(localStorage.getItem('visitCount') || '0');
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    
-    // Check if already installed
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
-    
-    // Check if user dismissed
     const dismissed = localStorage.getItem('installPromptDismissed');
 
-    // Show prompt on 2nd visit if mobile, not installed, and not dismissed
-    if (visitCount >= 2 && isMobile && !isStandalone && !dismissed) {
+    // Show prompt on 3rd visit if mobile, not installed, and not dismissed
+    if (visitCount >= 3 && isMobile && !isStandalone && !dismissed) {
       setShowPrompt(true);
     }
 

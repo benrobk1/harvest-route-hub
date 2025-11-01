@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useInstallPrompt } from '@/hooks/useInstallPrompt';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -6,9 +6,12 @@ import { Download, X } from 'lucide-react';
 
 export const InstallPromptToast = () => {
   const { showPrompt, handleInstall, handleDismiss } = useInstallPrompt();
+  const hasShownToast = useRef(false);
 
   useEffect(() => {
-    if (showPrompt) {
+    if (showPrompt && !hasShownToast.current) {
+      hasShownToast.current = true;
+      
       toast(
         <div className="flex flex-col gap-3 w-full">
           <div className="flex items-start justify-between">
@@ -40,10 +43,15 @@ export const InstallPromptToast = () => {
         {
           duration: 10000,
           position: 'bottom-center',
+          id: 'install-prompt',
         }
       );
     }
-  }, [showPrompt, handleInstall, handleDismiss]);
+    
+    if (!showPrompt) {
+      hasShownToast.current = false;
+    }
+  }, [showPrompt]);
 
   return null;
 };

@@ -5,12 +5,14 @@ import { supabase } from '@/integrations/supabase/client';
 import { MapPin, Phone, Mail, Calendar, ExternalLink } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { useNavigate } from 'react-router-dom';
 
 interface LeadFarmerInfoCardProps {
   leadFarmerId: string;
 }
 
 export function LeadFarmerInfoCard({ leadFarmerId }: LeadFarmerInfoCardProps) {
+  const navigate = useNavigate();
   const { data: leadFarmerInfo, isLoading } = useQuery({
     queryKey: ['lead-farmer-info', leadFarmerId],
     queryFn: async () => {
@@ -107,10 +109,10 @@ export function LeadFarmerInfoCard({ leadFarmerId }: LeadFarmerInfoCardProps) {
         <Button 
           variant="outline" 
           className="w-full"
-          onClick={() => window.location.href = `/farm-profile/${leadFarmerId}`}
+          onClick={() => navigate('/farmer/my-lead-farmer')}
         >
           <ExternalLink className="mr-2 h-4 w-4" />
-          View Full Farm Profile
+          View Details
         </Button>
       </CardContent>
     </Card>

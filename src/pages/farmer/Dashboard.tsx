@@ -1,42 +1,23 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { DollarSign, Package, TrendingUp, Plus, Pencil, Trash2, FileSpreadsheet, User } from "lucide-react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
-import { Skeleton } from "@/components/ui/skeleton";
-import { formatMoney } from "@/lib/formatMoney";
-import { ProductForm } from "@/components/farmer/ProductForm";
-import { BatchConsolidation } from "@/components/farmer/BatchConsolidation";
-import { StripeConnectSimple } from "@/components/farmer/StripeConnectSimple";
-import { BulkEditDialog } from "@/components/farmer/BulkEditDialog";
-import { MultiFarmDashboard } from "@/components/farmer/MultiFarmDashboard";
-import { WeeklyInventoryReview } from "@/components/farmer/WeeklyInventoryReview";
-import { LeadFarmerInfoCard } from "@/components/farmer/LeadFarmerInfoCard";
-import { toast } from "sonner";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { formatMoney } from '@/lib/formatMoney';
+import { DollarSign, Package, TrendingUp, Users, FileText, Boxes } from 'lucide-react';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useNavigate } from 'react-router-dom';
+import { StripeConnectSimple } from '@/components/farmer/StripeConnectSimple';
+import { WeeklyInventoryReview } from '@/components/farmer/WeeklyInventoryReview';
+import { LeadFarmerInfoCard } from '@/components/farmer/LeadFarmerInfoCard';
+import { MultiFarmDashboard } from '@/components/farmer/MultiFarmDashboard';
+import { BatchConsolidation } from '@/components/farmer/BatchConsolidation';
 
-const FarmerDashboard = () => {
+export default function FarmerDashboard() {
   const { user } = useAuth();
-  const queryClient = useQueryClient();
-  const [isAddingProduct, setIsAddingProduct] = useState(false);
-  const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<any>(null);
-  const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
+  const navigate = useNavigate();
 
-  // Fetch farmer's farm profile and check if lead farmer
-  const { data: farmProfile } = useQuery({
+  const { data: farmProfile, isLoading: farmLoading } = useQuery({
     queryKey: ['farmer-profile', user?.id],
     queryFn: async () => {
       const { data } = await supabase
@@ -49,7 +30,7 @@ const FarmerDashboard = () => {
     enabled: !!user?.id,
   });
 
-  const { data: userRoles } = useQuery({
+  const { data: userRoles, isLoading: rolesLoading } = useQuery({
     queryKey: ['user-roles', user?.id],
     queryFn: async () => {
       const { data } = await supabase
@@ -63,8 +44,7 @@ const FarmerDashboard = () => {
 
   const isLeadFarmer = userRoles?.includes('lead_farmer');
 
-  // Fetch user profile for collection point lead farmer
-  const { data: userProfile } = useQuery({
+  const { data: userProfile, isLoading: profileLoading } = useQuery({
     queryKey: ['user-profile', user?.id],
     queryFn: async () => {
       const { data } = await supabase
@@ -77,500 +57,179 @@ const FarmerDashboard = () => {
     enabled: !!user?.id && !isLeadFarmer,
   });
 
-  // Fetch earnings (including lead farmer commission if applicable)
+  const collectionPointLeadFarmerId = userProfile?.collection_point_lead_farmer_id;
+
   const { data: earnings, isLoading: earningsLoading } = useQuery({
-    queryKey: ['farmer-earnings', farmProfile?.id, user?.id],
+    queryKey: ['farmer-earnings', farmProfile?.id],
     queryFn: async () => {
-      if (!farmProfile?.id) return { today: 0, week: 0, month: 0, commission: { today: 0, week: 0, month: 0 } };
-
-      const now = new Date();
-      const todayStart = new Date(now.setHours(0, 0, 0, 0)).toISOString();
-      const weekStart = new Date(now.setDate(now.getDate() - 7)).toISOString();
-      const monthStart = new Date(now.setDate(now.getDate() - 30)).toISOString();
-
-      // Get orders containing farmer's products (direct sales)
-      const { data: todayOrders } = await supabase
-        .from('order_items')
-        .select('subtotal, products!inner(farm_profile_id)')
-        .eq('products.farm_profile_id', farmProfile.id)
-        .gte('created_at', todayStart);
-
-      const { data: weekOrders } = await supabase
-        .from('order_items')
-        .select('subtotal, products!inner(farm_profile_id)')
-        .eq('products.farm_profile_id', farmProfile.id)
-        .gte('created_at', weekStart);
-
-      const { data: monthOrders } = await supabase
-        .from('order_items')
-        .select('subtotal, products!inner(farm_profile_id)')
-        .eq('products.farm_profile_id', farmProfile.id)
-        .gte('created_at', monthStart);
-
-      // Farmer keeps 88% of sales (2% goes to lead farmer coordination, 10% to platform)
-      // All farmers are affiliated with lead farmers
-      const today = (todayOrders?.reduce((sum, item) => sum + Number(item.subtotal), 0) || 0) * 0.88;
-      const week = (weekOrders?.reduce((sum, item) => sum + Number(item.subtotal), 0) || 0) * 0.88;
-      const month = (monthOrders?.reduce((sum, item) => sum + Number(item.subtotal), 0) || 0) * 0.88;
-
-      // Get lead farmer commission if applicable
-      const { data: todayCommission } = await supabase
-        .from('payouts')
-        .select('amount')
-        .eq('recipient_id', user?.id)
-        .eq('recipient_type', 'lead_farmer_commission')
-        .gte('created_at', todayStart);
-
-      const { data: weekCommission } = await supabase
-        .from('payouts')
-        .select('amount')
-        .eq('recipient_id', user?.id)
-        .eq('recipient_type', 'lead_farmer_commission')
-        .gte('created_at', weekStart);
-
-      const { data: monthCommission } = await supabase
-        .from('payouts')
-        .select('amount')
-        .eq('recipient_id', user?.id)
-        .eq('recipient_type', 'lead_farmer_commission')
-        .gte('created_at', monthStart);
-
-      const commission = {
-        today: todayCommission?.reduce((sum, p) => sum + Number(p.amount), 0) || 0,
-        week: weekCommission?.reduce((sum, p) => sum + Number(p.amount), 0) || 0,
-        month: monthCommission?.reduce((sum, p) => sum + Number(p.amount), 0) || 0,
-      };
-
-      return { today, week, month, commission };
-    },
-    enabled: !!farmProfile?.id && !!user?.id,
-  });
-
-  // Fetch products
-  const { data: products, isLoading: productsLoading } = useQuery({
-    queryKey: ['farmer-products', farmProfile?.id],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('products')
-        .select('*')
-        .eq('farm_profile_id', farmProfile?.id)
-        .order('created_at', { ascending: false });
-
-      return data?.map(p => ({
-        ...p,
-        status: p.available_quantity < 10 ? 'low' : 'active'
-      })) || [];
-    },
-    enabled: !!farmProfile?.id,
-  });
-
-  // Fetch recent orders
-  const { data: recentOrders, isLoading: ordersLoading } = useQuery({
-    queryKey: ['farmer-orders', farmProfile?.id],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('order_items')
+      const { data: orders } = await supabase
+        .from('orders')
         .select(`
-          order_id,
-          quantity,
-          subtotal,
-          orders!inner(
-            id,
-            status,
-            profiles!inner(full_name)
-          ),
-          products!inner(farm_profile_id, name)
+          id,
+          created_at,
+          order_items!inner(
+            subtotal,
+            products!inner(farm_profile_id)
+          )
         `)
-        .eq('products.farm_profile_id', farmProfile?.id)
-        .order('created_at', { ascending: false })
-        .limit(5);
+        .eq('order_items.products.farm_profile_id', farmProfile?.id)
+        .eq('status', 'delivered');
 
-      // Group by order_id
-      const orderMap = new Map();
-      data?.forEach(item => {
-        const orderId = item.orders.id;
-        if (!orderMap.has(orderId)) {
-          orderMap.set(orderId, {
-            id: orderId,
-            customer: item.orders.profiles?.full_name || 'Unknown',
-            items: 0,
-            total: 0,
-            status: item.orders.status,
-          });
-        }
-        const order = orderMap.get(orderId);
-        order.items += item.quantity;
-        order.total += Number(item.subtotal);
-      });
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
 
-      return Array.from(orderMap.values()).slice(0, 5);
+      const today = orders
+        ?.filter((o) => new Date(o.created_at) >= todayStart)
+        .reduce((sum, o) => sum + o.order_items.reduce((s, i) => s + Number(i.subtotal), 0), 0) || 0;
+
+      return { today };
     },
     enabled: !!farmProfile?.id,
   });
 
-  // Create product mutation
-  const createProduct = useMutation({
-    mutationFn: async (productData: any) => {
-      const { error } = await supabase.from("products").insert({
-        ...productData,
-        price: parseFloat(productData.price),
-        available_quantity: parseInt(productData.available_quantity),
-        farm_profile_id: farmProfile?.id,
-      });
-      if (error) throw error;
+  const { data: productCount } = useQuery({
+    queryKey: ['product-count', farmProfile?.id],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from('products')
+        .select('*', { count: 'exact', head: true })
+        .eq('farm_profile_id', farmProfile?.id);
+      return count || 0;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["farmer-products"] });
-      toast.success("Product added successfully");
-    },
-    onError: () => {
-      toast.error("Failed to add product");
-    },
+    enabled: !!farmProfile?.id,
   });
 
-  // Update product mutation
-  const updateProduct = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: any }) => {
-      const { error } = await supabase
-        .from("products")
-        .update({
-          ...data,
-          price: parseFloat(data.price),
-          available_quantity: parseInt(data.available_quantity),
-        })
-        .eq("id", id);
-      if (error) throw error;
+  const { data: pendingOrdersCount } = useQuery({
+    queryKey: ['pending-orders-count', farmProfile?.id],
+    queryFn: async () => {
+      const { count } = await supabase
+        .from('orders')
+        .select('order_items!inner(products!inner(farm_profile_id))', { count: 'exact', head: true })
+        .eq('order_items.products.farm_profile_id', farmProfile?.id)
+        .in('status', ['pending', 'confirmed']);
+      return count || 0;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["farmer-products"] });
-      toast.success("Product updated successfully");
-      setEditingProduct(null);
-    },
-    onError: () => {
-      toast.error("Failed to update product");
-    },
+    enabled: !!farmProfile?.id,
   });
 
-  // Delete product mutation
-  const deleteProduct = useMutation({
-    mutationFn: async (productId: string) => {
-      const { error } = await supabase.from("products").delete().eq("id", productId);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["farmer-products"] });
-      toast.success("Product deleted successfully");
-      setDeletingProductId(null);
-    },
-    onError: () => {
-      toast.error("Failed to delete product");
-    },
-  });
+  if (profileLoading || rolesLoading || farmLoading || earningsLoading) {
+    return (
+      <div className="container mx-auto p-6 space-y-6">
+        <Skeleton className="h-16 w-full" />
+        <div className="grid gap-4 md:grid-cols-3">
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+        </div>
+        <Skeleton className="h-64" />
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-earth">
-      <header className="bg-white border-b shadow-soft">
-        <div className="container mx-auto px-4 py-4">
-          {/* Row 1: Farm name and Stripe */}
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">{farmProfile?.farm_name || 'My Farm'}</h1>
-              <p className="text-sm text-muted-foreground">You keep 90% of all sales</p>
-            </div>
-            <StripeConnectSimple variant="button" />
-          </div>
-          
-          {/* Row 2: Action buttons with visual hierarchy */}
-          <div className="flex items-center justify-between gap-2">
-            {/* Left side: Navigation buttons */}
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => window.location.href = '/farmer/profile'}>
-                <User className="h-4 w-4 mr-2" />
-                Profile
-              </Button>
-              {isLeadFarmer && (
-                <>
-                  <Button variant="outline" size="sm" onClick={() => window.location.href = '/farmer/customer-analytics'}>
-                    <TrendingUp className="h-4 w-4 mr-2" />
-                    Analytics
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => window.location.href = '/farmer/affiliated-farmers'}>
-                    <User className="h-4 w-4 mr-2" />
-                    Affiliated Farmers
-                  </Button>
-                </>
-              )}
-            </div>
-            
-            {/* Right side: Primary actions */}
-            <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={() => setIsBulkEditOpen(true)}>
-                <FileSpreadsheet className="h-4 w-4 mr-2" />
-                Bulk Import/Edit
-              </Button>
-              <Button onClick={() => setIsAddingProduct(true)}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Product
-              </Button>
-            </div>
-          </div>
+    <div className="container mx-auto p-6 space-y-6">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <h1 className="text-3xl font-bold">{farmProfile?.farm_name || 'Farm Dashboard'}</h1>
+          <StripeConnectSimple />
         </div>
-      </header>
-
-      <main className="container mx-auto px-4 py-8 space-y-8">
-        {/* Weekly Inventory Review */}
-        {farmProfile?.id && <WeeklyInventoryReview farmProfileId={farmProfile.id} />}
-
-        {/* Multi-Farm Dashboard for Lead Farmers */}
-        {isLeadFarmer && <MultiFarmDashboard />}
-
-        {/* Lead Farmer Batch Consolidation */}
-        {isLeadFarmer && (
-          <div>
-            <h2 className="text-xl font-semibold mb-4">Batch Consolidation</h2>
-            <BatchConsolidation />
-          </div>
-        )}
-
-        {/* Lead Farmer Info Card for Regular Farmers */}
-        {!isLeadFarmer && userProfile?.collection_point_lead_farmer_id && (
-          <LeadFarmerInfoCard leadFarmerId={userProfile.collection_point_lead_farmer_id} />
-        )}
-
-        {/* Earnings Overview */}
-        <div className="grid gap-6 md:grid-cols-3">
-          <Card className="border-2">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Today's Revenue
-              </CardTitle>
-              <DollarSign className="h-4 w-4 text-success" />
-            </CardHeader>
-            <CardContent>
-              {earningsLoading ? (
-                <Skeleton className="h-10 w-24" />
-              ) : (
-                <>
-                  <div className="text-3xl font-bold text-foreground">{formatMoney(earnings?.today || 0)}</div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    90% of sales{earnings?.commission.today ? ` + ${formatMoney(earnings.commission.today)} commission` : ''}
-                  </p>
-                </>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="border-2">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                This Week
-              </CardTitle>
-              <TrendingUp className="h-4 w-4 text-primary" />
-            </CardHeader>
-            <CardContent>
-              {earningsLoading ? (
-                <Skeleton className="h-10 w-24" />
-              ) : (
-                <>
-                  <div className="text-3xl font-bold text-foreground">{formatMoney(earnings?.week || 0)}</div>
-                  {earnings?.commission.week > 0 && (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Includes {formatMoney(earnings.commission.week)} lead farmer commission
-                    </p>
-                  )}
-                </>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="border-2">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                This Month
-              </CardTitle>
-              <Package className="h-4 w-4 text-secondary" />
-            </CardHeader>
-            <CardContent>
-              {earningsLoading ? (
-                <Skeleton className="h-10 w-24" />
-              ) : (
-                <>
-                  <div className="text-3xl font-bold text-foreground">{formatMoney(earnings?.month || 0)}</div>
-                  {earnings?.commission.month > 0 && (
-                    <p className="text-xs text-success mt-1">
-                      + {formatMoney(earnings.commission.month)} commission earnings
-                    </p>
-                  )}
-                </>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Product Inventory */}
-        <Card className="border-2">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Product Inventory</CardTitle>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => window.location.href = '/farmer/inventory'}
-            >
-              Manage All
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => navigate('/profile/farmer')}>
+            Profile
+          </Button>
+          {isLeadFarmer && (
+            <Button variant="outline" onClick={() => navigate('/farmer/customer-analytics')}>
+              Analytics
             </Button>
+          )}
+          {isLeadFarmer && (
+            <Button variant="outline" onClick={() => navigate('/farmer/affiliated-farmers')}>
+              <Users className="mr-2 h-4 w-4" />
+              Affiliated Farmers
+            </Button>
+          )}
+          {!isLeadFarmer && collectionPointLeadFarmerId && (
+            <Button variant="outline" onClick={() => navigate('/farmer/my-lead-farmer')}>
+              <Users className="mr-2 h-4 w-4" />
+              My Lead Farmer
+            </Button>
+          )}
+          <Button variant="outline" onClick={() => navigate('/farmer/inventory')}>
+            <Boxes className="mr-2 h-4 w-4" />
+            Manage Inventory
+          </Button>
+          <Button onClick={() => navigate('/farmer/financials')}>
+            <FileText className="mr-2 h-4 w-4" />
+            Financials
+          </Button>
+        </div>
+      </div>
+
+      {/* Quick Stats */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Today's Revenue</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {productsLoading ? (
-              <div className="space-y-4">
-                {[1, 2, 3].map(i => <Skeleton key={i} className="h-20 w-full" />)}
-              </div>
-            ) : products && products.length > 0 ? (
-              <div className="space-y-4">
-                {products.map((product) => (
-                  <div
-                    key={product.id}
-                    className="flex items-center justify-between p-4 border rounded-lg hover:border-primary transition-colors"
-                  >
-                    <div>
-                      <div className="font-semibold text-foreground">{product.name}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {formatMoney(Number(product.price))} per {product.unit}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <div className="text-sm font-medium text-foreground">{product.available_quantity} in stock</div>
-                        <Badge variant={product.status === "low" ? "destructive" : "secondary"}>
-                          {product.status === "low" ? "Low Stock" : "Active"}
-                        </Badge>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setEditingProduct(product)}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setDeletingProductId(product.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-center text-muted-foreground py-8">No products yet. Click "Add Product" to get started.</p>
-            )}
+            <div className="text-2xl font-bold">{formatMoney(earnings?.today || 0)}</div>
+            <p className="text-xs text-muted-foreground">From delivered orders</p>
           </CardContent>
         </Card>
 
-        {/* Recent Orders */}
-        <Card className="border-2">
-          <CardHeader>
-            <CardTitle>Recent Orders</CardTitle>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Products</CardTitle>
+            <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            {ordersLoading ? (
-              <div className="space-y-4">
-                {[1, 2].map(i => <Skeleton key={i} className="h-20 w-full" />)}
-              </div>
-            ) : recentOrders && recentOrders.length > 0 ? (
-              <div className="space-y-4">
-                {recentOrders.map((order) => (
-                  <div
-                    key={order.id}
-                    className="flex items-center justify-between p-4 border rounded-lg"
-                  >
-                    <div>
-                      <div className="font-semibold text-foreground">Order #{order.id.slice(0, 8)}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {order.customer} • {order.items} items
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <div className="font-semibold text-foreground">{formatMoney(order.total * 0.9)}</div>
-                        <Badge variant={order.status === "delivered" ? "default" : "secondary"}>
-                          {order.status}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-center text-muted-foreground py-8">No orders yet</p>
-            )}
+            <div className="text-2xl font-bold">{productCount || 0}</div>
+            <p className="text-xs text-muted-foreground">
+              <Button variant="link" className="p-0 h-auto" onClick={() => navigate('/farmer/inventory')}>
+                Manage inventory →
+              </Button>
+            </p>
           </CardContent>
         </Card>
-      </main>
 
-      <ProductForm
-        open={isAddingProduct}
-        onOpenChange={setIsAddingProduct}
-        onSubmit={async (data) => {
-          await createProduct.mutateAsync(data);
-        }}
-      />
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Pending Orders</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{pendingOrdersCount || 0}</div>
+            <p className="text-xs text-muted-foreground">Orders to fulfill</p>
+          </CardContent>
+        </Card>
+      </div>
 
-      <ProductForm
-        open={!!editingProduct}
-        onOpenChange={(open) => !open && setEditingProduct(null)}
-        onSubmit={async (data) => {
-          await updateProduct.mutateAsync({ id: editingProduct.id, data });
-        }}
-        defaultValues={
-          editingProduct
-            ? {
-                name: editingProduct.name,
-                description: editingProduct.description || "",
-                price: editingProduct.price.toString(),
-                unit: editingProduct.unit,
-                available_quantity: editingProduct.available_quantity.toString(),
-                image_url: editingProduct.image_url || "",
-              }
-            : undefined
-        }
-        isEdit
-      />
+      {/* Weekly Inventory Review Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Weekly Inventory Review</CardTitle>
+          <CardDescription>Keep your inventory up to date</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <WeeklyInventoryReview farmProfileId={farmProfile?.id || ''} />
+          <Button variant="outline" className="w-full mt-4" onClick={() => navigate('/farmer/inventory')}>
+            View All Products
+          </Button>
+        </CardContent>
+      </Card>
 
-      <AlertDialog open={!!deletingProductId} onOpenChange={(open) => !open && setDeletingProductId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Product</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this product? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deletingProductId && deleteProduct.mutate(deletingProductId)}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Multi-Farm Dashboard for Lead Farmers */}
+      {isLeadFarmer && <MultiFarmDashboard />}
 
-      <BulkEditDialog
-        open={isBulkEditOpen}
-        onOpenChange={setIsBulkEditOpen}
-        farmProfileId={farmProfile?.id || ''}
-        products={products || []}
-        onComplete={() => {
-          queryClient.invalidateQueries({ queryKey: ['farmer-products'] });
-        }}
-      />
+      {/* Batch Consolidation for Lead Farmers */}
+      {isLeadFarmer && <BatchConsolidation />}
+
+      {/* Lead Farmer Info Card for Regular Farmers */}
+      {!isLeadFarmer && collectionPointLeadFarmerId && (
+        <LeadFarmerInfoCard leadFarmerId={collectionPointLeadFarmerId} />
+      )}
     </div>
   );
-};
-
-export default FarmerDashboard;
+}

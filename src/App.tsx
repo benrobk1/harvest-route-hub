@@ -20,10 +20,12 @@ import RouteDetails from "./pages/driver/RouteDetails";
 import LoadBoxes from "./pages/driver/LoadBoxes";
 import DriverPayouts from "./pages/driver/PayoutDetails";
 import DriverTaxInfo from "./pages/driver/TaxInfo";
-import FarmerDashboard from "./pages/farmer/Dashboard";
-import CustomerAnalytics from "./pages/farmer/CustomerAnalytics";
-import AffiliatedFarmers from "./pages/farmer/AffiliatedFarmers";
-import InventoryManagement from "./pages/farmer/InventoryManagement";
+import FarmerDashboard from '@/pages/farmer/Dashboard';
+import InventoryManagement from '@/pages/farmer/InventoryManagement';
+import Financials from '@/pages/farmer/Financials';
+import MyLeadFarmer from '@/pages/farmer/MyLeadFarmer';
+import AffiliatedFarmers from '@/pages/farmer/AffiliatedFarmers';
+import CustomerAnalytics from '@/pages/farmer/CustomerAnalytics';
 import AdminDashboard from "./pages/admin/Dashboard";
 import AnalyticsAndFinancials from "./pages/admin/AnalyticsAndFinancials";
 import AdminRoles from "./pages/admin/AdminRoles";
@@ -143,6 +145,21 @@ const AppContent = () => {
               <FarmerDashboard />
             </RoleGate>
           } />
+          <Route path="/farmer/inventory" element={
+            <RoleGate roles={['farmer', 'lead_farmer']}>
+              <InventoryManagement />
+            </RoleGate>
+          } />
+          <Route path="/farmer/financials" element={
+            <RoleGate roles={['farmer', 'lead_farmer']}>
+              <Financials />
+            </RoleGate>
+          } />
+          <Route path="/farmer/my-lead-farmer" element={
+            <RoleGate roles={['farmer']}>
+              <MyLeadFarmer />
+            </RoleGate>
+          } />
           <Route path="/farmer/customer-analytics" element={
             <RoleGate roles={['lead_farmer']}>
               <CustomerAnalytics />
@@ -151,11 +168,6 @@ const AppContent = () => {
           <Route path="/farmer/affiliated-farmers" element={
             <RoleGate roles={['lead_farmer']}>
               <AffiliatedFarmers />
-            </RoleGate>
-          } />
-          <Route path="/farmer/inventory" element={
-            <RoleGate roles={['farmer', 'lead_farmer']}>
-              <InventoryManagement />
             </RoleGate>
           } />
           <Route path="/farmer/profile" element={

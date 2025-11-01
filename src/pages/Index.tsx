@@ -83,6 +83,29 @@ const Index = () => {
           </Button>
         </Card>
 
+        {/* Partner Options Section */}
+        <div className="mt-16">
+          <h2 className="text-3xl font-bold text-center mb-8">Join Our Community</h2>
+          <div className="grid md:grid-cols-2 gap-6">
+            {partnerOptions.map((option) => (
+              <Card key={option.id} className="p-6 hover:shadow-lift transition-all">
+                <div className="flex items-center mb-4">
+                  <option.icon className="h-8 w-8 text-primary mr-3" />
+                  <h3 className="text-2xl font-bold">{option.title}</h3>
+                </div>
+                <p className="text-muted-foreground mb-4">{option.description}</p>
+                <Button 
+                  variant="outline"
+                  onClick={() => navigate(option.route)}
+                  className="w-full"
+                >
+                  Learn More →
+                </Button>
+              </Card>
+            ))}
+          </div>
+        </div>
+
         {/* How It Works Section */}
         <div className="col-span-1 md:col-span-3 mt-12">
           <h2 className="text-3xl font-bold text-center mb-8">How It Works</h2>

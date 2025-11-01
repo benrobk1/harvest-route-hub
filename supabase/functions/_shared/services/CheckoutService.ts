@@ -1,0 +1,595 @@
+import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.75.0';
+import Stripe from 'https://esm.sh/stripe@18.5.0';
+
+/**
+ * CHECKOUT SERVICE
+ * Extracted business logic for checkout processing
+ * Handles validation, payment, order creation, and notifications
+ */
+
+export interface CheckoutInput {
+  cartId: string;
+  userId: string;
+  userEmail: string;
+  deliveryDate: string;
+  useCredits: boolean;
+  paymentMethodId?: string;
+  tipAmount: number;
+  requestOrigin: string;
+}
+
+export interface CheckoutResult {
+  success: boolean;
+  orderId: string;
+  clientSecret?: string;
+  amountCharged: number;
+  creditsRedeemed: number;
+  paymentStatus: 'paid' | 'pending' | 'requires_action';
+}
+
+export class CheckoutService {
+  constructor(
+    private supabase: SupabaseClient,
+    private stripe: Stripe
+  ) {}
+
+  async processCheckout(input: CheckoutInput): Promise<CheckoutResult> {
+    const { cartId, userId, userEmail, deliveryDate, useCredits, paymentMethodId, tipAmount, requestOrigin } = input;
+    const requestId = crypto.randomUUID();
+
+    console.log(`[${requestId}] [CHECKOUT] Starting checkout for user ${userId}`);
+
+    // 1. Validate delivery address
+    await this.validateDeliveryAddress(userId, requestId);
+
+    // 2. Validate cart ownership
+    const cart = await this.validateCart(cartId, userId, requestId);
+
+    // 3. Fetch cart items with products
+    const cartItems = await this.getCartItems(cartId, requestId);
+    if (cartItems.length === 0) {
+      throw new CheckoutError('EMPTY_CART', 'Cart is empty');
+    }
+
+    // 4. Get user profile
+    const profile = await this.getUserProfile(userId, requestId);
+
+    // 5. Get market config
+    const marketConfig = await this.getMarketConfig(profile.zip_code, requestId);
+
+    // 6. Validate delivery date
+    await this.validateDeliveryDate(deliveryDate, marketConfig, requestId);
+
+    // 7. Server-side price validation and inventory check
+    const { subtotal, insufficientProducts } = await this.validatePricesAndInventory(cartItems, requestId);
+    
+    if (insufficientProducts.length > 0) {
+      throw new CheckoutError('INSUFFICIENT_INVENTORY', 'Some products are out of stock', { products: insufficientProducts });
+    }
+
+    // 8. Calculate fees
+    const { platformFee, deliveryFee, totalBeforeCredits } = this.calculateFees(
+      subtotal, 
+      marketConfig.delivery_fee, 
+      tipAmount,
+      requestId
+    );
+
+    // 9. Check minimum order
+    if (subtotal < parseFloat(marketConfig.minimum_order.toString())) {
+      throw new CheckoutError('BELOW_MINIMUM_ORDER', `Minimum order is $${marketConfig.minimum_order}`, {
+        minimum: marketConfig.minimum_order,
+        current: subtotal
+      });
+    }
+
+    // 10. Handle credits (server-side recomputation)
+    const creditsUsed = await this.calculateCreditsUsed(userId, useCredits, totalBeforeCredits, requestId);
+    const totalAmount = totalBeforeCredits - creditsUsed;
+
+    console.log(`[${requestId}] [CHECKOUT] Payment breakdown: subtotal=$${subtotal}, platformFee=$${platformFee}, deliveryFee=$${deliveryFee}, tip=$${tipAmount}, credits=$${creditsUsed}, total=$${totalAmount}`);
+
+    // 11. Process payment if needed
+    const { paymentIntent, paymentStatus } = await this.processPayment(
+      totalAmount,
+      userId,
+      userEmail,
+      deliveryDate,
+      subtotal,
+      platformFee,
+      deliveryFee,
+      creditsUsed,
+      paymentMethodId,
+      requestOrigin,
+      requestId
+    );
+
+    // 12. Create order with all related records
+    const orderId = await this.createOrder(
+      userId,
+      deliveryDate,
+      totalAmount,
+      tipAmount,
+      paymentStatus,
+      paymentIntent,
+      cartItems,
+      platformFee,
+      deliveryFee,
+      creditsUsed,
+      profile,
+      requestId
+    );
+
+    // 13. Clear cart
+    await this.clearCart(cartId, requestId);
+
+    // 14. Send notification
+    await this.sendOrderConfirmation(orderId, requestId);
+
+    console.log(`[${requestId}] [CHECKOUT] ✅ Checkout completed successfully: order ${orderId}`);
+
+    return {
+      success: true,
+      orderId,
+      clientSecret: paymentIntent?.client_secret || undefined,
+      amountCharged: totalAmount,
+      creditsRedeemed: creditsUsed,
+      paymentStatus
+    };
+  }
+
+  private async validateDeliveryAddress(userId: string, requestId: string): Promise<void> {
+    const { data: userProfile, error } = await this.supabase
+      .from('profiles')
+      .select('delivery_address, zip_code')
+      .eq('id', userId)
+      .single();
+
+    if (error || !userProfile?.delivery_address) {
+      console.error(`[${requestId}] [CHECKOUT] ❌ Missing delivery address for user ${userId}`);
+      throw new CheckoutError('MISSING_ADDRESS', 'Delivery address not found. Please update your profile.');
+    }
+  }
+
+  private async validateCart(cartId: string, userId: string, requestId: string): Promise<any> {
+    const { data: cart, error } = await this.supabase
+      .from('shopping_carts')
+      .select('id, consumer_id')
+      .eq('id', cartId)
+      .single();
+
+    if (error || !cart || cart.consumer_id !== userId) {
+      console.error(`[${requestId}] [CHECKOUT] ❌ Invalid cart ${cartId} for user ${userId}`);
+      throw new CheckoutError('INVALID_CART', 'Invalid cart');
+    }
+
+    return cart;
+  }
+
+  private async getCartItems(cartId: string, requestId: string): Promise<any[]> {
+    const { data: cartItems, error } = await this.supabase
+      .from('cart_items')
+      .select(`
+        id,
+        product_id,
+        quantity,
+        unit_price,
+        products (
+          id,
+          name,
+          price,
+          available_quantity,
+          farm_profile_id,
+          farm_profiles (
+            farm_name,
+            farmer_id
+          )
+        )
+      `)
+      .eq('cart_id', cartId);
+
+    if (error) {
+      console.error(`[${requestId}] [CHECKOUT] ❌ Failed to fetch cart items:`, error);
+      throw new CheckoutError('CHECKOUT_ERROR', 'Failed to fetch cart items');
+    }
+
+    return cartItems || [];
+  }
+
+  private async getUserProfile(userId: string, requestId: string): Promise<any> {
+    const { data: profile, error } = await this.supabase
+      .from('profiles')
+      .select('zip_code, delivery_address')
+      .eq('id', userId)
+      .single();
+
+    if (error || !profile?.zip_code || !profile?.delivery_address) {
+      console.error(`[${requestId}] [CHECKOUT] ❌ Incomplete profile for user ${userId}`);
+      throw new CheckoutError('MISSING_PROFILE_INFO', 'Please complete your delivery address and zip code');
+    }
+
+    return profile;
+  }
+
+  private async getMarketConfig(zipCode: string, requestId: string): Promise<any> {
+    const { data: marketConfig, error } = await this.supabase
+      .from('market_configs')
+      .select('*')
+      .eq('zip_code', zipCode)
+      .eq('active', true)
+      .single();
+
+    if (error || !marketConfig) {
+      console.error(`[${requestId}] [CHECKOUT] ❌ No market config for ZIP ${zipCode}`);
+      throw new CheckoutError('NO_MARKET_CONFIG', `No active market configuration found for ZIP code ${zipCode}`);
+    }
+
+    return marketConfig;
+  }
+
+  private async validateDeliveryDate(deliveryDate: string, marketConfig: any, requestId: string): Promise<void> {
+    const deliveryDateObj = new Date(deliveryDate);
+    const dayOfWeek = deliveryDateObj.getDay();
+    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    
+    if (!marketConfig.delivery_days.includes(dayNames[dayOfWeek])) {
+      console.warn(`[${requestId}] [CHECKOUT] ⚠️  Invalid delivery day: ${dayNames[dayOfWeek]}`);
+      throw new CheckoutError('INVALID_DELIVERY_DATE', `Delivery not available on ${dayNames[dayOfWeek]} for your area`);
+    }
+
+    // Check cutoff time
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+
+    if (deliveryDateObj <= tomorrow) {
+      const cutoffTime = marketConfig.cutoff_time;
+      const [cutoffHour, cutoffMinute] = cutoffTime.split(':').map(Number);
+      const todayCutoff = new Date(now);
+      todayCutoff.setHours(cutoffHour, cutoffMinute, 0, 0);
+
+      if (now >= todayCutoff) {
+        console.warn(`[${requestId}] [CHECKOUT] ⚠️  Cutoff passed for ${deliveryDate}`);
+        throw new CheckoutError('CUTOFF_PASSED', `Orders for ${deliveryDate} must be placed before ${cutoffTime}`);
+      }
+    }
+  }
+
+  private async validatePricesAndInventory(cartItems: any[], requestId: string): Promise<{
+    subtotal: number;
+    insufficientProducts: string[];
+  }> {
+    let subtotal = 0;
+    const insufficientProducts: string[] = [];
+
+    for (const item of cartItems) {
+      const product = item.products as any;
+      
+      // Validate price matches (prevent tampering)
+      if (item.unit_price !== product.price) {
+        console.warn(`[${requestId}] [CHECKOUT] ⚠️  Price mismatch for product ${product.id}: cart=$${item.unit_price}, actual=$${product.price}`);
+      }
+
+      // Use server-side price
+      subtotal += product.price * item.quantity;
+
+      // Check inventory
+      if (product.available_quantity < item.quantity) {
+        insufficientProducts.push(`${product.name} (available: ${product.available_quantity}, requested: ${item.quantity})`);
+      }
+    }
+
+    return { subtotal, insufficientProducts };
+  }
+
+  private calculateFees(subtotal: number, deliveryFee: number, tipAmount: number, requestId: string) {
+    const platformFeeRate = 0.10; // 10%
+    const platformFee = subtotal * platformFeeRate;
+    const deliveryFeeValue = parseFloat(deliveryFee.toString());
+    const totalBeforeCredits = subtotal + platformFee + deliveryFeeValue + tipAmount;
+
+    return { platformFee, deliveryFee: deliveryFeeValue, totalBeforeCredits };
+  }
+
+  private async calculateCreditsUsed(
+    userId: string, 
+    useCredits: boolean, 
+    totalBeforeCredits: number,
+    requestId: string
+  ): Promise<number> {
+    if (!useCredits) return 0;
+
+    const { data: latestCredit } = await this.supabase
+      .from('credits_ledger')
+      .select('balance_after')
+      .eq('consumer_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    const availableCredits = latestCredit?.balance_after || 0;
+    const creditsUsed = Math.min(availableCredits, totalBeforeCredits);
+
+    console.log(`[${requestId}] [CHECKOUT] Credits: available=$${availableCredits}, using=$${creditsUsed}`);
+    
+    return creditsUsed;
+  }
+
+  private async processPayment(
+    totalAmount: number,
+    userId: string,
+    userEmail: string,
+    deliveryDate: string,
+    subtotal: number,
+    platformFee: number,
+    deliveryFee: number,
+    creditsUsed: number,
+    paymentMethodId: string | undefined,
+    requestOrigin: string,
+    requestId: string
+  ): Promise<{ paymentIntent: Stripe.PaymentIntent | null; paymentStatus: 'paid' | 'pending' | 'requires_action' }> {
+    if (totalAmount <= 0) {
+      console.log(`[${requestId}] [CHECKOUT] Order fully covered by credits`);
+      return { paymentIntent: null, paymentStatus: 'paid' };
+    }
+
+    console.log(`[${requestId}] [CHECKOUT] Processing Stripe payment: $${totalAmount}`);
+
+    // Get or create Stripe customer
+    const customers = await this.stripe.customers.list({ email: userEmail, limit: 1 });
+    let customerId: string;
+
+    if (customers.data.length > 0) {
+      customerId = customers.data[0].id;
+    } else {
+      const { data: profile } = await this.supabase
+        .from('profiles')
+        .select('full_name, phone')
+        .eq('id', userId)
+        .single();
+
+      const customer = await this.stripe.customers.create({
+        email: userEmail,
+        name: profile?.full_name || undefined,
+        phone: profile?.phone || undefined,
+        metadata: { supabase_user_id: userId }
+      });
+      customerId = customer.id;
+    }
+
+    // Create payment intent
+    const paymentIntentParams: Stripe.PaymentIntentCreateParams = {
+      amount: Math.round(totalAmount * 100),
+      currency: 'usd',
+      customer: customerId,
+      metadata: {
+        consumer_id: userId,
+        delivery_date: deliveryDate,
+        subtotal: subtotal.toFixed(2),
+        platform_fee: platformFee.toFixed(2),
+        delivery_fee: deliveryFee.toFixed(2),
+        credits_used: creditsUsed.toFixed(2)
+      },
+      automatic_payment_methods: { enabled: true },
+    };
+
+    if (paymentMethodId) {
+      paymentIntentParams.payment_method = paymentMethodId;
+      paymentIntentParams.confirm = true;
+      paymentIntentParams.return_url = `${requestOrigin}/consumer/order-tracking`;
+    }
+
+    try {
+      const paymentIntent = await this.stripe.paymentIntents.create(paymentIntentParams);
+      console.log(`[${requestId}] [CHECKOUT] Payment intent created: ${paymentIntent.id} (${paymentIntent.status})`);
+
+      const paymentStatus = paymentIntent.status === 'succeeded' 
+        ? 'paid' 
+        : paymentIntent.status === 'requires_action' 
+          ? 'requires_action' 
+          : 'pending';
+
+      return { paymentIntent, paymentStatus };
+    } catch (error: any) {
+      console.error(`[${requestId}] [CHECKOUT] ❌ Stripe payment failed:`, error.message);
+      throw new CheckoutError('PAYMENT_FAILED', error.message, { decline_code: error.decline_code });
+    }
+  }
+
+  private async createOrder(
+    userId: string,
+    deliveryDate: string,
+    totalAmount: number,
+    tipAmount: number,
+    paymentStatus: string,
+    paymentIntent: Stripe.PaymentIntent | null,
+    cartItems: any[],
+    platformFee: number,
+    deliveryFee: number,
+    creditsUsed: number,
+    profile: any,
+    requestId: string
+  ): Promise<string> {
+    // Create order
+    const { data: order, error: orderError } = await this.supabase
+      .from('orders')
+      .insert({
+        consumer_id: userId,
+        delivery_date: deliveryDate,
+        total_amount: totalAmount,
+        tip_amount: tipAmount,
+        status: paymentStatus === 'paid' ? 'confirmed' : 'pending'
+      })
+      .select()
+      .single();
+
+    if (orderError || !order) {
+      console.error(`[${requestId}] [CHECKOUT] ❌ Order creation failed:`, orderError);
+      
+      // Refund if payment succeeded
+      if (paymentIntent && paymentIntent.status === 'succeeded') {
+        console.error(`[${requestId}] [CHECKOUT] 🚨 CRITICAL: Payment succeeded but order creation failed. Refunding...`);
+        try {
+          await this.stripe.refunds.create({ payment_intent: paymentIntent.id });
+          console.log(`[${requestId}] [CHECKOUT] Refund initiated`);
+        } catch (refundError) {
+          console.error(`[${requestId}] [CHECKOUT] ❌ Refund failed:`, refundError);
+        }
+      }
+      
+      throw new CheckoutError('CHECKOUT_ERROR', 'Failed to create order');
+    }
+
+    // Store payment intent
+    if (paymentIntent) {
+      await this.supabase.from('payment_intents').insert({
+        stripe_payment_intent_id: paymentIntent.id,
+        order_id: order.id,
+        consumer_id: userId,
+        amount: totalAmount,
+        status: paymentIntent.status,
+        payment_method: paymentIntent.payment_method as string || null,
+        client_secret: paymentIntent.client_secret,
+        metadata: paymentIntent.metadata
+      });
+    }
+
+    // Create order items
+    const orderItems = cartItems.map(item => {
+      const product = item.products as any;
+      return {
+        order_id: order.id,
+        product_id: item.product_id,
+        quantity: item.quantity,
+        unit_price: product.price,
+        subtotal: product.price * item.quantity
+      };
+    });
+
+    await this.supabase.from('order_items').insert(orderItems);
+
+    // Create transaction fees
+    await this.supabase.from('transaction_fees').insert([
+      {
+        order_id: order.id,
+        fee_type: 'platform',
+        amount: platformFee,
+        description: 'Platform fee (10%)'
+      },
+      {
+        order_id: order.id,
+        fee_type: 'delivery',
+        amount: deliveryFee,
+        description: 'Delivery fee'
+      }
+    ]);
+
+    // Create payouts for farmers
+    await this.createFarmerPayouts(order.id, cartItems, requestId);
+
+    // Update inventory
+    await this.updateInventory(cartItems, requestId);
+
+    // Handle credits redemption
+    if (creditsUsed > 0) {
+      await this.redeemCredits(userId, order.id, creditsUsed, requestId);
+    }
+
+    console.log(`[${requestId}] [CHECKOUT] Order created: ${order.id}`);
+    return order.id;
+  }
+
+  private async createFarmerPayouts(orderId: string, cartItems: any[], requestId: string): Promise<void> {
+    const farmerPayouts = new Map<string, number>();
+
+    for (const item of cartItems) {
+      const product = item.products as any;
+      const farmProfile = product.farm_profiles;
+      const itemTotal = product.price * item.quantity;
+      const farmerShare = itemTotal * 0.88; // 88%
+      const leadFarmerShare = itemTotal * 0.02; // 2%
+
+      farmerPayouts.set(farmProfile.farmer_id, (farmerPayouts.get(farmProfile.farmer_id) || 0) + farmerShare);
+    }
+
+    const payouts = Array.from(farmerPayouts.entries()).map(([farmerId, amount]) => ({
+      order_id: orderId,
+      recipient_id: farmerId,
+      recipient_type: 'farmer',
+      amount,
+      description: 'Product sales',
+      status: 'pending'
+    }));
+
+    if (payouts.length > 0) {
+      await this.supabase.from('payouts').insert(payouts);
+      console.log(`[${requestId}] [CHECKOUT] Created ${payouts.length} farmer payouts`);
+    }
+  }
+
+  private async updateInventory(cartItems: any[], requestId: string): Promise<void> {
+    for (const item of cartItems) {
+      const product = item.products as any;
+      await this.supabase
+        .from('products')
+        .update({ available_quantity: product.available_quantity - item.quantity })
+        .eq('id', item.product_id);
+    }
+    console.log(`[${requestId}] [CHECKOUT] Updated inventory for ${cartItems.length} products`);
+  }
+
+  private async redeemCredits(userId: string, orderId: string, creditsUsed: number, requestId: string): Promise<void> {
+    const { data: latestCredit } = await this.supabase
+      .from('credits_ledger')
+      .select('balance_after')
+      .eq('consumer_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    const currentBalance = latestCredit?.balance_after || 0;
+    const newBalance = currentBalance - creditsUsed;
+
+    await this.supabase.from('credits_ledger').insert({
+      consumer_id: userId,
+      order_id: orderId,
+      transaction_type: 'redemption',
+      amount: -creditsUsed,
+      balance_after: newBalance,
+      description: `Credits redeemed for order`
+    });
+
+    console.log(`[${requestId}] [CHECKOUT] Credits redeemed: $${creditsUsed} (new balance: $${newBalance})`);
+  }
+
+  private async clearCart(cartId: string, requestId: string): Promise<void> {
+    await this.supabase.from('cart_items').delete().eq('cart_id', cartId);
+    console.log(`[${requestId}] [CHECKOUT] Cart cleared: ${cartId}`);
+  }
+
+  private async sendOrderConfirmation(orderId: string, requestId: string): Promise<void> {
+    try {
+      await this.supabase.functions.invoke('send-notification', {
+        body: {
+          type: 'order_confirmation',
+          order_id: orderId
+        }
+      });
+      console.log(`[${requestId}] [CHECKOUT] Order confirmation sent for ${orderId}`);
+    } catch (error) {
+      console.warn(`[${requestId}] [CHECKOUT] ⚠️  Failed to send notification:`, error);
+    }
+  }
+}
+
+export class CheckoutError extends Error {
+  constructor(
+    public code: string,
+    message: string,
+    public details?: Record<string, any>
+  ) {
+    super(message);
+    this.name = 'CheckoutError';
+  }
+}

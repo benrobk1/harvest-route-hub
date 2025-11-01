@@ -49,9 +49,19 @@ export const RATE_LIMITS = {
     keyPrefix: 'checkout' 
   },
   BATCH_GENERATION: { 
-    maxRequests: 10, 
+    maxRequests: 5, 
     windowMs: 60 * 1000, // 1 minute
     keyPrefix: 'batch_gen' 
+  },
+  BATCH_OPTIMIZATION: {
+    maxRequests: 10,
+    windowMs: 60 * 1000, // 1 minute
+    keyPrefix: 'batch_opt'
+  },
+  PAYOUT_PROCESSING: {
+    maxRequests: 1,
+    windowMs: 5 * 60 * 1000, // 5 minutes
+    keyPrefix: 'process-payouts'
   },
 } as const;
 

@@ -44,6 +44,7 @@ interface Dispute {
 const Disputes = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [selectedDispute, setSelectedDispute] = useState<Dispute | null>(null);
   const [resolution, setResolution] = useState('');
   const [refundAmount, setRefundAmount] = useState('');
@@ -183,8 +184,6 @@ const Disputes = () => {
       </div>
     );
   }
-
-  const navigate = useNavigate();
 
   return (
     <div className="space-y-6">

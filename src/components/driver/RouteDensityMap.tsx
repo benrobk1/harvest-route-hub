@@ -16,7 +16,7 @@ export const RouteDensityMap = ({ batchId }: RouteDensityMapProps) => {
     queryKey: ['route-stops', batchId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('batch_stops')
+        .from('driver_batch_stops_secure')
         .select(`
           id,
           sequence_number,

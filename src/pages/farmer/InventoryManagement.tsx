@@ -47,18 +47,23 @@ export default function InventoryManagement() {
     enabled: !!farmProfile?.id,
   });
 
-  const reviewProductMutation = useMutation({
-    mutationFn: async (productId: string) => {
+  const approveProductMutation = useMutation({
+    mutationFn: async ({ productId, currentStatus }: { productId: string; currentStatus: boolean }) => {
       const { error } = await supabase
         .from('products')
-        .update({ last_reviewed_at: new Date().toISOString() })
+        .update({ 
+          approved: !currentStatus,
+          last_reviewed_at: new Date().toISOString(),
+          approved_at: !currentStatus ? new Date().toISOString() : null,
+          approved_by: !currentStatus ? user?.id : null
+        })
         .eq('id', productId);
       
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      toast.success('Product reviewed');
+      toast.success(variables.currentStatus ? 'Product unapproved' : 'Product approved');
     },
   });
 
@@ -121,6 +126,15 @@ export default function InventoryManagement() {
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
                             <h3 className="font-semibold">{product.name}</h3>
+                            {product.approved ? (
+                              <Badge variant="default" className="bg-green-500 hover:bg-green-600">
+                                Approved
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary">
+                                Pending Approval
+                              </Badge>
+                            )}
                             {needsReview && (
                               <Badge variant="outline" className="text-warning border-warning">
                                 Needs Review
@@ -152,9 +166,13 @@ export default function InventoryManagement() {
                         <div className="flex gap-2">
                           <Button
                             size="sm"
-                            variant={needsReview ? 'default' : 'outline'}
-                            onClick={() => reviewProductMutation.mutate(product.id)}
-                            disabled={reviewProductMutation.isPending}
+                            variant={product.approved ? 'outline' : 'default'}
+                            onClick={() => approveProductMutation.mutate({ 
+                              productId: product.id, 
+                              currentStatus: product.approved 
+                            })}
+                            disabled={approveProductMutation.isPending}
+                            title={product.approved ? 'Unapprove Product' : 'Approve Product'}
                           >
                             <CheckCircle2 className="h-4 w-4" />
                           </Button>

@@ -3,6 +3,12 @@ import { z } from 'zod';
 /**
  * CHECKOUT CONTRACTS
  * Shared validation schemas for checkout flow between UI and backend
+ * 
+ * WHY SERVER-SIDE RECOMPUTATION:
+ * Frontend sends `use_credits` flag, but server recomputes actual credit amount
+ * from the ledger to prevent manipulation. Credits are a monetary value, so we
+ * always trust the server's calculation based on the authenticated user's balance.
+ * This is intentional - never trust client-side money calculations.
  */
 
 // Request schema

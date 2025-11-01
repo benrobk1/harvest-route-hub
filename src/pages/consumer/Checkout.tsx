@@ -20,6 +20,7 @@ import { PaymentForm } from "@/components/checkout/PaymentForm";
 import { Separator } from "@/components/ui/separator";
 import { Link } from "react-router-dom";
 import { PriceBreakdownDrawer } from "@/components/PriceBreakdownDrawer";
+import type { CheckoutRequest } from "@/contracts/checkout";
 
 const Checkout = () => {
   const navigate = useNavigate();
@@ -129,14 +130,16 @@ const Checkout = () => {
         throw new Error('Missing required data');
       }
 
-      // Call checkout edge function
+      // Call checkout edge function with validated contract payload
+      const checkoutPayload: CheckoutRequest = {
+        cart_id: cart.id,
+        delivery_date: selectedDate,
+        use_credits: useCredits,
+        tip_amount: tipAmount,
+      };
+
       const { data, error } = await supabase.functions.invoke('checkout', {
-        body: {
-          cart_id: cart.id,
-          delivery_date: selectedDate,
-          use_credits: useCredits,
-          tip_amount: tipAmount,
-        },
+        body: checkoutPayload,
       });
 
       if (error) {
@@ -353,11 +356,14 @@ const Checkout = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* 
-                  SECURITY: Payment & Privacy Protection Message
-                  Reassures consumers during checkout that:
-                  1. Payment info is encrypted (Stripe handles PCI compliance)
-                  2. Address is protected by RLS (only visible to assigned driver when nearby)
-                  Part of P2 security hardening (building trust at critical conversion point).
+                  PRIVACY & SECURITY MESSAGE:
+                  WHY addresses are hidden until pickup:
+                  1. Privacy protection - consumers' home addresses are sensitive data
+                  2. RLS (Row Level Security) enforces server-side access control
+                  3. Drivers only see addresses when geographically nearby (prevents stalking/abuse)
+                  4. Database trigger auto-updates visibility based on driver proximity
+                  
+                  This is part of security hardening - building trust at checkout conversion point.
                 */}
                 <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg flex items-start gap-3">
                   <svg className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">

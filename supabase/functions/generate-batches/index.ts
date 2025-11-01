@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
+import { loadConfig } from '../_shared/config.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,18 +26,22 @@ function getZipCenterCoordinates(zipCode: string): { latitude: number; longitude
   return { latitude: coords[0], longitude: coords[1] };
 }
 
-// Geocoding helper using Mapbox with ZIP fallback
-async function geocodeAddress(address: string, zipCode?: string): Promise<{ latitude: number; longitude: number } | null> {
-  const mapboxToken = Deno.env.get('MAPBOX_PUBLIC_TOKEN');
-  if (!mapboxToken) {
-    console.warn('MAPBOX_PUBLIC_TOKEN not configured - using ZIP-based fallback');
+// GEOCODING FALLBACK CHAIN:
+// 1. Mapbox API (most accurate, requires MAPBOX_PUBLIC_TOKEN)
+// 2. ZIP code center (good fallback, ~1km accuracy)
+// 3. Default NYC center (last resort)
+// WHY: Ensures batch generation never fails due to geocoding issues.
+// Geographic fallback maintains service coverage even when external APIs are down.
+async function geocodeAddress(address: string, zipCode?: string, config?: any): Promise<{ latitude: number; longitude: number } | null> {
+  if (!config?.mapbox?.publicToken) {
+    console.warn('⚠️ MAPBOX_PUBLIC_TOKEN not configured - using ZIP-based fallback (accuracy: ~1km)');
     return zipCode ? getZipCenterCoordinates(zipCode) : null;
   }
 
   try {
     const encodedAddress = encodeURIComponent(address);
     const response = await fetch(
-      `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedAddress}.json?access_token=${mapboxToken}&limit=1`
+      `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedAddress}.json?access_token=${config.mapbox.publicToken}&limit=1`
     );
     
     if (!response.ok) {
@@ -408,9 +413,12 @@ serve(async (req) => {
   }
 
   try {
+    // Load centralized config with fail-fast validation
+    const config = loadConfig();
+    
     const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      config.supabase.url,
+      config.supabase.serviceRoleKey
     );
 
     console.log('Starting batch generation...');
@@ -467,7 +475,7 @@ serve(async (req) => {
         const profile = order.profiles as any;
         const address = profile?.delivery_address;
         const zipCode = profile?.zip_code;
-        const coords = address ? await geocodeAddress(address, zipCode) : null;
+        const coords = address ? await geocodeAddress(address, zipCode, config) : null;
         
         // If geocoding completely failed, use ZIP center as fallback
         const finalCoords = coords || (zipCode ? getZipCenterCoordinates(zipCode) : null);

@@ -2,19 +2,24 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.75.0";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { checkRateLimit } from '../_shared/rateLimiter.ts';
+import { loadConfig } from '../_shared/config.ts';
+
+// Import Zod schema from source (Deno can read TS files directly)
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
+
+// Replicate contract schema for edge function validation
+const CheckoutRequestSchema = z.object({
+  cart_id: z.string().uuid({ message: "Invalid cart ID" }),
+  delivery_date: z.string().datetime({ message: "Invalid delivery date format" }),
+  use_credits: z.boolean().default(false),
+  payment_method_id: z.string().optional(),
+  tip_amount: z.number().min(0, { message: "Tip amount must be positive" }).default(0),
+});
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-interface CheckoutRequest {
-  cart_id: string;
-  delivery_date: string;
-  use_credits: boolean;
-  payment_method_id?: string;
-  tip_amount?: number;
-}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -22,9 +27,12 @@ serve(async (req) => {
   }
 
   try {
+    // Load centralized config with fail-fast validation
+    const config = loadConfig();
+    
     const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      config.supabase.url,
+      config.supabase.serviceRoleKey
     );
 
     // Get user from JWT
@@ -33,13 +41,32 @@ serve(async (req) => {
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
     
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'UNAUTHORIZED' }), {
+      return new Response(JSON.stringify({ 
+        error: 'UNAUTHORIZED',
+        message: 'Invalid or expired authentication token'
+      }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const { cart_id, delivery_date, use_credits, payment_method_id, tip_amount }: CheckoutRequest = await req.json();
+    // Validate request body against contract schema
+    const body = await req.json();
+    const validationResult = CheckoutRequestSchema.safeParse(body);
+    
+    if (!validationResult.success) {
+      console.error('Validation failed:', validationResult.error.flatten());
+      return new Response(JSON.stringify({
+        error: 'VALIDATION_ERROR',
+        message: 'Invalid request format',
+        details: validationResult.error.flatten()
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const { cart_id, delivery_date, use_credits, payment_method_id, tip_amount } = validationResult.data;
 
     console.log('Checkout request:', { user_id: user.id, cart_id, delivery_date, use_credits, has_payment_method: !!payment_method_id, tip_amount });
 
@@ -66,9 +93,9 @@ serve(async (req) => {
       );
     }
 
-    // Initialize Stripe
-    const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
-      // Using account default API version for compatibility
+    // Initialize Stripe with centralized config
+    const stripe = new Stripe(config.stripe.secretKey, {
+      // Using account default API version (safest - no hard-coded version drift)
     });
 
     // 1. Validate delivery address using Mapbox
@@ -85,13 +112,16 @@ serve(async (req) => {
       );
     }
 
-    // Geocode and validate address with Mapbox
-    const mapboxToken = Deno.env.get('MAPBOX_PUBLIC_TOKEN');
-    if (mapboxToken) {
+    // GEOCODING FALLBACK CHAIN:
+    // 1. Mapbox API (most accurate, requires API key)
+    // 2. ZIP-based coordinates (fallback if Mapbox unavailable)
+    // 3. Default NYC center (last resort)
+    // WHY: Prevents checkout failures if geocoding service is down
+    if (config.mapbox?.publicToken) {
       try {
         const encodedAddress = encodeURIComponent(userProfile.delivery_address);
         const response = await fetch(
-          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedAddress}.json?access_token=${mapboxToken}&limit=1`
+          `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedAddress}.json?access_token=${config.mapbox.publicToken}&limit=1`
         );
         
         if (response.ok) {
@@ -269,7 +299,9 @@ serve(async (req) => {
     const tipAmountValue = tip_amount || 0;
     const totalBeforeCredits = subtotal + platformFee + deliveryFee + tipAmountValue;
 
-    // 10. Handle credits
+    // 10. Handle credits (SERVER-SIDE RECOMPUTATION)
+    // WHY: Frontend sends use_credits flag, but we recompute the actual amount
+    // from the ledger to prevent manipulation. Never trust client-side money calculations.
     let creditsUsed = 0;
     if (use_credits) {
       const { data: latestCredit } = await supabaseClient

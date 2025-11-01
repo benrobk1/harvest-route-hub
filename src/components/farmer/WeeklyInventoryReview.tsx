@@ -49,9 +49,12 @@ export function WeeklyInventoryReview({ farmProfileId }: WeeklyInventoryReviewPr
     },
   });
 
-  const needsReview = products?.filter(p => 
-    new Date(p.last_reviewed_at || p.updated_at) < SEVEN_DAYS_AGO
-  ) || [];
+  const needsReview = products?.filter(p => {
+    const lastReviewed = new Date(p.last_reviewed_at || p.updated_at);
+    const isOld = lastReviewed < SEVEN_DAYS_AGO;
+    const isPending = !p.approved;
+    return isOld || isPending;
+  }) || [];
 
   const allReviewed = needsReview.length === 0 && products && products.length > 0;
 

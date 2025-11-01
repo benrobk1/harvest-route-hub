@@ -13,6 +13,16 @@ import { toast } from 'sonner';
 import { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { ProductForm } from '@/components/farmer/ProductForm';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function InventoryManagement() {
   const { user } = useAuth();
@@ -21,6 +31,7 @@ export default function InventoryManagement() {
   const [searchQuery, setSearchQuery] = useState('');
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
 
   const { data: farmProfile } = useQuery({
     queryKey: ['farm-profile', user?.id],
@@ -107,6 +118,27 @@ export default function InventoryManagement() {
       data 
     });
   };
+
+  const deleteProductMutation = useMutation({
+    mutationFn: async (productId: string) => {
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', productId);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['farmer-products'] });
+      queryClient.invalidateQueries({ queryKey: ['products-review'] });
+      toast.success('Product deleted successfully');
+      setDeletingProductId(null);
+    },
+    onError: (error: any) => {
+      toast.error(`Failed to delete product: ${error.message}`);
+    },
+  });
 
   const filteredProducts = products?.filter(p =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -224,6 +256,13 @@ export default function InventoryManagement() {
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setDeletingProductId(product.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
                     </CardContent>
@@ -253,6 +292,26 @@ export default function InventoryManagement() {
         } : undefined}
         isEdit={true}
       />
+
+      <AlertDialog open={!!deletingProductId} onOpenChange={() => setDeletingProductId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Product</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this product? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deletingProductId && deleteProductMutation.mutate(deletingProductId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

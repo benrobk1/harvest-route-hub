@@ -109,7 +109,7 @@ export default function ProductApproval() {
 
   // Group products by collection point → farmer → products
   const groupedProducts: GroupedProducts = products?.reduce((acc, product) => {
-    const leadFarmerId = product.farm_profiles.profiles.collection_point_lead_farmer_id || "independent";
+    const leadFarmerId = product.farm_profiles?.profiles?.collection_point_lead_farmer_id || "independent";
     const farmerId = product.farm_profiles.farmer_id;
 
     if (!acc[leadFarmerId]) {
@@ -124,7 +124,7 @@ export default function ProductApproval() {
 
     if (!acc[leadFarmerId].farmers[farmerId]) {
       acc[leadFarmerId].farmers[farmerId] = {
-        farmerName: product.farm_profiles.profiles.full_name,
+        farmerName: product.farm_profiles?.profiles?.full_name || "Unknown Farmer",
         farmName: product.farm_profiles.farm_name,
         products: [],
       };

@@ -1,8 +1,78 @@
-# Welcome to your Lovable project
+# Blue Harvests - Local Food Delivery Platform
 
-## Project info
+**A full-stack marketplace connecting local farmers with consumers, featuring AI-powered logistics optimization.**
 
-**URL**: https://lovable.dev/projects/eeae09ce-f16e-41fa-a46e-2dadc2102e6c
+**Project URL**: https://lovable.dev/projects/eeae09ce-f16e-41fa-a46e-2dadc2102e6c
+
+---
+
+## 🎯 Quick Demo (5 Minutes)
+
+This project demonstrates a production-ready marketplace with multi-role workflows, automated batch optimization, and real-time order tracking.
+
+### Demo Script (YC-Ready)
+
+#### 1. **Consumer Flow** (2 min)
+- Browse farmer products at `/shop`
+- Add items to cart with real-time inventory updates
+- Apply credits at checkout (earn $10 per $100 spent)
+- Complete payment with Stripe test card: `4242 4242 4242 4242`
+- View live order tracking with status updates
+
+#### 2. **Farmer Flow** (1 min)
+- Login as farmer at `/farmer-auth`
+- Upload products via CSV bulk import or manual form
+- View real-time earnings dashboard with 88% revenue share
+- Track order fulfillment and customer analytics
+
+#### 3. **Driver Flow** (1 min)
+- Login as driver at `/driver-auth`
+- View AI-optimized delivery batches (auto-generated daily)
+- Scan box codes with camera to confirm pickup
+- Complete optimized route with GPS navigation
+- Track earnings ($7.50 per delivery + tips)
+
+#### 4. **Admin Flow** (1 min)
+- View KPIs: revenue splits (88/2/10), batch efficiency, growth metrics
+- Approve pending products and new users
+- Generate 1099 tax forms for contractors (farmers & drivers)
+- Monitor system health and subsidized batches
+
+### Test Accounts
+
+Run the seed script to create demo data:
+```bash
+npm run seed
+```
+
+**Test Credentials**:
+```
+Consumer: test-consumer@example.com / password123
+Farmer:   test-farmer@example.com / password123
+Driver:   test-driver@example.com / password123
+Admin:    test-admin@example.com / password123
+```
+
+### Key Features to Highlight
+
+✅ **Dual-Path Batch Optimization** - AI-powered (Gemini 2.5) with deterministic geographic fallback  
+✅ **Automated Revenue Distribution** - 88% farmer / 2% lead farmer / 10% platform, calculated automatically  
+✅ **Credits System** - Earn $10 credit per $100 spent (subscription members only)  
+✅ **Stripe Connect** - Automated farmer payouts with 1099 generation  
+✅ **Mobile-First PWA** - Offline cart support, installable on iOS/Android  
+✅ **Real-Time Tracking** - Order status updates via Supabase Realtime  
+✅ **Role-Based Access Control** - Secure multi-tenant architecture with RLS policies  
+
+---
+
+## 📚 Documentation
+
+- **[Architecture Guide](./ARCHITECTURE.md)** - System design, data flows, and technical decisions
+- [Testing Guide](./README-TESTING.md) - Test runner instructions and E2E scenarios
+- [PWA Setup](./README-PWA.md) - Progressive Web App features and installation
+- [Capacitor Setup](./README-CAPACITOR.md) - Native mobile app build instructions
+
+---
 
 ## How can I edit this code?
 

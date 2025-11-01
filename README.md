@@ -6,6 +6,64 @@
 
 ---
 
+## 🚀 Demo Prep (First-Time Setup)
+
+### Required Environment Variables
+
+All secrets are pre-configured in Lovable Cloud. For local development, you'll need:
+
+```bash
+# Automatically provided by Lovable Cloud:
+VITE_SUPABASE_URL=<your-project-url>
+VITE_SUPABASE_PUBLISHABLE_KEY=<your-anon-key>
+
+# Backend secrets (configured in Lovable Cloud Secrets UI):
+STRIPE_SECRET_KEY=<your-stripe-secret>        # Required for payments
+MAPBOX_PUBLIC_TOKEN=<your-mapbox-token>       # Optional (geocoding fallback enabled)
+LOVABLE_API_KEY=<your-lovable-key>           # Optional (geographic batching fallback enabled)
+OSRM_SERVER_URL=<osrm-server>                # Optional (route optimization)
+RESEND_API_KEY=<your-resend-key>             # Optional (email notifications)
+```
+
+### Demo Data Seeding
+
+**Option 1: Full Demo Reset** (Recommended for demos)
+```bash
+npm run seed              # Creates 50+ orders, 10+ farmers, realistic data
+```
+
+This script (`scripts/seed-demo.ts`) creates:
+- 3 test users (consumer, farmer, driver)
+- 20+ products across multiple farms
+- 50+ orders with varied statuses
+- Delivery batches with optimized routes
+- Credits ledger transactions
+- Subscription data
+
+**Option 2: Reset to Clean State** (via Admin Dashboard)
+- Navigate to `/admin/dashboard`
+- Click "Reset Demo Data" button
+- Calls `reset-demo-data` edge function
+
+### Test Accounts
+
+```
+Consumer: test-consumer@example.com / password123
+Farmer:   test-farmer@example.com / password123  
+Driver:   test-driver@example.com / password123
+Admin:    test-admin@example.com / password123
+```
+
+**Test Payment Card** (Stripe):
+```
+Card: 4242 4242 4242 4242
+Expiry: Any future date
+CVC: Any 3 digits
+ZIP: 10001
+```
+
+---
+
 ## 🎯 Quick Demo (5 Minutes)
 
 This project demonstrates a production-ready marketplace with multi-role workflows, automated batch optimization, and real-time order tracking.
@@ -65,9 +123,72 @@ Admin:    test-admin@example.com / password123
 
 ---
 
+## 🏗️ Architecture Overview
+
+### System Design (30-Second Map)
+
+```
+Consumers → Shop → Cart → Checkout → Stripe Payment
+                                    ↓
+                              Order Created
+                                    ↓
+                    AI Batch Optimization (daily cron)
+                     ↓                    ↓
+              Gemini 2.5 Flash      Geographic Fallback
+              (optimal routes)      (ZIP-based grouping)
+                     ↓                    ↓
+                    Driver Dashboard (pick route)
+                                    ↓
+                          Box Code Scanning
+                                    ↓
+                         Delivery Completion
+                                    ↓
+                    Automated Payouts (Stripe Connect)
+                     ↓              ↓              ↓
+                  Farmer 88%   Lead Farmer 2%  Platform 10%
+```
+
+### Critical Demo Route
+
+**Consumer Journey** (2 min):
+1. `/shop` - Browse products, add to cart
+2. `/consumer/checkout` - Select delivery date, apply credits
+3. Complete Stripe payment (test card: 4242...)
+4. `/consumer/orders` - Track order status in real-time
+
+**Admin Batch Creation** (30 sec):
+1. Navigate to `/admin/dashboard`
+2. Click "Generate Batches" (calls `generate-batches` edge function)
+3. View optimized routes grouped by ZIP + AI optimization
+
+**Driver Delivery** (1 min):
+1. `/driver/routes` - Accept batch assignment
+2. `/driver/load-boxes` - Scan QR codes to confirm pickup
+3. `/driver/route/:id` - Follow optimized route with map
+4. Mark stops as delivered (triggers address reveal for next 3 stops)
+
+### Key Technical Decisions
+
+**Why addresses are hidden from drivers initially:**
+- **Privacy-first design** - Consumer addresses only revealed when driver starts route
+- **Progressive disclosure** - Next 3 addresses unlock as each stop completes
+- **RLS enforcement** - Database-level access control via `get_consumer_address()` function
+
+**Why batch sizes have caps (30-45 orders):**
+- **Driver workload** - 7.5 hour route maximum prevents burnout
+- **Subsidization threshold** - Batches <30 orders may need platform subsidy
+- **Quality control** - Larger batches risk delivery delays and quality issues
+
+**Why geographic fallback exists:**
+- **Reliability** - If Lovable AI API is down, system continues operating
+- **Cost optimization** - AI only used when needed (complex multi-ZIP batches)
+- **Performance** - Simple ZIP grouping is instant for small batches
+
+---
+
 ## 📚 Documentation
 
-- **[Architecture Guide](./ARCHITECTURE.md)** - System design, data flows, and technical decisions
+- **[Architecture Guide](./ARCHITECTURE.md)** - Detailed system design and data flows
 - [Testing Guide](./README-TESTING.md) - Test runner instructions and E2E scenarios
 - [PWA Setup](./README-PWA.md) - Progressive Web App features and installation
 - [Capacitor Setup](./README-CAPACITOR.md) - Native mobile app build instructions

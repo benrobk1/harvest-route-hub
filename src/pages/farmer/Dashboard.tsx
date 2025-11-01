@@ -136,7 +136,7 @@ export default function FarmerDashboard() {
           <StripeConnectSimple />
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => navigate('/profile/farmer')}>
+          <Button variant="outline" onClick={() => navigate('/farmer/profile')}>
             Profile
           </Button>
           <Button variant="outline" onClick={() => navigate('/farmer/customer-analytics')}>

@@ -245,7 +245,35 @@ const Checkout = () => {
     );
   }
 
-  if (!profile || !marketConfig) {
+  // If market config is missing for a provided ZIP, show a clear message instead of endless loading
+  if (profile && profile.zip_code && marketConfig === null) {
+    return (
+      <div className="min-h-screen bg-gradient-earth flex items-center justify-center p-4">
+        <Card className="max-w-md">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-primary" />
+              Delivery Unavailable
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-muted-foreground">
+              We don’t currently deliver to ZIP {profile.zip_code}. Update your address to check other areas.
+            </p>
+            <Button onClick={() => navigate('/consumer/profile')} className="w-full">
+              Change Address
+            </Button>
+            <Button variant="outline" onClick={() => navigate('/consumer/shop')} className="w-full">
+              Back to Shop
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // While loading profile or marketConfig, show skeletons
+  if (!profile || marketConfig === undefined) {
     return (
       <div className="min-h-screen bg-gradient-earth p-4">
         <div className="container max-w-4xl mx-auto py-8">

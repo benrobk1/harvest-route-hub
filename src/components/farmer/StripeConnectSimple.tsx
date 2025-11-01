@@ -48,7 +48,25 @@ export const StripeConnectSimple = ({ variant = 'button' }: StripeConnectSimpleP
   const handleConnect = async () => {
     try {
       setConnecting(true);
-      const { data, error } = await supabase.functions.invoke('stripe-connect-onboard');
+      
+      // Get current session for authorization
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        toast({
+          title: 'Authentication Required',
+          description: 'Please log in to continue',
+          variant: 'destructive',
+        });
+        return;
+      }
+      
+      // Call edge function with authorization header
+      const { data, error } = await supabase.functions.invoke('stripe-connect-onboard', {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
       
       if (error) throw error;
       
@@ -62,7 +80,7 @@ export const StripeConnectSimple = ({ variant = 'button' }: StripeConnectSimpleP
     } catch (error: any) {
       toast({
         title: 'Connection failed',
-        description: error.message,
+        description: error.message || 'Unable to connect to Stripe',
         variant: 'destructive',
       });
     } finally {

@@ -6,6 +6,32 @@
 
 ---
 
+## ⚡ Happy Path (30 Seconds)
+
+**First-time reviewers**: Get the full platform running in under 60 seconds:
+
+```bash
+# 1. Seed demo data (creates test accounts + orders)
+npm run seed
+
+# 2. Sign in as consumer
+# Email: test-consumer@example.com | Password: password123
+# Navigate to /consumer/shop
+
+# 3. Add items to cart → Checkout
+# Use test card: 4242 4242 4242 4242 | Any future date | Any CVC
+
+# 4. Admin generates batches
+# Navigate to /admin/dashboard → Click "Generate Batches"
+
+# 5. Driver completes delivery
+# Navigate to /driver/routes → Accept batch → Scan box code → Mark delivered
+```
+
+**Result**: You've now seen the complete lifecycle: consumer order → AI batch optimization → driver delivery → automated payouts.
+
+---
+
 ## 🚀 Demo Prep (First-Time Setup)
 
 ### Required Environment Variables
@@ -61,6 +87,21 @@ Expiry: Any future date
 CVC: Any 3 digits
 ZIP: 10001
 ```
+
+### Webhook Configuration
+
+**Stripe webhooks** are pre-configured in Lovable Cloud deployment:
+- Production: Automatically configured when you deploy
+- Local dev: **Skip webhook setup** - not required for core functionality
+- See `supabase/functions/stripe-webhook/index.ts` for implementation details
+
+**What webhooks handle** (post-demo):
+- `payment_intent.succeeded` → Update order status to 'paid'
+- `customer.subscription.updated` → Sync subscription credits
+- `charge.dispute.created` → Alert admin for review
+- `payout.failed` → Retry payout logic
+
+**Security**: All webhooks verify Stripe signature using `STRIPE_WEBHOOK_SECRET` before processing events.
 
 ---
 

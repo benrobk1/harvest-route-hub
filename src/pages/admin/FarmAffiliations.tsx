@@ -241,9 +241,15 @@ export default function FarmAffiliations() {
                         })}
                       >
                         {affiliation.active ? (
-                          <XCircle className="h-4 w-4 text-destructive" />
+                          <>
+                            <XCircle className="h-4 w-4 mr-2 text-destructive" />
+                            Deactivate
+                          </>
                         ) : (
-                          <CheckCircle className="h-4 w-4 text-green-600" />
+                          <>
+                            <CheckCircle className="h-4 w-4 mr-2 text-green-600" />
+                            Activate
+                          </>
                         )}
                       </Button>
                     </TableCell>

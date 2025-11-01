@@ -83,109 +83,95 @@ export default function MyLeadFarmer() {
         <Button variant="ghost" size="icon" onClick={() => navigate('/farmer/dashboard')}>
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <div>
-          <h1 className="text-3xl font-bold">My Lead Farmer</h1>
-          <p className="text-muted-foreground">Your collection point coordinator</p>
-        </div>
+      <div>
+        <h1 className="text-3xl font-bold">Your Collection Point</h1>
+        <p className="text-muted-foreground">Where you deliver your harvest</p>
+      </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
-        {/* Farm Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MapPin className="h-5 w-5" />
-              Collection Point
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <p className="text-2xl font-bold">{farmProfile?.farm_name}</p>
-              {farmProfile?.bio && (
-                <p className="text-sm text-muted-foreground mt-2">{farmProfile.bio}</p>
-              )}
-            </div>
+      {/* Collection Point Information */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-2xl">
+            <MapPin className="h-6 w-6" />
+            {farmProfile?.farm_name}
+          </CardTitle>
+          <CardDescription>
+            Managed by <span className="font-semibold">{leadProfile?.full_name}</span>
+            <Badge variant="outline" className="ml-2">Lead Farmer</Badge>
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {farmProfile?.bio && (
+            <p className="text-sm text-muted-foreground">{farmProfile.bio}</p>
+          )}
 
-            {leadProfile?.collection_point_address && (
-              <div className="flex items-start gap-2">
-                <MapPin className="h-4 w-4 mt-1 text-muted-foreground" />
-                <div>
-                  <p className="font-medium">Address</p>
-                  <p className="text-sm text-muted-foreground">{leadProfile.collection_point_address}</p>
-                </div>
-              </div>
-            )}
-
-            {leadProfile?.delivery_schedule && leadProfile.delivery_schedule.length > 0 && (
-              <div className="flex items-start gap-2">
-                <Calendar className="h-4 w-4 mt-1 text-muted-foreground" />
-                <div>
-                  <p className="font-medium">Delivery Schedule</p>
-                  <div className="flex gap-2 mt-1">
-                    {leadProfile.delivery_schedule.map((day: string) => (
-                      <Badge key={day} variant="secondary">
-                        {day}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Contact Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <User className="h-5 w-5" />
-              Manager Information
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <p className="text-2xl font-bold">{leadProfile?.full_name}</p>
-              <Badge variant="outline" className="mt-2">
-                Lead Farmer
-              </Badge>
-            </div>
-
-            {leadProfile?.phone && (
-              <div className="flex items-center gap-2">
-                <Phone className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="font-medium">Phone</p>
+          <div className="grid gap-4 md:grid-cols-2">
+            {/* Contact Information */}
+            <div className="space-y-3">
+              <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Contact</h3>
+              
+              {leadProfile?.phone && (
+                <div className="flex items-center gap-2">
+                  <Phone className="h-4 w-4 text-muted-foreground" />
                   <a href={`tel:${leadProfile.phone}`} className="text-sm text-primary hover:underline">
                     {leadProfile.phone}
                   </a>
                 </div>
-              </div>
-            )}
+              )}
 
-            {leadProfile?.email && (
-              <div className="flex items-center gap-2">
-                <Mail className="h-4 w-4 text-muted-foreground" />
-                <div>
-                  <p className="font-medium">Email</p>
+              {leadProfile?.email && (
+                <div className="flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-muted-foreground" />
                   <a href={`mailto:${leadProfile.email}`} className="text-sm text-primary hover:underline">
                     {leadProfile.email}
                   </a>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
-            {leadProfile?.commission_rate && (
-              <div className="p-3 bg-muted rounded-lg">
-                <p className="text-sm font-medium">Commission Rate</p>
-                <p className="text-2xl font-bold">{leadProfile.commission_rate}%</p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Coordination fee for collection point services
-                </p>
+            {/* Address Information */}
+            <div className="space-y-3">
+              <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wide">Location</h3>
+              
+              {leadProfile?.collection_point_address && (
+                <div className="flex items-start gap-2">
+                  <MapPin className="h-4 w-4 mt-1 text-muted-foreground flex-shrink-0" />
+                  <p className="text-sm">{leadProfile.collection_point_address}</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Delivery Schedule */}
+          {leadProfile?.delivery_schedule && leadProfile.delivery_schedule.length > 0 && (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <h3 className="font-semibold text-sm">Delivery Schedule</h3>
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+              <div className="flex flex-wrap gap-2">
+                {leadProfile.delivery_schedule.map((day: string) => (
+                  <Badge key={day} variant="secondary">
+                    {day}
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Commission Rate */}
+          {leadProfile?.commission_rate && (
+            <div className="p-4 bg-muted rounded-lg">
+              <p className="text-sm font-medium text-muted-foreground">Commission Rate</p>
+              <p className="text-2xl font-bold">{leadProfile.commission_rate}%</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Coordination fee for collection point services
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* View Public Profile */}
       {farmProfile?.id && (

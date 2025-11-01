@@ -12,6 +12,7 @@ import { WeeklyInventoryReview } from '@/components/farmer/WeeklyInventoryReview
 import { LeadFarmerInfoCard } from '@/components/farmer/LeadFarmerInfoCard';
 import { MultiFarmDashboard } from '@/components/farmer/MultiFarmDashboard';
 import { BatchConsolidation } from '@/components/farmer/BatchConsolidation';
+import { NextOrderCutoffCard } from '@/components/farmer/NextOrderCutoffCard';
 
 export default function FarmerDashboard() {
   const { user } = useAuth();
@@ -49,7 +50,7 @@ export default function FarmerDashboard() {
     queryFn: async () => {
       const { data } = await supabase
         .from('profiles')
-        .select('collection_point_lead_farmer_id')
+        .select('collection_point_lead_farmer_id, zip_code')
         .eq('id', user?.id)
         .single();
       return data;
@@ -138,11 +139,9 @@ export default function FarmerDashboard() {
           <Button variant="outline" onClick={() => navigate('/profile/farmer')}>
             Profile
           </Button>
-          {isLeadFarmer && (
-            <Button variant="outline" onClick={() => navigate('/farmer/customer-analytics')}>
-              Analytics
-            </Button>
-          )}
+          <Button variant="outline" onClick={() => navigate('/farmer/customer-analytics')}>
+            Analytics
+          </Button>
           {isLeadFarmer && (
             <Button variant="outline" onClick={() => navigate('/farmer/affiliated-farmers')}>
               <Users className="mr-2 h-4 w-4" />
@@ -151,8 +150,7 @@ export default function FarmerDashboard() {
           )}
           {!isLeadFarmer && collectionPointLeadFarmerId && (
             <Button variant="outline" onClick={() => navigate('/farmer/my-lead-farmer')}>
-              <Users className="mr-2 h-4 w-4" />
-              My Lead Farmer
+              Your Collection Point
             </Button>
           )}
           <Button variant="outline" onClick={() => navigate('/farmer/inventory')}>
@@ -205,6 +203,11 @@ export default function FarmerDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Next Order Cutoff */}
+      {userProfile?.zip_code && (
+        <NextOrderCutoffCard zipCode={userProfile.zip_code} />
+      )}
 
       {/* Weekly Inventory Review Card */}
       <Card>

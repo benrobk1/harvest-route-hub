@@ -161,7 +161,7 @@ const AppContent = () => {
             </RoleGate>
           } />
           <Route path="/farmer/customer-analytics" element={
-            <RoleGate roles={['lead_farmer']}>
+            <RoleGate roles={['farmer', 'lead_farmer']}>
               <CustomerAnalytics />
             </RoleGate>
           } />

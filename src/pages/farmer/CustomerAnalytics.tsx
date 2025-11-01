@@ -15,56 +15,121 @@ export default function CustomerAnalytics() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const { data: zipCodeData, isLoading: zipLoading } = useQuery({
-    queryKey: ['customer-zip-analytics', user?.id],
+  // Check if user is a lead farmer
+  const { data: userRoles } = useQuery({
+    queryKey: ['user-roles', user?.id],
     queryFn: async () => {
-      const { data: orders } = await supabase
-        .from('order_items')
-        .select(`
-          subtotal,
-          order:orders (
-            consumer_id,
-            created_at,
-            consumer:profiles!orders_consumer_id_fkey (
-              zip_code
-            )
-          ),
-          product:products (
-            farm_profile:farm_profiles (
-              farm_affiliations!farm_affiliations_farm_profile_id_fkey (
-                lead_farmer_id
-              )
-            )
-          )
-        `);
-
-      // Process manually
-      const zipStats: Record<string, { count: number; revenue: number; customers: Set<string> }> = {};
-      
-      orders?.forEach((item: any) => {
-        const zip = item.order?.consumer?.zip_code;
-        const isAffiliated = item.product?.farm_profile?.farm_affiliations?.some(
-          (fa: any) => fa.lead_farmer_id === user?.id
-        );
-        
-        if (zip && isAffiliated) {
-          if (!zipStats[zip]) {
-            zipStats[zip] = { count: 0, revenue: 0, customers: new Set() };
-          }
-          zipStats[zip].count += 1;
-          zipStats[zip].revenue += Number(item.subtotal);
-          zipStats[zip].customers.add(item.order.consumer_id);
-        }
-      });
-
-      return Object.entries(zipStats).map(([zip_code, stats]) => ({
-        zip_code,
-        order_count: stats.count,
-        total_revenue: stats.revenue,
-        unique_customers: stats.customers.size,
-      })).sort((a, b) => b.total_revenue - a.total_revenue);
+      const { data } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user?.id);
+      return data;
     },
     enabled: !!user?.id,
+  });
+
+  const isLeadFarmer = userRoles?.some(r => r.role === 'lead_farmer');
+
+  const { data: zipCodeData, isLoading: zipLoading } = useQuery({
+    queryKey: ['customer-zip-analytics', user?.id, isLeadFarmer],
+    queryFn: async () => {
+      if (isLeadFarmer) {
+        // Lead farmer: show analytics for affiliated farmers
+        const { data: orders } = await supabase
+          .from('order_items')
+          .select(`
+            subtotal,
+            order:orders (
+              consumer_id,
+              created_at,
+              consumer:profiles!orders_consumer_id_fkey (
+                zip_code
+              )
+            ),
+            product:products (
+              farm_profile:farm_profiles (
+                farm_affiliations!farm_affiliations_farm_profile_id_fkey (
+                  lead_farmer_id
+                )
+              )
+            )
+          `);
+
+        const zipStats: Record<string, { count: number; revenue: number; customers: Set<string> }> = {};
+        
+        orders?.forEach((item: any) => {
+          const zip = item.order?.consumer?.zip_code;
+          const isAffiliated = item.product?.farm_profile?.farm_affiliations?.some(
+            (fa: any) => fa.lead_farmer_id === user?.id
+          );
+          
+          if (zip && isAffiliated) {
+            if (!zipStats[zip]) {
+              zipStats[zip] = { count: 0, revenue: 0, customers: new Set() };
+            }
+            zipStats[zip].count += 1;
+            zipStats[zip].revenue += Number(item.subtotal);
+            zipStats[zip].customers.add(item.order.consumer_id);
+          }
+        });
+
+        return Object.entries(zipStats).map(([zip_code, stats]) => ({
+          zip_code,
+          order_count: stats.count,
+          total_revenue: stats.revenue,
+          unique_customers: stats.customers.size,
+        })).sort((a, b) => b.total_revenue - a.total_revenue);
+      } else {
+        // Regular farmer: show analytics only for their own products
+        const { data: farmProfile } = await supabase
+          .from('farm_profiles')
+          .select('id')
+          .eq('farmer_id', user?.id)
+          .single();
+
+        if (!farmProfile) return [];
+
+        const { data: orders } = await supabase
+          .from('order_items')
+          .select(`
+            subtotal,
+            order:orders (
+              consumer_id,
+              created_at,
+              consumer:profiles!orders_consumer_id_fkey (
+                zip_code
+              )
+            ),
+            product:products!inner (
+              farm_profile_id
+            )
+          `)
+          .eq('product.farm_profile_id', farmProfile.id);
+
+        const zipStats: Record<string, { count: number; revenue: number; customers: Set<string> }> = {};
+        
+        orders?.forEach((item: any) => {
+          const zip = item.order?.consumer?.zip_code;
+          
+          if (zip) {
+            if (!zipStats[zip]) {
+              zipStats[zip] = { count: 0, revenue: 0, customers: new Set() };
+            }
+            zipStats[zip].count += 1;
+            zipStats[zip].revenue += Number(item.subtotal);
+            zipStats[zip].customers.add(item.order.consumer_id);
+          }
+        });
+
+        return Object.entries(zipStats).map(([zip_code, stats]) => ({
+          zip_code,
+          order_count: stats.count,
+          total_revenue: stats.revenue,
+          unique_customers: stats.customers.size,
+        })).sort((a, b) => b.total_revenue - a.total_revenue);
+      }
+    },
+    enabled: !!user?.id && userRoles !== undefined,
   });
 
   const { data: summary, isLoading: summaryLoading } = useQuery({

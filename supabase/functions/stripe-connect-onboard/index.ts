@@ -32,19 +32,29 @@ serve(async (req) => {
 
     console.log('Stripe Connect onboarding request for user:', user.id);
 
-    // Verify user is farmer or driver
-    const { data: userRoles } = await supabaseClient
+    // Verify user is farmer or driver - use service role to bypass RLS
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    const { data: userRoles, error: rolesError } = await supabaseAdmin
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id);
 
+    console.log('User roles query result:', { userRoles, rolesError });
+
     const roles = userRoles?.map(r => r.role) || [];
+    console.log('User roles:', roles);
+    
     const isFarmerOrDriver = roles.includes('farmer') || roles.includes('lead_farmer') || roles.includes('driver');
 
     if (!isFarmerOrDriver) {
       return new Response(JSON.stringify({ 
         error: 'INVALID_ROLE',
-        message: 'Only farmers and drivers can connect Stripe accounts'
+        message: 'Only farmers and drivers can connect Stripe accounts',
+        debug: { roles, userId: user.id }
       }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

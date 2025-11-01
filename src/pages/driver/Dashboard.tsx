@@ -312,7 +312,7 @@ const DriverDashboard = () => {
                 Welcome back! You have {stats?.deliveries || 0} deliveries today
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button variant="outline" onClick={() => navigate('/driver/payouts')}>
                 <DollarSign className="h-4 w-4 mr-2" />
                 Payouts
@@ -321,7 +321,7 @@ const DriverDashboard = () => {
                 <FileText className="h-4 w-4 mr-2" />
                 Tax Info
               </Button>
-              <Button variant="outline" onClick={() => navigate('/driver/profile')}>
+              <Button onClick={() => navigate('/driver/profile')}>
                 <User className="h-4 w-4 mr-2" />
                 Profile
               </Button>

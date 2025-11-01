@@ -19,17 +19,12 @@ export default function AffiliatedFarmers() {
         .from('farm_affiliations')
         .select(`
           *,
-          farm_profiles (
+          farm_profiles!inner (
             id,
             farm_name,
             location,
             bio,
-            farmer_id,
-            profiles (
-              full_name,
-              email,
-              phone
-            )
+            farmer_id
           )
         `)
         .eq('lead_farmer_id', user?.id)
@@ -37,19 +32,30 @@ export default function AffiliatedFarmers() {
       
       if (error) throw error;
 
-      // Get product counts for each farm
+      // Get product counts and farmer profile for each farm
       const farmsWithProducts = await Promise.all(
         (data || []).map(async (affiliation) => {
-          const { data: products, error: prodError } = await supabase
-            .from('products')
-            .select('id, name, available_quantity')
-            .eq('farm_profile_id', affiliation.farm_profiles.id)
-            .gt('available_quantity', 0);
+          const [productsResult, profileResult] = await Promise.all([
+            supabase
+              .from('products')
+              .select('id, name, available_quantity')
+              .eq('farm_profile_id', affiliation.farm_profiles.id)
+              .gt('available_quantity', 0),
+            supabase
+              .from('profiles')
+              .select('full_name, email, phone')
+              .eq('id', affiliation.farm_profiles.farmer_id)
+              .single()
+          ]);
 
           return {
             ...affiliation,
-            active_products: products?.length || 0,
-            product_names: products?.map(p => p.name).join(', ') || 'No active products',
+            farm_profiles: {
+              ...affiliation.farm_profiles,
+              profiles: profileResult.data
+            },
+            active_products: productsResult.data?.length || 0,
+            product_names: productsResult.data?.map(p => p.name).join(', ') || 'No active products',
           };
         })
       );

@@ -7,17 +7,21 @@ interface DemoModeContextType {
   dataSeeded: boolean;
   currentDemoAccount: string | null;
   enableDemoMode: () => Promise<any>;
-  disableDemoMode: () => void;
+  disableDemoMode: () => Promise<void>;
   setCurrentDemoAccount: (email: string) => void;
 }
 
-const DemoModeContext = createContext<DemoModeContextType | undefined>(undefined);
+const DemoModeContext = createContext<DemoModeContextType>({
+  isDemoMode: false,
+  dataSeeded: false,
+  currentDemoAccount: null,
+  enableDemoMode: async () => ({}),
+  disableDemoMode: async () => {},
+  setCurrentDemoAccount: () => {},
+});
 
 export const useDemoMode = () => {
   const context = useContext(DemoModeContext);
-  if (!context) {
-    throw new Error('useDemoMode must be used within DemoModeProvider');
-  }
   return context;
 };
 

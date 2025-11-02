@@ -2,7 +2,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 
 export const pwaConfig = VitePWA({
   registerType: 'autoUpdate',
-  includeAssets: ['favicon.ico', 'robots.txt'],
+  includeAssets: ['favicon.png', 'robots.txt'],
   manifest: {
     name: 'Blue Harvests',
     short_name: 'Blue Harvests',

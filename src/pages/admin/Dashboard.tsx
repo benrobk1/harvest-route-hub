@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, Truck, Sprout, DollarSign, TrendingUp, MapPin, FileText } from "lucide-react";
+import { Users, Truck, Sprout, DollarSign, TrendingUp, MapPin, FileText, Database } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,12 +15,14 @@ import { AdminRoleManager } from "@/components/admin/AdminRoleManager";
 import { KPIHeader } from "@/components/admin/KPIHeader";
 import { FarmAffiliationManager } from "@/components/admin/FarmAffiliationManager";
 import { TaxDocumentGenerator } from "@/components/admin/TaxDocumentGenerator";
+import { useToast } from "@/hooks/use-toast";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   
   // Fetch metrics
-  const { data: metrics, isLoading: metricsLoading } = useQuery({
+  const { data: metrics, isLoading: metricsLoading, refetch } = useQuery({
     queryKey: ['admin-metrics'],
     queryFn: async () => {
       // Count consumers
@@ -126,6 +128,34 @@ const AdminDashboard = () => {
     },
   });
 
+  const handleSeedDemoData = async () => {
+    try {
+      toast({
+        title: "Creating Demo Data",
+        description: "This will take about 30 seconds...",
+      });
+
+      const { data, error } = await supabase.functions.invoke('seed-full-demo');
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Demo Data Created",
+        description: `Successfully created ${data.summary.users_created} users, ${data.summary.products_created} products, ${data.summary.orders_created} orders, and more!`,
+      });
+      
+      // Refetch all data
+      refetch();
+    } catch (error) {
+      console.error('Error seeding demo data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create demo data. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-earth">
       <header className="bg-white border-b shadow-soft">
@@ -135,7 +165,19 @@ const AdminDashboard = () => {
               <h1 className="text-2xl font-bold text-foreground">Management Portal</h1>
               <p className="text-sm text-muted-foreground">Real-time business intelligence and operations</p>
             </div>
-            <div className="grid gap-2 md:grid-cols-6 lg:grid-cols-12">
+            <div className="flex gap-2">
+              <Button 
+                variant="default" 
+                size="sm" 
+                onClick={handleSeedDemoData}
+                className="bg-gradient-to-r from-primary to-primary/80"
+              >
+                <Database className="h-4 w-4 mr-2" />
+                Seed Full Demo
+              </Button>
+            </div>
+          </div>
+          <div className="grid gap-2 md:grid-cols-6 lg:grid-cols-12 mt-4">
               <Button variant="outline" size="sm" onClick={() => navigate('/admin/approvals')}>Approvals</Button>
               <Button variant="outline" size="sm" onClick={() => navigate('/admin/user-search')}>User Search</Button>
               <Button variant="outline" size="sm" onClick={() => navigate('/admin/products')}>Products</Button>
@@ -149,7 +191,6 @@ const AdminDashboard = () => {
               <Button variant="outline" size="sm" onClick={() => navigate('/admin/roles')}>Roles</Button>
               <Button variant="outline" size="sm" onClick={() => navigate('/admin/credits')}>Credits</Button>
             </div>
-          </div>
         </div>
       </header>
 

@@ -4,7 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, Truck, Sprout, DollarSign, TrendingUp, MapPin, FileText, Database } from "lucide-react";
+import { Users, Truck, Sprout, DollarSign, TrendingUp, MapPin, FileText, Database, Loader2 } from "lucide-react";
+import { DemoModeBanner } from "@/components/admin/DemoModeBanner";
+import { DemoDataStatus } from "@/components/admin/DemoDataStatus";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -20,6 +22,8 @@ import { useToast } from "@/hooks/use-toast";
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [isSeeding, setIsSeeding] = useState(false);
+  const [demoStats, setDemoStats] = useState<any>(null);
   
   // Fetch metrics
   const { data: metrics, isLoading: metricsLoading, refetch } = useQuery({
@@ -130,18 +134,29 @@ const AdminDashboard = () => {
 
   const handleSeedDemoData = async () => {
     try {
+      setIsSeeding(true);
       toast({
         title: "Creating Demo Data",
-        description: "This will take about 30 seconds...",
+        description: "This will take 30-60 seconds. All demo accounts and data will be ready...",
       });
 
       const { data, error } = await supabase.functions.invoke('seed-full-demo');
       
       if (error) throw error;
       
+      // Set the demo stats for the status card
+      setDemoStats({
+        usersCreated: data.summary?.users_created || 0,
+        ordersGenerated: data.summary?.orders_created || 0,
+        batchesCreated: data.summary?.batches_created || 0,
+        productsCreated: data.summary?.products_created || 0,
+        creditsAwarded: data.summary?.credits_awarded || 0,
+        subscriptionsCreated: data.summary?.subscriptions_created || 0,
+      });
+      
       toast({
-        title: "Demo Data Created",
-        description: `Successfully created ${data.summary.users_created} users, ${data.summary.products_created} products, ${data.summary.orders_created} orders, and more!`,
+        title: "Demo Data Loaded! 🎬",
+        description: "All accounts ready for YC demo. Use Quick Login buttons to switch between users.",
       });
       
       // Refetch all data
@@ -153,11 +168,14 @@ const AdminDashboard = () => {
         description: "Failed to create demo data. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsSeeding(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-gradient-earth">
+      <DemoModeBanner />
       <header className="bg-white border-b shadow-soft">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
@@ -170,10 +188,20 @@ const AdminDashboard = () => {
                 variant="default" 
                 size="sm" 
                 onClick={handleSeedDemoData}
+                disabled={isSeeding}
                 className="bg-gradient-to-r from-primary to-primary/80"
               >
-                <Database className="h-4 w-4 mr-2" />
-                Seed Full Demo
+                {isSeeding ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Seeding Demo...
+                  </>
+                ) : (
+                  <>
+                    <Database className="h-4 w-4 mr-2" />
+                    Seed Full Demo
+                  </>
+                )}
               </Button>
             </div>
           </div>
@@ -198,6 +226,9 @@ const AdminDashboard = () => {
       <KPIHeader />
 
       <main className="container mx-auto px-4 py-8 space-y-8">
+        {/* Demo Stats Card */}
+        {demoStats && <DemoDataStatus stats={demoStats} />}
+        
         {/* Pending Approvals - Single Card */}
         <Link to="/admin/approvals">
           <Card className="border-2 hover:shadow-md transition-shadow cursor-pointer">

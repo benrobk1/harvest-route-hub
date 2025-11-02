@@ -3,10 +3,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, BarChart3, Shield } from "lucide-react";
+import { ArrowLeft, BarChart3, Shield, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useDemoMode } from "@/contexts/DemoModeContext";
 import { z } from "zod";
 
 const emailSchema = z.string().email("Invalid email address");
@@ -15,6 +17,7 @@ const passwordSchema = z.string().min(6, "Password must be at least 6 characters
 const AdminAuth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { isDemoMode } = useDemoMode();
   const [isLoading, setIsLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
 
@@ -130,6 +133,13 @@ const AdminAuth = () => {
           </CardHeader>
           <CardContent>
             <form onSubmit={isSignUp ? handleSignUp : handleLogin} className="space-y-4">
+              {isDemoMode && !isSignUp && (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertTitle>Demo Mode Active</AlertTitle>
+                  <AlertDescription>Demo credentials are pre-filled. Just click "Access Portal"!</AlertDescription>
+                </Alert>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="adminEmail">Admin Email</Label>
                 <Input 
@@ -137,6 +147,7 @@ const AdminAuth = () => {
                   name="email"
                   type="email" 
                   placeholder="admin@blueharvests.com" 
+                  defaultValue={isDemoMode && !isSignUp ? "admin@demo.com" : ""}
                   required 
                 />
               </div>
@@ -147,6 +158,7 @@ const AdminAuth = () => {
                   name="password"
                   type="password" 
                   placeholder="••••••••" 
+                  defaultValue={isDemoMode && !isSignUp ? "demo123456" : ""}
                   required 
                 />
               </div>

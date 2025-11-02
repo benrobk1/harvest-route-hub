@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { useDemoMode } from "@/contexts/DemoModeContext";
-import { X } from "lucide-react";
+import { X, Home } from "lucide-react";
 
 const DEMO_ACCOUNTS = [
   { email: "admin@demo.com", role: "Admin", path: "/admin/dashboard" },
@@ -57,6 +57,16 @@ export function DemoModeBanner() {
           </div>
           
           <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate('/')}
+              className="text-xs"
+            >
+              <Home className="h-4 w-4 mr-1" />
+              Home
+            </Button>
+            <span className="text-sm text-muted-foreground mx-2 hidden sm:inline">|</span>
             <span className="text-sm text-muted-foreground mr-2 hidden sm:inline">Quick Login:</span>
             {DEMO_ACCOUNTS.map((account) => (
               <Button

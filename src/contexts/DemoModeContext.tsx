@@ -98,16 +98,49 @@ export const DemoModeProvider = ({ children }: DemoModeProviderProps) => {
     }
   };
 
-  const disableDemoMode = () => {
-    setIsDemoMode(false);
-    setCurrentDemoAccount(null);
-    
-    // Sign out current user
-    supabase.auth.signOut();
-    
-    toast.success('Demo Mode Disabled', {
-      description: 'App has returned to normal mode. You have been signed out.',
-    });
+  const disableDemoMode = async () => {
+    try {
+      toast.loading('Cleaning up demo data...', {
+        description: 'Removing all demo accounts and data from the platform.',
+      });
+
+      // Get the current session
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session) {
+        // Call cleanup edge function
+        const { error } = await supabase.functions.invoke('cleanup-demo-data', {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+        
+        if (error) {
+          console.error('Error cleaning up demo data:', error);
+          toast.dismiss();
+          toast.error('Failed to clean up demo data', {
+            description: 'Demo mode disabled, but some data may remain.',
+          });
+        } else {
+          toast.dismiss();
+          toast.success('Demo Data Cleaned', {
+            description: 'All demo accounts and data have been removed.',
+          });
+        }
+      }
+    } catch (error: any) {
+      console.error('Error during demo cleanup:', error);
+      toast.dismiss();
+      toast.error('Cleanup error', {
+        description: error.message,
+      });
+    } finally {
+      setIsDemoMode(false);
+      setCurrentDemoAccount(null);
+      
+      // Sign out current user
+      await supabase.auth.signOut();
+    }
   };
 
   return (

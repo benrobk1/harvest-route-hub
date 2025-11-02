@@ -11,6 +11,7 @@ import { ArrowLeft, Truck, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useDemoMode } from "@/contexts/DemoModeContext";
 import { z } from "zod";
 import { getAuthErrorMessage } from "@/lib/authErrors";
 
@@ -21,6 +22,7 @@ const DriverAuth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { roles } = useAuth();
+  const { isDemoMode } = useDemoMode();
   const [isLoading, setIsLoading] = useState(false);
   const [formError, setFormError] = useState<{ title: string; description: string } | null>(null);
   const [emailError, setEmailError] = useState('');
@@ -247,6 +249,13 @@ const DriverAuth = () => {
               
               <TabsContent value="login">
                 <form onSubmit={handleLogin} className="space-y-4">
+                  {isDemoMode && (
+                    <Alert>
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Demo Mode Active</AlertTitle>
+                      <AlertDescription>Demo credentials are pre-filled. Just click "Login"!</AlertDescription>
+                    </Alert>
+                  )}
                   {formError && (
                     <Alert variant="destructive">
                       <AlertCircle className="h-4 w-4" />
@@ -261,6 +270,7 @@ const DriverAuth = () => {
                       name="email" 
                       type="email" 
                       placeholder="you@example.com" 
+                      defaultValue={isDemoMode ? "driver1@demo.com" : ""}
                       required 
                       onBlur={(e) => validateEmail(e.target.value)}
                       className={emailError ? 'border-destructive' : ''}
@@ -274,6 +284,7 @@ const DriverAuth = () => {
                       name="password" 
                       type="password" 
                       placeholder="••••••••" 
+                      defaultValue={isDemoMode ? "demo123456" : ""}
                       required 
                       onChange={(e) => validatePassword(e.target.value)}
                       className={passwordError ? 'border-destructive' : ''}

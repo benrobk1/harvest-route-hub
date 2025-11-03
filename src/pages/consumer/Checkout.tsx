@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -105,7 +105,7 @@ const Checkout = () => {
     enabled: !!user,
   });
 
-  // Generate available delivery dates (next 7 days)
+// Generate available delivery dates (next 7 days)
   const availableDates = Array.from({ length: 7 }, (_, i) => {
     const date = addDays(startOfDay(new Date()), i + 1);
     const dayName = format(date, 'EEEE');
@@ -117,6 +117,16 @@ const Checkout = () => {
       isAvailable: marketConfig?.delivery_days?.includes(dayName) ?? true,
     };
   });
+
+  // Auto-select a valid delivery date when market config loads or selection becomes invalid
+  useEffect(() => {
+    if (!marketConfig) return;
+    const isCurrentValid = selectedDate && availableDates.find(d => d.value === selectedDate)?.isAvailable;
+    if (!isCurrentValid) {
+      const first = availableDates.find(d => d.isAvailable);
+      if (first) setSelectedDate(first.value);
+    }
+  }, [marketConfig, selectedDate, availableDates]);
 
   const deliveryFee = marketConfig?.delivery_fee || 7.50;
   const platformFee = cartTotal * 0.10; // 10% platform fee
@@ -145,6 +155,19 @@ const Checkout = () => {
 
       if (!user || !cart) {
         throw new Error('Missing required data');
+      }
+
+      // Validate selected date against allowed delivery days
+      const selected = availableDates.find(d => d.value === selectedDate);
+      if (!selected || !selected.isAvailable) {
+        const dayLabel = selected ? selected.label.split(',')[0] : 'selected day';
+        const allowed = (marketConfig?.delivery_days || []).join(', ');
+        // Auto-select next available date to prevent hard failure
+        const next = availableDates.find(d => d.isAvailable);
+        if (next) {
+          setSelectedDate(next.value);
+        }
+        throw new Error(`Delivery not available on ${dayLabel}. Available days: ${allowed}.`);
       }
 
       // Call checkout edge function with validated contract payload

@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { formatMoney } from '@/lib/formatMoney';
-import { Calendar, MapPin, Sprout, Check } from 'lucide-react';
+import { Calendar, MapPin, Sprout, Check, Minus, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import PriceBreakdownDrawer from './PriceBreakdownDrawer';
@@ -30,7 +30,7 @@ interface Product {
 
 interface ProductCardProps {
   product: Product;
-  onAddToCart: (product: Product) => void;
+  onAddToCart: (product: Product, quantity: number) => void;
   farmerData?: {
     profiles?: {
       avatar_url?: string;
@@ -47,6 +47,7 @@ const ProductCard = ({ product, onAddToCart, farmerData, consumerProfile }: Prod
   const [isAdding, setIsAdding] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
   const [showFarmStory, setShowFarmStory] = useState(false);
+  const [quantity, setQuantity] = useState(1);
 
   // Memoize distance calculation
   const milesFromFarm = useMemo(() => {
@@ -56,10 +57,25 @@ const ProductCard = ({ product, onAddToCart, farmerData, consumerProfile }: Prod
 
   const handleAddToCart = async () => {
     setIsAdding(true);
-    await onAddToCart(product);
+    await onAddToCart(product, quantity);
     setIsAdding(false);
     setJustAdded(true);
-    setTimeout(() => setJustAdded(false), 2000);
+    setTimeout(() => {
+      setJustAdded(false);
+      setQuantity(1); // Reset quantity after adding
+    }, 2000);
+  };
+
+  const incrementQuantity = () => {
+    if (quantity < product.available_quantity) {
+      setQuantity(prev => prev + 1);
+    }
+  };
+
+  const decrementQuantity = () => {
+    if (quantity > 1) {
+      setQuantity(prev => prev - 1);
+    }
   };
 
   return (
@@ -142,21 +158,48 @@ const ProductCard = ({ product, onAddToCart, farmerData, consumerProfile }: Prod
             />
           </div>
 
-          <LoadingButton 
-            onClick={handleAddToCart}
-            isLoading={isAdding}
-            loadingText="Adding..."
-            disabled={justAdded}
-          >
-            {justAdded ? (
-              <>
-                <Check className="h-4 w-4 mr-1" />
-                Added!
-              </>
-            ) : (
-              'Add to Cart'
-            )}
-          </LoadingButton>
+          <div className="flex flex-col gap-2">
+            {/* Quantity Selector */}
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={decrementQuantity}
+                disabled={quantity <= 1 || isAdding || justAdded}
+              >
+                <Minus className="h-3 w-3" />
+              </Button>
+              <span className="w-8 text-center font-medium">{quantity}</span>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={incrementQuantity}
+                disabled={quantity >= product.available_quantity || isAdding || justAdded}
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
+            </div>
+
+            {/* Add to Cart Button */}
+            <LoadingButton 
+              onClick={handleAddToCart}
+              isLoading={isAdding}
+              loadingText="Adding..."
+              disabled={justAdded}
+              size="sm"
+            >
+              {justAdded ? (
+                <>
+                  <Check className="h-4 w-4 mr-1" />
+                  Added!
+                </>
+              ) : (
+                'Add to Cart'
+              )}
+            </LoadingButton>
+          </div>
         </div>
       </CardContent>
 

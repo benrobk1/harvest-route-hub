@@ -166,10 +166,10 @@ const Shop = () => {
     });
   }, [filteredProducts]);
 
-  const handleAddToCart = (product: Product) => {
+  const handleAddToCart = (product: Product, quantity: number) => {
     addToCart.mutate({
       productId: product.id,
-      quantity: 1,
+      quantity: quantity,
       unitPrice: product.price,
     });
   };

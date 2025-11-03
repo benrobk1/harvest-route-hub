@@ -533,54 +533,66 @@ const Checkout = () => {
                   100% of your tip goes directly to your delivery driver
                 </p>
                 
+                {/* Preset Tip Amounts */}
+                <div>
+                  <Label className="text-sm font-medium mb-2 block">Tip Amount</Label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {[5, 7.50, 10, 15].map((amount) => (
+                      <Button
+                        key={amount}
+                        variant={customTip === amount.toString() && tipPercentage === 0 ? "default" : "outline"}
+                        onClick={() => {
+                          setTipPercentage(0);
+                          setCustomTip(amount.toString());
+                        }}
+                        className="w-full"
+                      >
+                        ${amount}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
                 {/* Preset Tip Percentages */}
-                <div className="grid grid-cols-4 gap-2">
-                  {[10, 15, 20].map((percent) => (
-                    <Button
-                      key={percent}
-                      variant={tipPercentage === percent ? "default" : "outline"}
-                      onClick={() => {
-                        setTipPercentage(percent);
-                        setCustomTip("");
-                      }}
-                      className="w-full"
-                    >
-                      {percent}%
-                    </Button>
-                  ))}
-                  <Button
-                    variant={customTip ? "default" : "outline"}
-                    onClick={() => {
-                      setTipPercentage(0);
-                      setCustomTip("0");
-                    }}
-                  >
-                    Custom
-                  </Button>
+                <div>
+                  <Label className="text-sm font-medium mb-2 block">Or Tip Percentage</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[10, 15, 20].map((percent) => (
+                      <Button
+                        key={percent}
+                        variant={tipPercentage === percent ? "default" : "outline"}
+                        onClick={() => {
+                          setTipPercentage(percent);
+                          setCustomTip("");
+                        }}
+                        className="w-full"
+                      >
+                        {percent}%
+                      </Button>
+                    ))}
+                  </div>
                 </div>
 
                 {/* Custom Tip Input */}
-                {(tipPercentage === 0 || customTip) && (
-                  <div className="space-y-2">
-                    <Label htmlFor="custom-tip">Custom Tip Amount</Label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                      <Input
-                        id="custom-tip"
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="0.00"
-                        value={customTip}
-                        onChange={(e) => {
-                          setCustomTip(e.target.value);
-                          setTipPercentage(0);
-                        }}
-                        className="pl-7"
-                      />
-                    </div>
+                <div className="space-y-2">
+                  <Label htmlFor="custom-tip">Custom Tip Amount</Label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                    <Input
+                      id="custom-tip"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      value={customTip}
+                      onChange={(e) => {
+                        setCustomTip(e.target.value);
+                        setTipPercentage(0);
+                      }}
+                      className="pl-7"
+                    />
                   </div>
-                )}
+                </div>
 
                 {tipAmount > 0 && (
                   <p className="text-sm font-medium text-primary">

@@ -18,14 +18,13 @@ const CustomerMap = ({ zipData }: CustomerMapProps) => {
   const [token, setToken] = useState<string | null>(null);
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
-  const [hasMapboxToken, setHasMapboxToken] = useState(false);
+  
 
   // Acquire token from env or backend
   useEffect(() => {
     const envToken = import.meta.env.VITE_MAPBOX_PUBLIC_TOKEN as string | undefined;
     if (envToken) {
       setToken(envToken);
-      setHasMapboxToken(true);
       return;
     }
 
@@ -34,17 +33,14 @@ const CustomerMap = ({ zipData }: CustomerMapProps) => {
       .then(({ data, error }) => {
         if (error) {
           console.warn('Mapbox token fetch error:', error);
-          setHasMapboxToken(false);
           return;
         }
         if (data?.token) {
           setToken(data.token);
-          setHasMapboxToken(true);
         }
       })
       .catch((e) => {
         console.warn('Mapbox token fetch exception:', e);
-        setHasMapboxToken(false);
       });
   }, []);
 
@@ -179,7 +175,7 @@ const CustomerMap = ({ zipData }: CustomerMapProps) => {
   }, [zipData, token]);
 
   // Fallback view when Mapbox token is not configured
-  if (!hasMapboxToken) {
+  if (!token) {
     return (
       <div className="w-full h-[400px] rounded-lg border bg-muted/20 flex flex-col items-center justify-center p-8 space-y-4">
         <div className="relative w-full max-w-md">

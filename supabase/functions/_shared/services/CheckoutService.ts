@@ -230,11 +230,12 @@ export class CheckoutService {
   private async validateDeliveryDate(deliveryDate: string, marketConfig: any, requestId: string): Promise<void> {
     const deliveryDateObj = new Date(deliveryDate);
     const dayOfWeek = deliveryDateObj.getDay();
-    const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dayName = dayNames[dayOfWeek];
     
-    if (!marketConfig.delivery_days.includes(dayNames[dayOfWeek])) {
-      console.warn(`[${requestId}] [CHECKOUT] ⚠️  Invalid delivery day: ${dayNames[dayOfWeek]}`);
-      throw new CheckoutError('INVALID_DELIVERY_DATE', `Delivery not available on ${dayNames[dayOfWeek]} for your area`);
+    if (!marketConfig.delivery_days.includes(dayName)) {
+      console.warn(`[${requestId}] [CHECKOUT] ⚠️  Invalid delivery day: ${dayName}`);
+      throw new CheckoutError('INVALID_DELIVERY_DATE', `Delivery not available on ${dayName} for your area`);
     }
 
     // Check cutoff time

@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useToast } from '@/hooks/use-toast';
-import { Truck, Package, Calendar, ArrowLeft, ChevronDown, DollarSign, MapPin } from 'lucide-react';
+import { Truck, Package, Calendar, ArrowLeft, ChevronDown, DollarSign, MapPin, RefreshCw, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const BatchAdjustments = () => {
@@ -16,6 +16,7 @@ const BatchAdjustments = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [selectedBatch, setSelectedBatch] = useState<string | null>(null);
+  const [isResetting, setIsResetting] = useState(false);
 
   const { data: batches, isLoading } = useQuery({
     queryKey: ['admin-batches'],
@@ -68,6 +69,39 @@ const BatchAdjustments = () => {
     },
   });
 
+  const handleResetDemoData = async () => {
+    if (!confirm('Reset demo data? This will delete all demo data and recreate batch #7 with 39 stops.')) {
+      return;
+    }
+
+    setIsResetting(true);
+    try {
+      // First reset demo data
+      const { error: resetError } = await supabase.functions.invoke('reset-demo-data');
+      if (resetError) throw resetError;
+
+      // Then seed new demo data
+      const { error: seedError } = await supabase.functions.invoke('seed-full-demo');
+      if (seedError) throw seedError;
+
+      toast({
+        title: "Demo data reset",
+        description: "Batch #7 has been created with 39 stops",
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['admin-batches'] });
+    } catch (error: any) {
+      console.error('Reset error:', error);
+      toast({
+        variant: "destructive",
+        title: "Failed to reset demo data",
+        description: error.message,
+      });
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   const reassignMutation = useMutation({
     mutationFn: async ({ batchId, driverId }: { batchId: string; driverId: string }) => {
       const { error } = await supabase
@@ -119,15 +153,34 @@ const BatchAdjustments = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Button variant="outline" size="sm" onClick={() => navigate('/admin/dashboard')}>
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Dashboard
-        </Button>
-        <div>
-          <h1 className="text-3xl font-bold">Batch Adjustments</h1>
-          <p className="text-muted-foreground">Manually adjust delivery batches and reassign drivers</p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="outline" size="sm" onClick={() => navigate('/admin/dashboard')}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Dashboard
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold">Batch Adjustments</h1>
+            <p className="text-muted-foreground">Manually adjust delivery batches and reassign drivers</p>
+          </div>
         </div>
+        <Button
+          onClick={handleResetDemoData}
+          disabled={isResetting}
+          variant="outline"
+        >
+          {isResetting ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              Resetting...
+            </>
+          ) : (
+            <>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Reset Demo Data
+            </>
+          )}
+        </Button>
       </div>
 
       <div className="space-y-4">

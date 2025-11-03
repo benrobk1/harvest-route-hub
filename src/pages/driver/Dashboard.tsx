@@ -223,6 +223,25 @@ const DriverDashboard = () => {
     enabled: !!user?.id,
   });
 
+  // Fetch monthly completed batches count
+  const { data: monthlyBatches } = useQuery({
+    queryKey: ['driver-monthly-batches', user?.id],
+    queryFn: async () => {
+      const monthStart = new Date();
+      monthStart.setDate(monthStart.getDate() - 30);
+      
+      const { data, count } = await supabase
+        .from('delivery_batches')
+        .select('id', { count: 'exact' })
+        .eq('driver_id', user?.id)
+        .eq('status', 'completed')
+        .gte('created_at', monthStart.toISOString());
+      
+      return count || 0;
+    },
+    enabled: !!user?.id,
+  });
+
   const handlePrintManifest = async (batchId: string) => {
     try {
       const { data: batch } = await supabase
@@ -517,7 +536,7 @@ const DriverDashboard = () => {
                 <>
                   <div className="text-3xl font-bold text-foreground">{formatMoney(earnings?.month.total || 0)}</div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {stats?.deliveries || 0} deliveries | {formatMoney(earnings?.month.tips || 0)} tips
+                    {monthlyBatches || 0} deliveries | {formatMoney(earnings?.month.tips || 0)} tips
                   </p>
                 </>
               )}

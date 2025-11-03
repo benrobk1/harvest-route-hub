@@ -837,51 +837,119 @@ serve(async (req) => {
       }
     ]);
 
-    // Step 14: Create payouts - demo driver gets exactly 2 deliveries this month for $591 ($15 in tips)
-    console.log('Creating payouts...');
+    // Step 14: Create payouts and mark 2 batches as completed this month for demo driver
+    console.log('Creating payouts and marking batches completed...');
     
-    // For demo driver1: Create 2 specific payouts this month
+    // Mark the 2 most recent batches (batch 0 and 1) as completed within the last 30 days
     const thisMonthStart = new Date();
-    thisMonthStart.setDate(1);
-    thisMonthStart.setHours(0, 0, 0, 0);
+    thisMonthStart.setDate(thisMonthStart.getDate() - 25); // 25 days ago
+    const batch1CompletedDate = new Date(thisMonthStart.getTime() + 5 * 24 * 60 * 60 * 1000); // 20 days ago
+    const batch2CompletedDate = new Date(thisMonthStart.getTime() + 12 * 24 * 60 * 60 * 1000); // 13 days ago
     
-    const demoDelivery1Date = new Date(thisMonthStart.getTime() + 5 * 24 * 60 * 60 * 1000); // 5 days into month
-    const demoDelivery2Date = new Date(thisMonthStart.getTime() + 12 * 24 * 60 * 60 * 1000); // 12 days into month
+    // Get the first 2 batches for driver1
+    const { data: driver1Batches } = await supabase
+      .from('delivery_batches')
+      .select('id')
+      .eq('driver_id', driver1Id)
+      .order('created_at', { ascending: true })
+      .limit(2);
     
-    // First delivery: $288 delivery fee + $7 tip = $295
-    await supabase.from('payouts').insert({
-      order_id: orderIds[0],
-      recipient_id: driver1Id,
-      recipient_type: 'driver',
-      amount: 288,
-      description: 'Delivery fees for batch',
-      status: 'completed',
-      completed_at: demoDelivery1Date.toISOString(),
-      created_at: demoDelivery1Date.toISOString()
-    });
-    
-    // Second delivery: $288 delivery fee + $8 tip = $296
-    await supabase.from('payouts').insert({
-      order_id: orderIds[1],
-      recipient_id: driver1Id,
-      recipient_type: 'driver',
-      amount: 288,
-      description: 'Delivery fees for batch',
-      status: 'completed',
-      completed_at: demoDelivery2Date.toISOString(),
-      created_at: demoDelivery2Date.toISOString()
-    });
-    
-    // Create demo orders with tips
-    await supabase.from('orders').update({ 
-      tip_amount: 7,
-      created_at: demoDelivery1Date.toISOString()
-    }).eq('id', orderIds[0]);
-    
-    await supabase.from('orders').update({ 
-      tip_amount: 8,
-      created_at: demoDelivery2Date.toISOString()
-    }).eq('id', orderIds[1]);
+    if (driver1Batches && driver1Batches.length >= 2) {
+      // Update batch 1 (first completed batch this month)
+      await supabase.from('delivery_batches')
+        .update({ 
+          status: 'completed',
+          created_at: batch1CompletedDate.toISOString()
+        })
+        .eq('id', driver1Batches[0].id);
+      
+      // Update batch 2 (second completed batch this month)
+      await supabase.from('delivery_batches')
+        .update({ 
+          status: 'completed',
+          created_at: batch2CompletedDate.toISOString()
+        })
+        .eq('id', driver1Batches[1].id);
+      
+      // Get all stops from these 2 batches
+      const { data: batch1Stops } = await supabase
+        .from('batch_stops')
+        .select('order_id')
+        .eq('delivery_batch_id', driver1Batches[0].id);
+      
+      const { data: batch2Stops } = await supabase
+        .from('batch_stops')
+        .select('order_id')
+        .eq('delivery_batch_id', driver1Batches[1].id);
+      
+      // Calculate total tips from these batches
+      let batch1Tips = 0;
+      let batch2Tips = 0;
+      
+      if (batch1Stops) {
+        for (const stop of batch1Stops) {
+          const tipAmount = Math.random() < 0.5 ? (2 + Math.random() * 3) : 0; // Random tips
+          batch1Tips += tipAmount;
+          await supabase.from('orders').update({ 
+            tip_amount: tipAmount,
+            created_at: batch1CompletedDate.toISOString()
+          }).eq('id', stop.order_id);
+        }
+      }
+      
+      if (batch2Stops) {
+        for (const stop of batch2Stops) {
+          const tipAmount = Math.random() < 0.5 ? (2 + Math.random() * 3) : 0; // Random tips
+          batch2Tips += tipAmount;
+          await supabase.from('orders').update({ 
+            tip_amount: tipAmount,
+            created_at: batch2CompletedDate.toISOString()
+          }).eq('id', stop.order_id);
+        }
+      }
+      
+      // Ensure total tips equal $15 (adjust second batch tips)
+      const totalTips = batch1Tips + batch2Tips;
+      const tipAdjustment = 15 - totalTips;
+      if (batch2Stops && batch2Stops.length > 0) {
+        const firstOrderId = batch2Stops[0].order_id;
+        const { data: firstOrder } = await supabase
+          .from('orders')
+          .select('tip_amount')
+          .eq('id', firstOrderId)
+          .single();
+        
+        if (firstOrder) {
+          await supabase.from('orders').update({ 
+            tip_amount: Number(firstOrder.tip_amount) + tipAdjustment
+          }).eq('id', firstOrderId);
+        }
+      }
+      
+      // Batch 1: $288 delivery fees (37 stops × $7.50 + $10.50 for batch)
+      await supabase.from('payouts').insert({
+        order_id: batch1Stops?.[0]?.order_id || orderIds[0],
+        recipient_id: driver1Id,
+        recipient_type: 'driver',
+        amount: 288,
+        description: 'Delivery fees for batch',
+        status: 'completed',
+        completed_at: batch1CompletedDate.toISOString(),
+        created_at: batch1CompletedDate.toISOString()
+      });
+      
+      // Batch 2: $288 delivery fees (38 stops × $7.50 + $3)
+      await supabase.from('payouts').insert({
+        order_id: batch2Stops?.[0]?.order_id || orderIds[1],
+        recipient_id: driver1Id,
+        recipient_type: 'driver',
+        amount: 288,
+        description: 'Delivery fees for batch',
+        status: 'completed',
+        completed_at: batch2CompletedDate.toISOString(),
+        created_at: batch2CompletedDate.toISOString()
+      });
+    }
     
     // Create payouts for farmers from all orders
     for (const orderId of orderIds) {

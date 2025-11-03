@@ -2,8 +2,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, MapPin, TrendingUp, Users } from 'lucide-react';
+import { ArrowLeft, MapPin, TrendingUp, Users, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatMoney } from '@/lib/formatMoney';
@@ -11,7 +12,7 @@ import { useDemoMode } from '@/contexts/DemoModeContext';
 
 const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))', 'hsl(var(--muted))'];
 
-// Demo data for Brooklyn zip code
+// Demo data for Brooklyn zip code with customer details
 const DEMO_ZIP_DATA = [
   {
     zip_code: '11201',
@@ -20,7 +21,14 @@ const DEMO_ZIP_DATA = [
     unique_customers: 40,
     most_common_produce: 'Tomatoes, Lettuce, Carrots',
     avg_days_between_orders: 14,
-    avg_order_size: 38
+    avg_order_size: 38,
+    customers: [
+      { name: 'Sarah Johnson', orders: 12, revenue: 456, avg_order: 38, common_produce: 'Tomatoes, Basil', days_between: 7 },
+      { name: 'Mike Chen', orders: 8, revenue: 312, avg_order: 39, common_produce: 'Lettuce, Carrots', days_between: 14 },
+      { name: 'Emily Rodriguez', orders: 15, revenue: 585, avg_order: 39, common_produce: 'Tomatoes, Lettuce', days_between: 10 },
+      { name: 'James Wilson', orders: 6, revenue: 228, avg_order: 38, common_produce: 'Carrots, Peppers', days_between: 21 },
+      { name: 'Lisa Anderson', orders: 10, revenue: 380, avg_order: 38, common_produce: 'Tomatoes, Cucumbers', days_between: 12 },
+    ]
   }
 ];
 
@@ -264,48 +272,63 @@ export default function CustomerAnalytics() {
       {/* ZIP Code Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Detailed ZIP Code Breakdown</CardTitle>
+          <CardTitle>Zip Code Breakdown</CardTitle>
         </CardHeader>
         <CardContent>
           {displayZipData && Array.isArray(displayZipData) && displayZipData.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2">ZIP Code</th>
-                    <th className="text-right py-2">Customers</th>
-                    <th className="text-right py-2">Orders</th>
-                    <th className="text-right py-2">Revenue</th>
-                    <th className="text-right py-2">Avg Order</th>
-                    {isDemoMode && displayZipData.some((d: any) => d.most_common_produce) && (
-                      <>
-                        <th className="text-left py-2">Common Produce</th>
-                        <th className="text-right py-2">Time Between Orders</th>
-                      </>
-                    )}
-                  </tr>
-                </thead>
-                <tbody>
-                  {displayZipData.map((row: any) => (
-                    <tr key={row.zip_code} className="border-b">
-                      <td className="py-2 font-mono">{row.zip_code}</td>
-                      <td className="text-right py-2">{row.unique_customers}</td>
-                      <td className="text-right py-2">{row.order_count}</td>
-                      <td className="text-right py-2">{formatMoney(row.total_revenue)}</td>
-                      <td className="text-right py-2">
-                        {formatMoney(Number(row.total_revenue) / Number(row.order_count))}
-                      </td>
-                      {isDemoMode && row.most_common_produce && (
-                        <>
-                          <td className="text-left py-2">{row.most_common_produce}</td>
-                          <td className="text-right py-2">{row.avg_days_between_orders} days</td>
-                        </>
+            <Accordion type="single" collapsible className="w-full">
+              {displayZipData.map((row: any) => (
+                <AccordionItem key={row.zip_code} value={row.zip_code} className="border rounded-lg mb-2 px-4">
+                  <AccordionTrigger className="hover:no-underline">
+                    <div className="flex items-center justify-between w-full pr-4">
+                      <div className="flex items-center gap-4">
+                        <span className="font-mono font-semibold text-lg">ZIP {row.zip_code}</span>
+                        <span className="text-muted-foreground text-sm">
+                          {row.unique_customers} customers
+                        </span>
+                      </div>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="pt-4 space-y-3">
+                      {row.customers && row.customers.length > 0 ? (
+                        row.customers.map((customer: any, idx: number) => (
+                          <div key={idx} className="bg-muted/30 rounded-lg p-4 space-y-2">
+                            <div className="font-semibold text-base">{customer.name}</div>
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
+                              <div>
+                                <div className="text-muted-foreground">Orders</div>
+                                <div className="font-medium">{customer.orders}</div>
+                              </div>
+                              <div>
+                                <div className="text-muted-foreground">Revenue</div>
+                                <div className="font-medium">{formatMoney(customer.revenue)}</div>
+                              </div>
+                              <div>
+                                <div className="text-muted-foreground">Avg Order</div>
+                                <div className="font-medium">{formatMoney(customer.avg_order)}</div>
+                              </div>
+                              <div className="md:col-span-1 col-span-2">
+                                <div className="text-muted-foreground">Common Produce</div>
+                                <div className="font-medium">{customer.common_produce}</div>
+                              </div>
+                              <div>
+                                <div className="text-muted-foreground">Time Between Orders</div>
+                                <div className="font-medium">{customer.days_between} days</div>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-4 text-muted-foreground">
+                          No customer details available
+                        </div>
                       )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
               No customer data available yet

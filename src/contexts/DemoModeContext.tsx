@@ -29,25 +29,29 @@ interface DemoModeProviderProps {
   children: ReactNode;
 }
 
-export const DemoModeProvider = ({ children }: DemoModeProviderProps) => {
-  const [isDemoMode, setIsDemoMode] = useState(false);
-  const [dataSeeded, setDataSeeded] = useState(false);
-  const [currentDemoAccount, setCurrentDemoAccount] = useState<string | null>(null);
-
-  // Load demo mode state from localStorage on mount
-  useEffect(() => {
+// Load initial state from localStorage
+const getInitialDemoMode = () => {
+  try {
     const storedDemoMode = localStorage.getItem('demoMode');
     if (storedDemoMode) {
-      try {
-        const parsed = JSON.parse(storedDemoMode);
-        setIsDemoMode(parsed.enabled || false);
-        setDataSeeded(parsed.dataSeeded || false);
-        setCurrentDemoAccount(parsed.lastAccount || null);
-      } catch (e) {
-        console.error('Failed to parse demo mode state:', e);
-      }
+      const parsed = JSON.parse(storedDemoMode);
+      return {
+        enabled: parsed.enabled || false,
+        dataSeeded: parsed.dataSeeded || false,
+        lastAccount: parsed.lastAccount || null,
+      };
     }
-  }, []);
+  } catch (e) {
+    console.error('Failed to parse demo mode state:', e);
+  }
+  return { enabled: false, dataSeeded: false, lastAccount: null };
+};
+
+export const DemoModeProvider = ({ children }: DemoModeProviderProps) => {
+  const initialState = getInitialDemoMode();
+  const [isDemoMode, setIsDemoMode] = useState(initialState.enabled);
+  const [dataSeeded, setDataSeeded] = useState(initialState.dataSeeded);
+  const [currentDemoAccount, setCurrentDemoAccount] = useState<string | null>(initialState.lastAccount);
 
   // Save demo mode state to localStorage whenever it changes
   useEffect(() => {

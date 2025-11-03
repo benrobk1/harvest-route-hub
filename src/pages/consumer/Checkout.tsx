@@ -34,6 +34,7 @@ const Checkout = () => {
   const [useCredits, setUseCredits] = useState(false);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
+  const [orderId, setOrderId] = useState<string | null>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [tipPercentage, setTipPercentage] = useState<number>(0);
   const [customTip, setCustomTip] = useState<string>("");
@@ -208,19 +209,10 @@ const Checkout = () => {
       if (data.client_secret) {
         setClientSecret(data.client_secret);
         setPaymentIntentId(data.payment_intent_id);
+        setOrderId(data.order_id);
       } else {
         // Order completed without payment (fully covered by credits)
-        toast({
-          title: '🎉 Order Placed Successfully!',
-          description: (
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-4 w-4 text-green-500" />
-              <span>Confirmed for {format(new Date(data.delivery_date), 'MMM d')}</span>
-            </div>
-          ),
-          duration: 5000,
-        });
-        navigate('/consumer/orders');
+        navigate(`/consumer/order-success/${data.order_id}`);
       }
     },
     onError: (error: Error) => {
@@ -234,17 +226,11 @@ const Checkout = () => {
   });
 
   const handlePaymentSuccess = () => {
-    toast({
-      title: '🎉 Payment Successful!',
-      description: (
-        <div className="flex items-center gap-2">
-          <CheckCircle2 className="h-4 w-4 text-green-500" />
-          <span>Your order has been confirmed!</span>
-        </div>
-      ),
-      duration: 5000,
-    });
-    navigate('/consumer/orders');
+    if (orderId) {
+      navigate(`/consumer/order-success/${orderId}`);
+    } else {
+      navigate('/consumer/orders');
+    }
   };
 
   // Check if profile is missing required address info

@@ -533,29 +533,9 @@ const Checkout = () => {
                   100% of your tip goes directly to your delivery driver
                 </p>
                 
-                {/* Preset Tip Amounts */}
-                <div>
-                  <Label className="text-sm font-medium mb-2 block">Tip Amount</Label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {[5, 7.50, 10, 15].map((amount) => (
-                      <Button
-                        key={amount}
-                        variant={customTip === amount.toString() && tipPercentage === 0 ? "default" : "outline"}
-                        onClick={() => {
-                          setTipPercentage(0);
-                          setCustomTip(amount.toString());
-                        }}
-                        className="w-full"
-                      >
-                        ${amount}
-                      </Button>
-                    ))}
-                  </div>
-                </div>
-
                 {/* Preset Tip Percentages */}
                 <div>
-                  <Label className="text-sm font-medium mb-2 block">Or Tip Percentage</Label>
+                  <Label className="text-sm font-medium mb-2 block">Tip Percentage</Label>
                   <div className="grid grid-cols-3 gap-2">
                     {[10, 15, 20].map((percent) => (
                       <Button
@@ -575,7 +555,7 @@ const Checkout = () => {
 
                 {/* Custom Tip Input */}
                 <div className="space-y-2">
-                  <Label htmlFor="custom-tip">Custom Tip Amount</Label>
+                  <Label htmlFor="custom-tip">Or Custom Amount</Label>
                   <div className="relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
                     <Input

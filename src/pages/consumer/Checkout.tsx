@@ -704,7 +704,7 @@ const Checkout = () => {
 
                 {!clientSecret && (
                   <LoadingButton
-                    className={`w-full ${selectedDate && termsAccepted && !createOrder.isPending ? 'animate-pulse' : ''}`}
+                    className="w-full"
                     size="lg"
                     onClick={() => createOrder.mutate()}
                     isLoading={createOrder.isPending}

@@ -23,15 +23,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 
 const ConsumerOrderTracking = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { toast } = useToast();
   const [cancelOrderId, setCancelOrderId] = useState<string | null>(null);
-  const [hiddenOrderIds, setHiddenOrderIds] = useState<Set<string>>(new Set());
-  const hideTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   const { data: orders, isLoading, refetch } = useQuery({
     queryKey: ['consumer-orders', user?.id],
@@ -103,28 +101,6 @@ const ConsumerOrderTracking = () => {
     enabled: !!user?.id,
   });
 
-  // Auto-hide cancelled orders after 30 seconds
-  useEffect(() => {
-    if (!orders) return;
-
-    orders.forEach(order => {
-      if (order.status === 'cancelled' && !hiddenOrderIds.has(order.id) && !hideTimeoutsRef.current.has(order.id)) {
-        const timeoutId = setTimeout(() => {
-          setHiddenOrderIds(prev => new Set([...prev, order.id]));
-          hideTimeoutsRef.current.delete(order.id);
-        }, 30000); // 30 seconds
-
-        hideTimeoutsRef.current.set(order.id, timeoutId);
-      }
-    });
-
-    // Cleanup timeouts on unmount
-    return () => {
-      hideTimeoutsRef.current.forEach(timeout => clearTimeout(timeout));
-      hideTimeoutsRef.current.clear();
-    };
-  }, [orders, hiddenOrderIds]);
-
   const cancelOrder = useMutation({
     mutationFn: async (orderId: string) => {
       const { data, error } = await supabase.functions.invoke('cancel-order', {
@@ -137,8 +113,8 @@ const ConsumerOrderTracking = () => {
     },
     onSuccess: () => {
       toast({
-        title: "Order Cancelled",
-        description: "Your order has been cancelled successfully.",
+        title: "Order Deleted",
+        description: "Your order has been cancelled and removed.",
       });
       refetch();
       setCancelOrderId(null);
@@ -195,7 +171,7 @@ const ConsumerOrderTracking = () => {
           </Card>
         ) : (
           <div className="space-y-6">
-            {orders.filter(order => !hiddenOrderIds.has(order.id)).map((order) => {
+            {orders.map((order) => {
               const driver = order.delivery_batches?.profiles;
               const itemCount = order.order_items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
 

@@ -86,26 +86,13 @@ serve(async (req) => {
       );
     }
 
-    // Update order status to cancelled using service role
+    // Use service role client for deletion
     const supabaseServiceClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const { error: updateError } = await supabaseServiceClient
-      .from('orders')
-      .update({ status: 'cancelled' })
-      .eq('id', orderId);
-
-    if (updateError) {
-      console.error('Error updating order:', updateError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to cancel order' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Return inventory to products
+    // Return inventory to products first
     const { data: orderItems } = await supabaseServiceClient
       .from('order_items')
       .select('product_id, quantity')
@@ -132,10 +119,40 @@ serve(async (req) => {
       }
     }
 
-    console.log(`Order ${orderId} cancelled successfully`);
+    // Delete related records first (order_items will cascade, but delete others explicitly)
+    await supabaseServiceClient
+      .from('credits_ledger')
+      .delete()
+      .eq('order_id', orderId);
+
+    await supabaseServiceClient
+      .from('payment_intents')
+      .delete()
+      .eq('order_id', orderId);
+
+    await supabaseServiceClient
+      .from('transaction_fees')
+      .delete()
+      .eq('order_id', orderId);
+
+    // Delete the order (order_items will cascade via foreign key)
+    const { error: deleteError } = await supabaseServiceClient
+      .from('orders')
+      .delete()
+      .eq('id', orderId);
+
+    if (deleteError) {
+      console.error('Error deleting order:', deleteError);
+      return new Response(
+        JSON.stringify({ error: 'Failed to delete order' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log(`Order ${orderId} permanently deleted`);
 
     return new Response(
-      JSON.stringify({ success: true, message: 'Order cancelled successfully' }),
+      JSON.stringify({ success: true, message: 'Order cancelled and deleted successfully' }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

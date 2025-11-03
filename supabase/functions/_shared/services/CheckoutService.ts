@@ -16,6 +16,7 @@ export interface CheckoutInput {
   paymentMethodId?: string;
   tipAmount: number;
   requestOrigin: string;
+  isDemoMode?: boolean;
 }
 
 export interface CheckoutResult {
@@ -34,11 +35,72 @@ export class CheckoutService {
   ) {}
 
   async processCheckout(input: CheckoutInput): Promise<CheckoutResult> {
-    const { cartId, userId, userEmail, deliveryDate, useCredits, paymentMethodId, tipAmount, requestOrigin } = input;
+    const { cartId, userId, userEmail, deliveryDate, useCredits, paymentMethodId, tipAmount, requestOrigin, isDemoMode = false } = input;
     const requestId = crypto.randomUUID();
 
-    console.log(`[${requestId}] [CHECKOUT] Starting checkout for user ${userId}`);
+    console.log(`[${requestId}] [CHECKOUT] Starting checkout for user ${userId}${isDemoMode ? ' (DEMO MODE)' : ''}`);
 
+    // FAST PATH FOR DEMO MODE: Parallelize all validation queries
+    if (isDemoMode) {
+      const [cart, cartItems, profile] = await Promise.all([
+        this.validateCart(cartId, userId, requestId),
+        this.getCartItems(cartId, requestId),
+        this.getUserProfile(userId, requestId),
+      ]);
+
+      if (cartItems.length === 0) {
+        throw new CheckoutError('EMPTY_CART', 'Cart is empty');
+      }
+
+      // Skip delivery date validation in demo mode
+      const { subtotal } = await this.validatePricesAndInventory(cartItems, requestId);
+      
+      // Minimal fee calculation
+      const platformFee = subtotal * 0.10;
+      const deliveryFee = 5.99; // Fixed delivery fee for demo
+      const totalBeforeCredits = subtotal + platformFee + deliveryFee + tipAmount;
+      const creditsUsed = 0; // Skip credits in demo mode for speed
+      const totalAmount = totalBeforeCredits;
+
+      // Skip payment processing - mock payment intent
+      const mockPaymentIntent = {
+        id: `demo_pi_${crypto.randomUUID()}`,
+        status: 'succeeded',
+        client_secret: null
+      };
+
+      // Create order (this includes inventory update)
+      const orderId = await this.createOrder(
+        userId,
+        deliveryDate,
+        totalAmount,
+        tipAmount,
+        'paid',
+        mockPaymentIntent as any,
+        cartItems,
+        platformFee,
+        deliveryFee,
+        creditsUsed,
+        profile,
+        requestId
+      );
+
+      // Clear cart
+      await this.clearCart(cartId, requestId);
+
+      // Skip notification in demo mode
+      console.log(`[${requestId}] [CHECKOUT] ✅ Demo checkout completed: order ${orderId}`);
+
+      return {
+        success: true,
+        orderId,
+        amountCharged: totalAmount,
+        creditsRedeemed: creditsUsed,
+        paymentStatus: 'paid'
+      };
+    }
+
+    // NORMAL PATH: Sequential validation for production
     // 1. Validate delivery address
     await this.validateDeliveryAddress(userId, requestId);
 
@@ -534,13 +596,16 @@ export class CheckoutService {
   }
 
   private async updateInventory(cartItems: any[], requestId: string): Promise<void> {
-    for (const item of cartItems) {
+    // Batch update inventory using RPC or individual updates in parallel
+    const updatePromises = cartItems.map(item => {
       const product = item.products as any;
-      await this.supabase
+      return this.supabase
         .from('products')
         .update({ available_quantity: product.available_quantity - item.quantity })
         .eq('id', item.product_id);
-    }
+    });
+    
+    await Promise.all(updatePromises);
     console.log(`[${requestId}] [CHECKOUT] Updated inventory for ${cartItems.length} products`);
   }
 

@@ -180,6 +180,7 @@ const Checkout = () => {
         delivery_date: deliveryDateTime,
         use_credits: useCredits,
         tip_amount: tipAmount,
+        is_demo_mode: isDemoMode,
       };
 
       const { data, error } = await supabase.functions.invoke('checkout', {

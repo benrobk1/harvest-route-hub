@@ -95,7 +95,8 @@ serve(async (req) => {
         useCredits: input.use_credits || false,
         paymentMethodId: input.payment_method_id,
         tipAmount: input.tip_amount || 0,
-        requestOrigin: req.headers.get('origin') || ''
+        requestOrigin: req.headers.get('origin') || '',
+        isDemoMode: input.is_demo_mode || false
       });
 
       console.log(`[${requestId}] [CHECKOUT] ✅ Success: order ${result.orderId}`);

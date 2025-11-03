@@ -18,6 +18,7 @@ export const CheckoutRequestSchema = z.object({
   use_credits: z.boolean().default(false),
   payment_method_id: z.string().optional(),
   tip_amount: z.number().min(0, { message: "Tip amount must be positive" }).default(0),
+  is_demo_mode: z.boolean().optional().default(false),
 });
 
 export type CheckoutRequest = z.infer<typeof CheckoutRequestSchema>;

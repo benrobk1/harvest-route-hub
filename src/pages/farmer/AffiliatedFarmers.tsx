@@ -4,13 +4,82 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Phone, Mail, MapPin, Package, ExternalLink } from 'lucide-react';
+import { ArrowLeft, Phone, Mail, MapPin, Package, ExternalLink, Building2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useDemoMode } from '@/contexts/DemoModeContext';
+
+// Demo data for Brooklyn collection point
+const DEMO_COLLECTION_POINT = {
+  name: 'Brooklyn Hub',
+  address: '123 Atlantic Avenue, Brooklyn, NY 11201',
+  contact: 'Maria Santos',
+  phone: '(718) 555-0100',
+  email: 'maria@brooklynhub.farm'
+};
+
+const DEMO_AFFILIATED_FARMERS = [
+  {
+    id: '1',
+    farm_name: 'Green Valley Organics',
+    farmer_name: 'John Thompson',
+    role: 'Farmer',
+    address: '456 Farm Road, Brooklyn, NY 11205',
+    phone: '(718) 555-0201',
+    email: 'john@greenvalley.farm',
+    location: 'Brooklyn, NY',
+    bio: 'Certified organic vegetables and herbs, specializing in heirloom tomatoes',
+    commission_rate: 2.0,
+    active_products: 8,
+    product_names: 'Tomatoes, Lettuce, Carrots, Basil, Peppers, Cucumbers',
+  },
+  {
+    id: '2',
+    farm_name: 'Sunrise Acres',
+    farmer_name: 'Emily Rodriguez',
+    role: 'Farmer',
+    address: '789 Harvest Lane, Brooklyn, NY 11206',
+    phone: '(718) 555-0202',
+    email: 'emily@sunriseacres.farm',
+    location: 'Brooklyn, NY',
+    bio: 'Family-run farm growing seasonal produce with sustainable practices',
+    commission_rate: 2.0,
+    active_products: 6,
+    product_names: 'Squash, Zucchini, Kale, Spinach, Beets',
+  },
+  {
+    id: '3',
+    farm_name: 'Heritage Fields',
+    farmer_name: 'Michael Chen',
+    role: 'Farmer',
+    address: '321 Orchard Street, Brooklyn, NY 11211',
+    phone: '(718) 555-0203',
+    email: 'michael@heritagefields.farm',
+    location: 'Brooklyn, NY',
+    bio: 'Preserving traditional farming methods while growing diverse crops',
+    commission_rate: 2.0,
+    active_products: 10,
+    product_names: 'Beans, Peas, Radishes, Turnips, Cabbage, Onions',
+  },
+];
 
 export default function AffiliatedFarmers() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { isDemoMode } = useDemoMode();
+
+  const { data: collectionPoint, isLoading: collectionPointLoading } = useQuery({
+    queryKey: ['collection-point', user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('collection_point_address, full_name, phone, email')
+        .eq('id', user?.id)
+        .single();
+      return data;
+    },
+    enabled: !!user?.id && !isDemoMode,
+  });
 
   const { data: affiliatedFarmers, isLoading } = useQuery({
     queryKey: ['affiliated-farmers-detailed', user?.id],
@@ -35,7 +104,7 @@ export default function AffiliatedFarmers() {
       // Get product counts and farmer profile for each farm
       const farmsWithProducts = await Promise.all(
         (data || []).map(async (affiliation) => {
-          const [productsResult, profileResult] = await Promise.all([
+          const [productsResult, profileResult, userRolesResult] = await Promise.all([
             supabase
               .from('products')
               .select('id, name, available_quantity')
@@ -43,10 +112,17 @@ export default function AffiliatedFarmers() {
               .gt('available_quantity', 0),
             supabase
               .from('profiles')
-              .select('full_name, email, phone')
+              .select('full_name, email, phone, street_address, city, state, zip_code')
               .eq('id', affiliation.farm_profiles.farmer_id)
-              .single()
+              .single(),
+            supabase
+              .from('user_roles')
+              .select('role')
+              .eq('user_id', affiliation.farm_profiles.farmer_id)
           ]);
+
+          const roles = userRolesResult.data?.map(r => r.role) || [];
+          const isLeadFarmer = roles.includes('lead_farmer');
 
           return {
             ...affiliation,
@@ -56,16 +132,20 @@ export default function AffiliatedFarmers() {
             },
             active_products: productsResult.data?.length || 0,
             product_names: productsResult.data?.map(p => p.name).join(', ') || 'No active products',
+            farmer_role: isLeadFarmer ? 'Lead Farmer' : 'Farmer',
           };
         })
       );
 
       return farmsWithProducts;
     },
-    enabled: !!user?.id,
+    enabled: !!user?.id && !isDemoMode,
   });
 
-  if (isLoading) {
+  const displayCollectionPoint = isDemoMode ? DEMO_COLLECTION_POINT : collectionPoint;
+  const displayFarmers = isDemoMode ? DEMO_AFFILIATED_FARMERS : affiliatedFarmers;
+
+  if (isLoading || collectionPointLoading) {
     return (
       <div className="container mx-auto p-6 space-y-6">
         <Skeleton className="h-96 w-full" />
@@ -81,59 +161,122 @@ export default function AffiliatedFarmers() {
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Dashboard
           </Button>
-          <h1 className="text-3xl font-bold mt-2">Affiliated Farmers</h1>
+          <h1 className="text-3xl font-bold mt-2">Collection Point & Affiliated Farmers</h1>
           <p className="text-muted-foreground">
-            Farmers who use your collection point ({affiliatedFarmers?.length || 0} total)
+            Your collection point details and farmers who use it ({displayFarmers?.length || 0} total)
           </p>
         </div>
       </div>
 
-      {affiliatedFarmers && affiliatedFarmers.length > 0 ? (
+      {/* Collection Point Information */}
+      {displayCollectionPoint && (isDemoMode || (displayCollectionPoint as any).collection_point_address) && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardHeader>
+            <div className="flex items-start justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Building2 className="h-5 w-5" />
+                  {isDemoMode ? (displayCollectionPoint as any).name : 'Your Collection Point'}
+                </CardTitle>
+                <CardDescription>Hub for consolidated deliveries</CardDescription>
+              </div>
+              <Badge variant="secondary">Collection Point</Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {(isDemoMode ? (displayCollectionPoint as any).address : (displayCollectionPoint as any).collection_point_address) && (
+              <div className="flex items-start gap-2 text-sm">
+                <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                <span>
+                  {isDemoMode ? (displayCollectionPoint as any).address : (displayCollectionPoint as any).collection_point_address}
+                </span>
+              </div>
+            )}
+            {(isDemoMode ? (displayCollectionPoint as any).contact : (displayCollectionPoint as any).full_name) && (
+              <div className="flex items-center gap-2 text-sm">
+                <span className="font-medium">
+                  Contact: {isDemoMode ? (displayCollectionPoint as any).contact : (displayCollectionPoint as any).full_name}
+                </span>
+              </div>
+            )}
+            {displayCollectionPoint.phone && (
+              <div className="flex items-center gap-2 text-sm">
+                <Phone className="h-4 w-4 text-muted-foreground" />
+                <a href={`tel:${displayCollectionPoint.phone}`} className="hover:underline">
+                  {displayCollectionPoint.phone}
+                </a>
+              </div>
+            )}
+            {displayCollectionPoint.email && (
+              <div className="flex items-center gap-2 text-sm">
+                <Mail className="h-4 w-4 text-muted-foreground" />
+                <a href={`mailto:${displayCollectionPoint.email}`} className="hover:underline">
+                  {displayCollectionPoint.email}
+                </a>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {displayFarmers && displayFarmers.length > 0 ? (
         <div className="grid gap-6 md:grid-cols-2">
-          {affiliatedFarmers.map((affiliation: any) => {
-            const farmer = affiliation.farm_profiles;
-            const profile = farmer?.profiles;
+          {displayFarmers.map((affiliation: any) => {
+            const farmer = isDemoMode ? affiliation : affiliation.farm_profiles;
+            const profile = isDemoMode ? affiliation : farmer?.profiles;
+            const farmerRole = isDemoMode ? affiliation.role : affiliation.farmer_role;
 
             return (
               <Card key={affiliation.id}>
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div>
-                      <CardTitle>{farmer?.farm_name || 'Unknown Farm'}</CardTitle>
-                      <CardDescription>Managed by {profile?.full_name || 'Unknown Farmer'}</CardDescription>
+                      <CardTitle>{isDemoMode ? affiliation.farm_name : farmer?.farm_name || 'Unknown Farm'}</CardTitle>
+                      <CardDescription>
+                        Managed by {isDemoMode ? affiliation.farmer_name : profile?.full_name || 'Unknown Farmer'}
+                      </CardDescription>
                     </div>
-                    <Badge variant="secondary">
-                      {affiliation.commission_rate}% commission
-                    </Badge>
+                    <div className="flex flex-col gap-1 items-end">
+                      <Badge variant="outline">{farmerRole}</Badge>
+                      <Badge variant="secondary">
+                        {affiliation.commission_rate}% commission
+                      </Badge>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {farmer?.bio && (
-                    <p className="text-sm text-muted-foreground line-clamp-2">{farmer.bio}</p>
+                  {(isDemoMode ? affiliation.bio : farmer?.bio) && (
+                    <p className="text-sm text-muted-foreground line-clamp-2">
+                      {isDemoMode ? affiliation.bio : farmer.bio}
+                    </p>
                   )}
 
                   <div className="space-y-2">
-                    {farmer?.location && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                        <span>{farmer.location}</span>
+                    {(isDemoMode ? affiliation.address : profile?.street_address) && (
+                      <div className="flex items-start gap-2 text-sm">
+                        <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                        <span>
+                          {isDemoMode 
+                            ? affiliation.address 
+                            : `${profile.street_address}, ${profile.city}, ${profile.state} ${profile.zip_code}`}
+                        </span>
                       </div>
                     )}
 
-                    {profile?.phone && (
+                    {(isDemoMode ? affiliation.phone : profile?.phone) && (
                       <div className="flex items-center gap-2 text-sm">
                         <Phone className="h-4 w-4 text-muted-foreground" />
-                        <a href={`tel:${profile.phone}`} className="hover:underline">
-                          {profile.phone}
+                        <a href={`tel:${isDemoMode ? affiliation.phone : profile.phone}`} className="hover:underline">
+                          {isDemoMode ? affiliation.phone : profile.phone}
                         </a>
                       </div>
                     )}
 
-                    {profile?.email && (
+                    {(isDemoMode ? affiliation.email : profile?.email) && (
                       <div className="flex items-center gap-2 text-sm">
                         <Mail className="h-4 w-4 text-muted-foreground" />
-                        <a href={`mailto:${profile.email}`} className="hover:underline">
-                          {profile.email}
+                        <a href={`mailto:${isDemoMode ? affiliation.email : profile.email}`} className="hover:underline">
+                          {isDemoMode ? affiliation.email : profile.email}
                         </a>
                       </div>
                     )}
@@ -149,25 +292,27 @@ export default function AffiliatedFarmers() {
                     </div>
                   </div>
 
-                  <div className="flex gap-2 pt-2">
-                    <Button
-                      variant="outline"
-                      className="flex-1"
-                      onClick={() => navigate(`/farm/${farmer?.id}`)}
-                      disabled={!farmer?.id}
-                    >
-                      <ExternalLink className="mr-2 h-4 w-4" />
-                      View Profile
-                    </Button>
-                    {profile?.email && (
+                  {!isDemoMode && (
+                    <div className="flex gap-2 pt-2">
                       <Button
                         variant="outline"
-                        onClick={() => window.location.href = `mailto:${profile.email}`}
+                        className="flex-1"
+                        onClick={() => navigate(`/farm/${farmer?.id}`)}
+                        disabled={!farmer?.id}
                       >
-                        <Mail className="h-4 w-4" />
+                        <ExternalLink className="mr-2 h-4 w-4" />
+                        View Profile
                       </Button>
-                    )}
-                  </div>
+                      {profile?.email && (
+                        <Button
+                          variant="outline"
+                          onClick={() => window.location.href = `mailto:${profile.email}`}
+                        >
+                          <Mail className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             );

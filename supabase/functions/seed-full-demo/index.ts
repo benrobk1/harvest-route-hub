@@ -112,12 +112,17 @@ serve(async (req) => {
         email: 'farmer1@demo.com', 
         password: DEMO_PASSWORD, 
         full_name: 'Mike Thompson', 
-        roles: ['farmer'], 
+        roles: ['lead_farmer'], 
         profile: { 
           farm_name: 'Thompson Family Farm', 
           location: 'Hudson Valley, NY', 
           description: 'Organic vegetables and fruits',
-          bio: 'We traded our city shoes for muddy boots and haven\'t stopped smiling since. Every tomato with a funny nose becomes a mascot before it becomes dinner.'
+          bio: 'We traded our city shoes for muddy boots and haven\'t stopped smiling since. Every tomato with a funny nose becomes a mascot before it becomes dinner.',
+          collection_point_address: '456 Valley Road, Hudson Valley, NY 10002',
+          street_address: '456 Valley Road',
+          city: 'Hudson Valley',
+          state: 'NY',
+          zip_code: '10002'
         } 
       },
       { email: 'farmer2@demo.com', password: DEMO_PASSWORD, full_name: 'Lisa Chen', roles: ['farmer'], profile: { farm_name: 'Chen Organic Gardens', location: 'Catskills, NY', description: 'Asian vegetables and herbs' } },

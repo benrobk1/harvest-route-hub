@@ -271,6 +271,10 @@ const AppContent = () => {
             </RoleGate>
           } />
           
+          <Route path="/demo/live-orders" element={
+            React.createElement(React.lazy(() => import('./pages/demo/LiveOrderStatus')))
+          } />
+          
           <Route path="/admin/accept-invitation" element={<AcceptInvitation />} />
           
           <Route path="/farm/:farmId" element={<FarmProfileView />} />

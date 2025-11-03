@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Search, MapPin, Package, User, TrendingUp, Clock } from "lucide-react";
+import { Search, MapPin, Package, User, TrendingUp, Clock, Truck } from "lucide-react";
 import logo from "@/assets/blue-harvests-logo.jpeg";
 import { supabase } from "@/integrations/supabase/client";
 import { useCart } from "@/hooks/useCart";
@@ -198,6 +198,10 @@ const Shop = () => {
               <Button variant="outline" onClick={() => navigate("/consumer/orders")}>
                 <Package className="h-5 w-5 mr-2" />
                 Orders
+              </Button>
+              <Button variant="outline" onClick={() => navigate("/demo/live-orders")}>
+                <Truck className="h-5 w-5 mr-2" />
+                Live Status
               </Button>
               <CartDrawer />
             </div>

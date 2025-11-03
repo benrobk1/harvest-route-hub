@@ -60,6 +60,7 @@ const ConsumerOrderTracking = () => {
           )
         `)
         .eq('consumer_id', user?.id)
+        .neq('status', 'cancelled')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -289,7 +290,7 @@ const ConsumerOrderTracking = () => {
 
                     {/* Cancel Order Button */}
                     {(() => {
-                      const canCancel = ['pending', 'paid'].includes(order.status);
+                      const canCancel = ['pending', 'paid', 'confirmed'].includes(order.status);
                       const deliveryTime = new Date(order.delivery_date).getTime();
                       const now = Date.now();
                       const hoursUntilDelivery = (deliveryTime - now) / (1000 * 60 * 60);

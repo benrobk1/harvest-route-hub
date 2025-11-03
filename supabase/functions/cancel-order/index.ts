@@ -61,8 +61,8 @@ serve(async (req) => {
       );
     }
 
-    // Check if order can be cancelled (pending or paid, and more than 24 hours before delivery)
-    const allowedStatuses = ['pending', 'paid'];
+    // Check if order can be cancelled (pending, paid, or confirmed, and more than 24 hours before delivery)
+    const allowedStatuses = ['pending', 'paid', 'confirmed'];
     if (!allowedStatuses.includes(order.status)) {
       return new Response(
         JSON.stringify({ 

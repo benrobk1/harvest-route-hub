@@ -26,9 +26,18 @@ export const CartDrawer = () => {
   } = useCart();
   const navigate = useNavigate();
   const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  const handleCheckout = () => {
+    setOpen(false);
+    // Small delay to ensure sheet closes before navigation
+    setTimeout(() => {
+      navigate('/consumer/checkout');
+    }, 100);
+  };
 
   return (
-    <Sheet>
+    <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
         <Button className="relative">
           <ShoppingCart className="h-5 w-5 mr-2" />
@@ -137,7 +146,7 @@ export const CartDrawer = () => {
                     Save Cart
                   </Button>
                   <Button 
-                    onClick={() => navigate('/consumer/checkout')}
+                    onClick={handleCheckout}
                     disabled={cartTotal < 25}
                   >
                     {cartTotal < 25 ? `$${(25 - cartTotal).toFixed(2)} more` : 'Checkout'}

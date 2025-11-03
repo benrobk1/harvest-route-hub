@@ -7,10 +7,12 @@ import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { Package } from "lucide-react";
 import { useDemoMode } from "@/contexts/DemoModeContext";
+import { useState } from "react";
 
 export function AvailableRoutes() {
   const { toast } = useToast();
   const { isDemoMode, claimDemoRoute } = useDemoMode();
+  const [claimedRoutes, setClaimedRoutes] = useState<Set<string>>(new Set());
   
   // Demo batch data
   const demoBatch = {
@@ -62,6 +64,7 @@ export function AvailableRoutes() {
   
   const handleClaimRoute = async (batchId: string) => {
     if (isDemoMode) {
+      setClaimedRoutes(prev => new Set(prev).add(batchId));
       claimDemoRoute();
       toast({
         title: 'Route Claimed!',
@@ -87,6 +90,7 @@ export function AvailableRoutes() {
         variant: 'destructive',
       });
     } else {
+      setClaimedRoutes(prev => new Set(prev).add(batchId));
       toast({
         title: 'Route claimed!',
         description: 'Check your active route to begin deliveries',
@@ -143,8 +147,12 @@ export function AvailableRoutes() {
                     </div>
                   </div>
                 </div>
-                <Button onClick={() => handleClaimRoute(batch.id)} size="lg">
-                  Claim Route
+                <Button 
+                  onClick={() => handleClaimRoute(batch.id)} 
+                  size="lg"
+                  disabled={claimedRoutes.has(batch.id)}
+                >
+                  {claimedRoutes.has(batch.id) ? 'Claimed' : 'Claim Route'}
                 </Button>
               </div>
             </div>

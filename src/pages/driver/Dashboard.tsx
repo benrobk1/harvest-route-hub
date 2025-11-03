@@ -30,9 +30,9 @@ const DriverDashboard = () => {
   console.log('Driver Dashboard: isDemoMode =', isDemoMode);
   console.log('Driver Dashboard: user =', user);
 
-  // Demo data for claimed route
+  // Demo data for claimed route (starts at 2:30 PM)
   const demoActiveRoute = claimedDemoRoute ? [
-    { id: '0', customer: 'Thompson Family Farm', address: '456 Farm Road, Milton, NY 12547', status: 'pending', addressVisible: true, isCollectionPoint: true },
+    { id: '0', customer: 'Thompson Family Farm', address: '456 Farm Road, Milton, NY 12547', status: 'pending', addressVisible: true, isCollectionPoint: true, started_at: new Date(new Date().setHours(14, 30, 0, 0)).toISOString() },
     { id: '1', customer: 'Alice Johnson', address: '123 Main St, Brooklyn, NY 11201', status: 'delivered', addressVisible: true },
     { id: '2', customer: 'Bob Smith', address: '456 Oak Ave, Brooklyn, NY 11201', status: 'delivered', addressVisible: true },
     { id: '3', customer: 'Carol Davis', address: '789 Pine Rd, Brooklyn, NY 11201', status: 'in_progress', addressVisible: true },
@@ -42,11 +42,11 @@ const DriverDashboard = () => {
 
   const demoEarnings = claimedDemoRoute ? {
     today: { 
-      total: 284,
-      tips: Math.round(5 * FLAT_DELIVERY_FEE * 0.05), // 5% of delivery fees for 5 stops
-      deliveryFees: 284 - Math.round(5 * FLAT_DELIVERY_FEE * 0.05)
+      total: 65,
+      tips: 15,
+      deliveryFees: 50 // 5 deliveries * $10
     },
-    week: { total: 292, tips: 42, deliveryFees: 250 },
+    week: { total: 65, tips: 15, deliveryFees: 50 }, // Same as today
     month: { total: 415.50, tips: 15.50, deliveryFees: 400 }, // 40 deliveries * $10
   } : null;
 
@@ -471,13 +471,27 @@ const DriverDashboard = () => {
         </div>
 
         {/* Route Density Map - Show if there's an active batch */}
-        {displayActiveBatch?.id && (
+        {displayActiveBatch?.id ? (
+          <Card className="border-2">
+            <CardHeader>
+              <CardTitle>Route Overview</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Your route starts at 2:30 PM. Head to the collection point to pick up and scan orders, then follow GPS tracking for deliveries.
+              </p>
+              <RouteDensityMap batchId={displayActiveBatch.id} />
+            </CardContent>
+          </Card>
+        ) : (
           <Card className="border-2">
             <CardHeader>
               <CardTitle>Route Overview</CardTitle>
             </CardHeader>
             <CardContent>
-              <RouteDensityMap batchId={displayActiveBatch.id} />
+              <p className="text-sm text-muted-foreground text-center py-8">
+                Route overview remains blank until you claim and activate a route. Check Available Routes to get started.
+              </p>
             </CardContent>
           </Card>
         )}

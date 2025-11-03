@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SubscriptionManager } from "@/components/consumer/SubscriptionManager";
 import { ReferralManager } from "@/components/consumer/ReferralManager";
+import { SpendingProgressCard } from "@/components/consumer/SpendingProgressCard";
 
 const ConsumerProfile = () => {
   const navigate = useNavigate();
@@ -134,6 +135,9 @@ const ConsumerProfile = () => {
 
         {/* Subscription Manager */}
         <SubscriptionManager />
+
+        {/* Spending Progress */}
+        <SpendingProgressCard />
 
         {/* Referral Manager */}
         <ReferralManager />

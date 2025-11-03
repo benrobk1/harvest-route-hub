@@ -3,6 +3,7 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Card } from '@/components/ui/card';
 import { MapPin } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CustomerMapProps {
   zipData: Array<{
@@ -14,17 +15,44 @@ interface CustomerMapProps {
 }
 
 const CustomerMap = ({ zipData }: CustomerMapProps) => {
+  const [token, setToken] = useState<string | null>(null);
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [hasMapboxToken, setHasMapboxToken] = useState(false);
 
+  // Acquire token from env or backend
   useEffect(() => {
-    const mapboxToken = import.meta.env.VITE_MAPBOX_PUBLIC_TOKEN;
-    setHasMapboxToken(!!mapboxToken);
+    const envToken = import.meta.env.VITE_MAPBOX_PUBLIC_TOKEN as string | undefined;
+    if (envToken) {
+      setToken(envToken);
+      setHasMapboxToken(true);
+      return;
+    }
 
-    if (!mapContainer.current || !mapboxToken) return;
+    supabase.functions
+      .invoke('get-mapbox-token')
+      .then(({ data, error }) => {
+        if (error) {
+          console.warn('Mapbox token fetch error:', error);
+          setHasMapboxToken(false);
+          return;
+        }
+        if (data?.token) {
+          setToken(data.token);
+          setHasMapboxToken(true);
+        }
+      })
+      .catch((e) => {
+        console.warn('Mapbox token fetch exception:', e);
+        setHasMapboxToken(false);
+      });
+  }, []);
 
-    mapboxgl.accessToken = mapboxToken;
+  // Initialize map when token is ready
+  useEffect(() => {
+    if (!mapContainer.current || !token) return;
+
+    mapboxgl.accessToken = token;
 
     // Initialize map centered on NYC
     map.current = new mapboxgl.Map({
@@ -148,7 +176,7 @@ const CustomerMap = ({ zipData }: CustomerMapProps) => {
     return () => {
       map.current?.remove();
     };
-  }, [zipData]);
+  }, [zipData, token]);
 
   // Fallback view when Mapbox token is not configured
   if (!hasMapboxToken) {

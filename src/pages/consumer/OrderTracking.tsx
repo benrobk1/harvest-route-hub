@@ -312,19 +312,30 @@ const ConsumerOrderTracking = () => {
                     )}
 
                     {/* Cancel Order Button */}
-                    {order.status === 'pending' && (
-                      <div className="pt-4 border-t">
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          className="w-full"
-                          onClick={() => setCancelOrderId(order.id)}
-                        >
-                          <X className="h-4 w-4 mr-2" />
-                          Cancel Order
-                        </Button>
-                      </div>
-                    )}
+                    {(() => {
+                      const canCancel = ['pending', 'paid'].includes(order.status);
+                      const deliveryTime = new Date(order.delivery_date).getTime();
+                      const now = Date.now();
+                      const hoursUntilDelivery = (deliveryTime - now) / (1000 * 60 * 60);
+                      const isWithinCancellationWindow = hoursUntilDelivery > 24;
+
+                      return canCancel && isWithinCancellationWindow ? (
+                        <div className="pt-4 border-t">
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => setCancelOrderId(order.id)}
+                          >
+                            <X className="h-4 w-4 mr-2" />
+                            Cancel Order
+                          </Button>
+                          <p className="text-xs text-muted-foreground text-center mt-2">
+                            Can cancel until 24 hours before delivery
+                          </p>
+                        </div>
+                      ) : null;
+                    })()}
                   </CardContent>
                 </Card>
               );

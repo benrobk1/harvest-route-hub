@@ -48,7 +48,7 @@ serve(async (req) => {
     // Get the order
     const { data: order, error: orderError } = await supabaseClient
       .from('orders')
-      .select('id, consumer_id, status, total_amount')
+      .select('id, consumer_id, status, total_amount, delivery_date')
       .eq('id', orderId)
       .eq('consumer_id', user.id)
       .single();
@@ -61,11 +61,26 @@ serve(async (req) => {
       );
     }
 
-    // Only allow cancellation of pending orders
-    if (order.status !== 'pending') {
+    // Check if order can be cancelled (pending or paid, and more than 24 hours before delivery)
+    const allowedStatuses = ['pending', 'paid'];
+    if (!allowedStatuses.includes(order.status)) {
       return new Response(
         JSON.stringify({ 
-          error: `Cannot cancel order with status: ${order.status}. Only pending orders can be cancelled.` 
+          error: `Cannot cancel order with status: ${order.status}. Only pending or confirmed orders can be cancelled.` 
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Check if within 24 hours of delivery
+    const deliveryTime = new Date(order.delivery_date).getTime();
+    const now = Date.now();
+    const hoursUntilDelivery = (deliveryTime - now) / (1000 * 60 * 60);
+
+    if (hoursUntilDelivery <= 24) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Cannot cancel orders within 24 hours of delivery date' 
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );

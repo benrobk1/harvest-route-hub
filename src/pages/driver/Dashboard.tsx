@@ -48,18 +48,27 @@ const DriverDashboard = () => {
     },
     week: { total: 0, tips: 0, deliveryFees: 0 },
     month: { total: 313, tips: 16, deliveryFees: 297 }, // 40 deliveries
-  } : null;
+  } : {
+    today: { total: 0, tips: 0, deliveryFees: 0 },
+    week: { total: 0, tips: 0, deliveryFees: 0 },
+    month: { total: 0, tips: 0, deliveryFees: 0 },
+  };
 
   const demoStats = claimedDemoRoute ? {
     deliveries: 40,
     rating: '4.8',
     totalRatings: 18,
     onTime: 95,
-  } : null;
+  } : {
+    deliveries: 0,
+    rating: '0.0',
+    totalRatings: 0,
+    onTime: 0,
+  };
 
   const demoActiveBatch = claimedDemoRoute ? { id: 'demo-batch-8' } : null;
 
-  const demoMonthlyBatches = claimedDemoRoute ? 12 : null;
+  const demoMonthlyBatches = claimedDemoRoute ? 12 : 0;
 
   // Fetch earnings from delivery fees and tips
   const { data: earnings, isLoading: earningsLoading } = useQuery({
@@ -362,11 +371,11 @@ const DriverDashboard = () => {
     }
   };
   // Derived display values for Today's Earnings (use demo estimates when no real payouts today)
-  const displayActiveRoute = isDemoMode && claimedDemoRoute ? demoActiveRoute : activeRoute;
-  const displayEarnings = isDemoMode && claimedDemoRoute ? demoEarnings : earnings;
-  const displayStats = isDemoMode && claimedDemoRoute ? demoStats : stats;
-  const displayActiveBatch = isDemoMode && claimedDemoRoute ? demoActiveBatch : activeBatch;
-  const displayMonthlyBatches = isDemoMode && claimedDemoRoute ? demoMonthlyBatches : monthlyBatches;
+  const displayActiveRoute = isDemoMode ? demoActiveRoute : activeRoute;
+  const displayEarnings = isDemoMode ? demoEarnings : earnings;
+  const displayStats = isDemoMode ? demoStats : stats;
+  const displayActiveBatch = isDemoMode ? demoActiveBatch : activeBatch;
+  const displayMonthlyBatches = isDemoMode ? demoMonthlyBatches : monthlyBatches;
 
   const activeStopsCount = displayActiveRoute?.filter((r: any) => !r.isCollectionPoint).length || 0;
   const usingFallbackToday = (displayEarnings?.today.total || 0) === 0 && activeStopsCount > 0;

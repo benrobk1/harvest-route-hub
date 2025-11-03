@@ -88,8 +88,14 @@ export const StripeConnectSimple = ({ variant = 'button' }: StripeConnectSimpleP
     }
   };
 
-  // Show nothing while checking initial status
-  if (loading) return null;
+  // Show skeleton while checking initial status to prevent layout shift
+  if (loading) {
+    return variant === 'button' ? (
+      <div className="h-9 w-[180px] bg-muted animate-pulse rounded-md" />
+    ) : (
+      <div className="h-20 w-full bg-muted animate-pulse rounded-lg" />
+    );
+  }
 
   // Already connected + payouts enabled → Show success badge only
   if (status?.payouts_enabled) {

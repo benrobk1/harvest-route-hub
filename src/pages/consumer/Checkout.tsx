@@ -532,83 +532,10 @@ const Checkout = () => {
                 )}
               </CardContent>
             </Card>
-
-            {/* Payment Method */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CreditCard className="h-5 w-5" />
-                  Payment Method
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* 
-                  PRIVACY & SECURITY MESSAGE:
-                  WHY addresses are hidden until pickup:
-                  1. Privacy protection - consumers' home addresses are sensitive data
-                  2. RLS (Row Level Security) enforces server-side access control
-                  3. Drivers only see addresses when geographically nearby (prevents stalking/abuse)
-                  4. Database trigger auto-updates visibility based on driver proximity
-                  
-                  This is part of security hardening - building trust at checkout conversion point.
-                */}
-                <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg flex items-start gap-3">
-                  <svg className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                  </svg>
-                  <p className="text-sm text-muted-foreground">
-                    Your payment info is encrypted. Your address is only shared with your assigned driver when they're nearby.
-                  </p>
-                </div>
-                {availableCreditsAmount > 0 && (
-                  <div className="p-4 bg-muted rounded-lg space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <Coins className="h-4 w-4 text-primary" />
-                        <span className="font-medium">Available Credits</span>
-                      </div>
-                      <span className="font-bold">{formatMoney(availableCreditsAmount)}</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="use-credits-payment"
-                        checked={useCredits}
-                        onCheckedChange={(checked) => setUseCredits(checked as boolean)}
-                      />
-                      <label
-                        htmlFor="use-credits-payment"
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        Use credits for this order
-                      </label>
-                    </div>
-                    {useCredits && creditsToUse > 0 && (
-                      <p className="text-sm text-muted-foreground">
-                        {formatMoney(creditsToUse)} will be applied to this order
-                      </p>
-                    )}
-                  </div>
-                )}
-                
-                {clientSecret && total > 0 ? (
-                  <Elements stripe={stripePromise} options={{ clientSecret }}>
-                    <PaymentForm onSuccess={handlePaymentSuccess} amount={total} />
-                  </Elements>
-                ) : total === 0 ? (
-                  <p className="text-sm text-green-600 font-medium">
-                    Order fully covered by credits - no payment required!
-                  </p>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    Complete order details to proceed with payment
-                  </p>
-                )}
-              </CardContent>
-            </Card>
           </div>
 
           {/* Order Summary */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1 space-y-6">
             <Card className="sticky top-4">
               <CardHeader>
                 <CardTitle>Order Summary</CardTitle>
@@ -749,6 +676,79 @@ const Checkout = () => {
                   <p className="text-sm text-destructive text-center flex items-center justify-center gap-2">
                     <AlertCircle className="h-4 w-4" />
                     Please accept the terms to continue
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Payment Method */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard className="h-5 w-5" />
+                  Payment Method
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* 
+                  PRIVACY & SECURITY MESSAGE:
+                  WHY addresses are hidden until pickup:
+                  1. Privacy protection - consumers' home addresses are sensitive data
+                  2. RLS (Row Level Security) enforces server-side access control
+                  3. Drivers only see addresses when geographically nearby (prevents stalking/abuse)
+                  4. Database trigger auto-updates visibility based on driver proximity
+                  
+                  This is part of security hardening - building trust at checkout conversion point.
+                */}
+                <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg flex items-start gap-3">
+                  <svg className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                  </svg>
+                  <p className="text-sm text-muted-foreground">
+                    Your payment info is encrypted. Your address is only shared with your assigned driver when they're nearby.
+                  </p>
+                </div>
+                {availableCreditsAmount > 0 && (
+                  <div className="p-4 bg-muted rounded-lg space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Coins className="h-4 w-4 text-primary" />
+                        <span className="font-medium">Available Credits</span>
+                      </div>
+                      <span className="font-bold">{formatMoney(availableCreditsAmount)}</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="use-credits-payment"
+                        checked={useCredits}
+                        onCheckedChange={(checked) => setUseCredits(checked as boolean)}
+                      />
+                      <label
+                        htmlFor="use-credits-payment"
+                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                      >
+                        Use credits for this order
+                      </label>
+                    </div>
+                    {useCredits && creditsToUse > 0 && (
+                      <p className="text-sm text-muted-foreground">
+                        {formatMoney(creditsToUse)} will be applied to this order
+                      </p>
+                    )}
+                  </div>
+                )}
+                
+                {clientSecret && total > 0 ? (
+                  <Elements stripe={stripePromise} options={{ clientSecret }}>
+                    <PaymentForm onSuccess={handlePaymentSuccess} amount={total} />
+                  </Elements>
+                ) : total === 0 ? (
+                  <p className="text-sm text-green-600 font-medium">
+                    Order fully covered by credits - no payment required!
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted-foreground">
+                    Complete order details to proceed with payment
                   </p>
                 )}
               </CardContent>

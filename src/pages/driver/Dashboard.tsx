@@ -42,12 +42,12 @@ const DriverDashboard = () => {
 
   const demoEarnings = claimedDemoRoute ? {
     today: { 
-      total: 297,
+      total: 315,
       tips: 15,
-      deliveryFees: 282
+      deliveryFees: 300
     },
     week: { total: 0, tips: 0, deliveryFees: 0 },
-    month: { total: 313, tips: 16, deliveryFees: 297 }, // 40 deliveries
+    month: { total: 300, tips: 16, deliveryFees: 300 }, // 40 deliveries
   } : {
     today: { total: 0, tips: 0, deliveryFees: 0 },
     week: { total: 0, tips: 0, deliveryFees: 0 },

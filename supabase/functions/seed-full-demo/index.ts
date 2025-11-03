@@ -536,12 +536,13 @@ serve(async (req) => {
       }
     }
 
-    // Step 8: Create 4 delivery batches with 37.2 avg stops, 93% on-time
+    // Step 8: Create 5 delivery batches (4 completed + 1 available with 36 stops)
     console.log('Creating delivery batches...');
     const today = new Date().toISOString().split('T')[0];
-    const batchStopCounts = [37, 38, 37, 37]; // avg = 37.25 ≈ 37.2
+    const batchStopCounts = [37, 38, 37, 37]; // avg = 37.25 ≈ 37.2 for completed batches
     let orderIdx = 0;
 
+    // Create 4 completed batches for driver1
     for (let batchNum = 0; batchNum < 4; batchNum++) {
       const stopCount = batchStopCounts[batchNum];
       const batchDate = new Date(now.getTime() - batchNum * 24 * 60 * 60 * 1000);
@@ -604,6 +605,92 @@ serve(async (req) => {
           await supabase.from('orders').update({
             delivery_batch_id: batch.id
           }).eq('id', orderId);
+        }
+      }
+    }
+
+    // Create an available batch (unclaimed) for tomorrow with 36 stops
+    console.log('Creating available batch for demo...');
+    const dayAfterTomorrow = new Date();
+    dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
+    const dayAfterTomorrowStr = dayAfterTomorrow.toISOString().split('T')[0];
+    
+    const { data: availableBatch } = await supabase.from('delivery_batches').insert({
+      lead_farmer_id: leadFarmerId,
+      driver_id: null, // No driver assigned - available to claim
+      delivery_date: dayAfterTomorrowStr,
+      batch_number: 5,
+      estimated_duration_minutes: 36 * 10, // 360 minutes = 6 hours
+      zip_codes: ['11201', '11205', '11206'],
+      status: 'pending'
+    }).select().single();
+
+    // Create 36 pending stops for the available batch
+    if (availableBatch) {
+      for (let i = 0; i < 36; i++) {
+        const consumerNum = (i % 48) + 1;
+        const consumerId = createdUserIds[`consumer${consumerNum}@demo.com`];
+        const addr = addresses[i % 15];
+        
+        // Create order for this stop
+        const numItems = Math.floor(Math.random() * 3) + 2;
+        const selectedProducts = productIds.sort(() => 0.5 - Math.random()).slice(0, numItems);
+        
+        let totalAmount = 38 + Math.random() * 4;
+        const orderItems: any[] = [];
+        
+        for (const productId of selectedProducts) {
+          const { data: product } = await supabase.from('products').select('price').eq('id', productId).single();
+          const quantity = Math.floor(Math.random() * 2) + 1;
+          const subtotal = product!.price * quantity;
+          
+          orderItems.push({
+            product_id: productId,
+            quantity,
+            unit_price: product!.price,
+            subtotal
+          });
+        }
+        
+        const { data: order } = await supabase.from('orders').insert({
+          consumer_id: consumerId,
+          delivery_date: dayAfterTomorrowStr,
+          total_amount: totalAmount,
+          tip_amount: 0,
+          status: 'pending'
+        }).select().single();
+        
+        if (order) {
+          for (const item of orderItems) {
+            await supabase.from('order_items').insert({
+              order_id: order.id,
+              ...item
+            });
+          }
+          
+          // Create batch stop
+          const estimatedArrival = new Date(dayAfterTomorrow.getTime() + i * 10 * 60 * 1000);
+          
+          await supabase.from('batch_stops').insert({
+            delivery_batch_id: availableBatch.id,
+            order_id: order.id,
+            sequence_number: i + 1,
+            address: `${addr.street}, ${addr.city}, NY ${addr.zip}`,
+            street_address: addr.street,
+            city: addr.city,
+            state: 'NY',
+            zip_code: addr.zip,
+            status: 'pending',
+            address_visible_at: null,
+            estimated_arrival: estimatedArrival.toISOString(),
+            actual_arrival: null,
+            latitude: 40.6782 + (Math.random() * 0.05),
+            longitude: -73.9442 + (Math.random() * 0.05)
+          });
+          
+          await supabase.from('orders').update({
+            delivery_batch_id: availableBatch.id
+          }).eq('id', order.id);
         }
       }
     }
@@ -750,8 +837,53 @@ serve(async (req) => {
       }
     ]);
 
-    // Step 14: Create payouts for all orders ($41,000 total farm revenue)
+    // Step 14: Create payouts - demo driver gets exactly 2 deliveries this month for $591 ($15 in tips)
     console.log('Creating payouts...');
+    
+    // For demo driver1: Create 2 specific payouts this month
+    const thisMonthStart = new Date();
+    thisMonthStart.setDate(1);
+    thisMonthStart.setHours(0, 0, 0, 0);
+    
+    const demoDelivery1Date = new Date(thisMonthStart.getTime() + 5 * 24 * 60 * 60 * 1000); // 5 days into month
+    const demoDelivery2Date = new Date(thisMonthStart.getTime() + 12 * 24 * 60 * 60 * 1000); // 12 days into month
+    
+    // First delivery: $288 delivery fee + $7 tip = $295
+    await supabase.from('payouts').insert({
+      order_id: orderIds[0],
+      recipient_id: driver1Id,
+      recipient_type: 'driver',
+      amount: 288,
+      description: 'Delivery fees for batch',
+      status: 'completed',
+      completed_at: demoDelivery1Date.toISOString(),
+      created_at: demoDelivery1Date.toISOString()
+    });
+    
+    // Second delivery: $288 delivery fee + $8 tip = $296
+    await supabase.from('payouts').insert({
+      order_id: orderIds[1],
+      recipient_id: driver1Id,
+      recipient_type: 'driver',
+      amount: 288,
+      description: 'Delivery fees for batch',
+      status: 'completed',
+      completed_at: demoDelivery2Date.toISOString(),
+      created_at: demoDelivery2Date.toISOString()
+    });
+    
+    // Create demo orders with tips
+    await supabase.from('orders').update({ 
+      tip_amount: 7,
+      created_at: demoDelivery1Date.toISOString()
+    }).eq('id', orderIds[0]);
+    
+    await supabase.from('orders').update({ 
+      tip_amount: 8,
+      created_at: demoDelivery2Date.toISOString()
+    }).eq('id', orderIds[1]);
+    
+    // Create payouts for farmers from all orders
     for (const orderId of orderIds) {
       const { data: order } = await supabase.from('orders').select('total_amount, created_at').eq('id', orderId).single();
       if (!order) continue;
@@ -759,24 +891,11 @@ serve(async (req) => {
       const farmerEmail = `farmer${Math.floor(Math.random() * 6) + 1}@demo.com`;
       const farmerId = createdUserIds[farmerEmail];
       
-      // $41,000 total / 1,025 orders = $40 per order to farmer
-      const farmerPayout = 40;
       await supabase.from('payouts').insert({
         order_id: orderId,
         recipient_id: farmerId,
         recipient_type: 'farmer',
-        amount: farmerPayout,
-        status: 'completed',
-        completed_at: order.created_at,
-        created_at: order.created_at
-      });
-      
-      // Driver payout: ~$4-5 per delivery
-      await supabase.from('payouts').insert({
-        order_id: orderId,
-        recipient_id: driver1Id,
-        recipient_type: 'driver',
-        amount: 4 + Math.random() * 1,
+        amount: 40,
         status: 'completed',
         completed_at: order.created_at,
         created_at: order.created_at
@@ -791,8 +910,8 @@ serve(async (req) => {
       summary: {
         users_created: users.length,
         products_created: productIds.length,
-        orders_created: 1025,
-        batches_created: 4,
+        orders_created: 1025 + 36, // Including available batch orders
+        batches_created: 5, // 4 completed + 1 available
         ratings_created: 30,
         farm_revenue: 41000,
         households_active: 48,

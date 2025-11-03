@@ -9,13 +9,13 @@ import { useNavigate } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDemoMode } from '@/contexts/DemoModeContext';
 
-// Demo data for Brooklyn collection point
+// Demo data for collection point
 const DEMO_COLLECTION_POINT = {
-  name: 'Brooklyn Hub',
-  address: '123 Atlantic Avenue, Brooklyn, NY 11201',
-  contact: 'Maria Santos',
-  phone: '(718) 555-0100',
-  email: 'maria@brooklynhub.farm'
+  name: 'Thompson Family Farm',
+  address: '456 Farm Road, Milton, NY 12547',
+  contact: null,
+  phone: null,
+  email: null
 };
 
 const DEMO_AFFILIATED_FARMERS = [
@@ -24,10 +24,10 @@ const DEMO_AFFILIATED_FARMERS = [
     farm_name: 'Green Valley Organics',
     farmer_name: 'John Thompson',
     role: 'Farmer',
-    address: '456 Farm Road, Brooklyn, NY 11205',
-    phone: '(718) 555-0201',
+    address: '123 Valley Road, Milton, NY 12547',
+    phone: '(845) 555-0201',
     email: 'john@greenvalley.farm',
-    location: 'Brooklyn, NY',
+    location: 'Milton, NY',
     bio: 'Certified organic vegetables and herbs, specializing in heirloom tomatoes',
     commission_rate: 2.0,
     active_products: 8,
@@ -38,10 +38,10 @@ const DEMO_AFFILIATED_FARMERS = [
     farm_name: 'Sunrise Acres',
     farmer_name: 'Emily Rodriguez',
     role: 'Farmer',
-    address: '789 Harvest Lane, Brooklyn, NY 11206',
-    phone: '(718) 555-0202',
+    address: '789 Harvest Lane, Milton, NY 12547',
+    phone: '(845) 555-0202',
     email: 'emily@sunriseacres.farm',
-    location: 'Brooklyn, NY',
+    location: 'Milton, NY',
     bio: 'Family-run farm growing seasonal produce with sustainable practices',
     commission_rate: 2.0,
     active_products: 6,
@@ -52,10 +52,10 @@ const DEMO_AFFILIATED_FARMERS = [
     farm_name: 'Heritage Fields',
     farmer_name: 'Michael Chen',
     role: 'Farmer',
-    address: '321 Orchard Street, Brooklyn, NY 11211',
-    phone: '(718) 555-0203',
+    address: '321 Orchard Street, Milton, NY 12547',
+    phone: '(845) 555-0203',
     email: 'michael@heritagefields.farm',
-    location: 'Brooklyn, NY',
+    location: 'Milton, NY',
     bio: 'Preserving traditional farming methods while growing diverse crops',
     commission_rate: 2.0,
     active_products: 10,
@@ -187,7 +187,7 @@ export default function AffiliatedFarmers() {
             {(isDemoMode ? (displayCollectionPoint as any).address : (displayCollectionPoint as any).collection_point_address) && (
               <div className="flex items-start gap-2 text-sm">
                 <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                <span>
+                <span className="font-medium">
                   {isDemoMode ? (displayCollectionPoint as any).address : (displayCollectionPoint as any).collection_point_address}
                 </span>
               </div>
@@ -199,7 +199,7 @@ export default function AffiliatedFarmers() {
                 </span>
               </div>
             )}
-            {displayCollectionPoint.phone && (
+            {!isDemoMode && displayCollectionPoint.phone && (
               <div className="flex items-center gap-2 text-sm">
                 <Phone className="h-4 w-4 text-muted-foreground" />
                 <a href={`tel:${displayCollectionPoint.phone}`} className="hover:underline">
@@ -207,7 +207,7 @@ export default function AffiliatedFarmers() {
                 </a>
               </div>
             )}
-            {displayCollectionPoint.email && (
+            {!isDemoMode && displayCollectionPoint.email && (
               <div className="flex items-center gap-2 text-sm">
                 <Mail className="h-4 w-4 text-muted-foreground" />
                 <a href={`mailto:${displayCollectionPoint.email}`} className="hover:underline">

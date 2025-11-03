@@ -12,10 +12,10 @@ import { useDemoMode } from '@/contexts/DemoModeContext';
 
 const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))', 'hsl(var(--muted))'];
 
-// Demo data for Brooklyn zip code with customer details
+// Demo data for Milton zip code with customer details
 const DEMO_ZIP_DATA = [
   {
-    zip_code: '11201',
+    zip_code: '12547',
     order_count: 264,
     total_revenue: 10032,
     unique_customers: 40,

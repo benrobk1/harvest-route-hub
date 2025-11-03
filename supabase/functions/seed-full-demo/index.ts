@@ -83,6 +83,7 @@ serve(async (req) => {
     }
 
     // Clean up orphaned market configs
+    await supabase.from('market_configs').delete().eq('zip_code', '12547');
     await supabase.from('market_configs').delete().eq('zip_code', '10001');
     await supabase.from('market_configs').delete().eq('zip_code', '10002');
     await supabase.from('market_configs').delete().eq('zip_code', '10003');
@@ -101,12 +102,12 @@ serve(async (req) => {
         roles: ['lead_farmer'], 
         profile: { 
           farm_name: 'Valley Collection Point', 
-          collection_point_address: '123 Farm Road, Hudson Valley, NY 10001',
+          collection_point_address: '123 Farm Road, Milton, NY 12547',
           street_address: '123 Farm Road',
-          city: 'Hudson Valley',
+          city: 'Milton',
           state: 'NY',
-          zip_code: '10001'
-        } 
+          zip_code: '12547'
+        }
       },
       { 
         email: 'farmer1@demo.com', 
@@ -115,14 +116,14 @@ serve(async (req) => {
         roles: ['lead_farmer'], 
         profile: { 
           farm_name: 'Thompson Family Farm', 
-          location: 'Hudson Valley, NY', 
+          location: 'Milton, NY', 
           description: 'Organic vegetables and fruits',
           bio: 'We traded our city shoes for muddy boots and haven\'t stopped smiling since. Every tomato with a funny nose becomes a mascot before it becomes dinner.',
-          collection_point_address: '456 Valley Road, Hudson Valley, NY 10002',
-          street_address: '456 Valley Road',
-          city: 'Hudson Valley',
+          collection_point_address: '456 Farm Road, Milton, NY 12547',
+          street_address: '456 Farm Road',
+          city: 'Milton',
           state: 'NY',
-          zip_code: '10002'
+          zip_code: '12547'
         } 
       },
       { email: 'farmer2@demo.com', password: DEMO_PASSWORD, full_name: 'Lisa Chen', roles: ['farmer'], profile: { farm_name: 'Chen Organic Gardens', location: 'Catskills, NY', description: 'Asian vegetables and herbs' } },
@@ -137,21 +138,21 @@ serve(async (req) => {
 
     // Add 96 consumers (48 active + 48 churned for 50% churn rate)
     const addresses = [
-      { street: '101 Main St', city: 'Brooklyn', zip: '11201' },
-      { street: '102 Oak Ave', city: 'Brooklyn', zip: '11201' },
-      { street: '103 Elm St', city: 'Brooklyn', zip: '11201' },
-      { street: '104 Pine Rd', city: 'Brooklyn', zip: '11201' },
-      { street: '105 Maple Dr', city: 'Brooklyn', zip: '11201' },
-      { street: '201 Park Ave', city: 'Brooklyn', zip: '11205' },
-      { street: '202 Court St', city: 'Brooklyn', zip: '11205' },
-      { street: '203 Smith St', city: 'Brooklyn', zip: '11205' },
-      { street: '204 Jay St', city: 'Brooklyn', zip: '11205' },
-      { street: '205 Hoyt St', city: 'Brooklyn', zip: '11205' },
-      { street: '301 Bedford Ave', city: 'Brooklyn', zip: '11206' },
-      { street: '302 Grand St', city: 'Brooklyn', zip: '11206' },
-      { street: '303 Kent Ave', city: 'Brooklyn', zip: '11206' },
-      { street: '304 Wythe Ave', city: 'Brooklyn', zip: '11206' },
-      { street: '305 Berry St', city: 'Brooklyn', zip: '11206' },
+      { street: '101 Main St', city: 'Milton', zip: '12547' },
+      { street: '102 Oak Ave', city: 'Milton', zip: '12547' },
+      { street: '103 Elm St', city: 'Milton', zip: '12547' },
+      { street: '104 Pine Rd', city: 'Milton', zip: '12547' },
+      { street: '105 Maple Dr', city: 'Milton', zip: '12547' },
+      { street: '201 Park Ave', city: 'Milton', zip: '12547' },
+      { street: '202 Court St', city: 'Milton', zip: '12547' },
+      { street: '203 Smith St', city: 'Milton', zip: '12547' },
+      { street: '204 Jay St', city: 'Milton', zip: '12547' },
+      { street: '205 Hoyt St', city: 'Milton', zip: '12547' },
+      { street: '301 River Rd', city: 'Milton', zip: '12547' },
+      { street: '302 Valley St', city: 'Milton', zip: '12547' },
+      { street: '303 Farm Ave', city: 'Milton', zip: '12547' },
+      { street: '304 Harvest Ln', city: 'Milton', zip: '12547' },
+      { street: '305 Garden Way', city: 'Milton', zip: '12547' },
     ];
 
     for (let i = 1; i <= 96; i++) {
@@ -318,13 +319,7 @@ serve(async (req) => {
     // Step 5: Create market configs for all demo ZIP codes
     console.log('Creating market configs...');
     const marketConfigs = [
-      { zip_code: '11201', delivery_fee: 5.99, minimum_order: 25, delivery_days: ['Wednesday', 'Saturday'] },
-      { zip_code: '11205', delivery_fee: 5.99, minimum_order: 25, delivery_days: ['Wednesday', 'Saturday'] },
-      { zip_code: '11206', delivery_fee: 5.99, minimum_order: 25, delivery_days: ['Wednesday', 'Saturday'] },
-      { zip_code: '11211', delivery_fee: 5.99, minimum_order: 25, delivery_days: ['Wednesday', 'Saturday'] },
-      { zip_code: '11222', delivery_fee: 5.99, minimum_order: 25, delivery_days: ['Wednesday', 'Saturday'] },
-      { zip_code: '10001', delivery_fee: 5.99, minimum_order: 25, delivery_days: ['Wednesday', 'Saturday'] },
-      { zip_code: '10003', delivery_fee: 5.99, minimum_order: 25, delivery_days: ['Wednesday', 'Saturday'] },
+      { zip_code: '12547', delivery_fee: 5.99, minimum_order: 25, delivery_days: ['Wednesday', 'Saturday'] },
     ];
 
     for (const config of marketConfigs) {

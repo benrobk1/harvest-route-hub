@@ -225,7 +225,7 @@ export default function CustomerAnalytics() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-5">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Customers</CardTitle>
@@ -265,6 +265,19 @@ export default function CustomerAnalytics() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold">{formatMoney(summary?.avgOrderValue || 0)}</div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Price Capture</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-green-500" />
+              <div className="text-3xl font-bold text-green-600">90%</div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">of listed price</p>
           </CardContent>
         </Card>
       </div>

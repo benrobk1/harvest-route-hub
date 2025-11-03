@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -68,6 +68,30 @@ export function ProductForm({
       image_url: defaultValues?.image_url || "",
     },
   });
+
+  // Reset form when defaultValues change (for editing)
+  useEffect(() => {
+    if (open && defaultValues) {
+      form.reset({
+        name: defaultValues?.name || "",
+        description: defaultValues?.description || "",
+        price: defaultValues?.price || "",
+        unit: defaultValues?.unit || "lb",
+        available_quantity: defaultValues?.available_quantity || "",
+        image_url: defaultValues?.image_url || "",
+      });
+    } else if (open && !defaultValues) {
+      // Reset to empty form when adding new product
+      form.reset({
+        name: "",
+        description: "",
+        price: "",
+        unit: "lb",
+        available_quantity: "",
+        image_url: "",
+      });
+    }
+  }, [open, defaultValues, form]);
 
   const handleSubmit = async (data: ProductFormValues) => {
     setIsSubmitting(true);
@@ -147,7 +171,7 @@ export function ProductForm({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Unit</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select unit" />

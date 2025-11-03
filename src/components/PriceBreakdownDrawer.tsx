@@ -81,9 +81,9 @@ const PriceBreakdownDrawer = ({
             
             <Separator />
             
-            {/* Product Total */}
+            {/* Total */}
             <div className="flex justify-between items-center text-lg font-bold pt-2">
-              <span>Product Price</span>
+              <span>Total</span>
               <span>{formatMoney(price)}</span>
             </div>
           </div>

@@ -213,6 +213,11 @@ const Checkout = () => {
         setOrderId(data.order_id);
       } else {
         // Order completed without payment (fully covered by credits)
+        toast({
+          title: '✅ Order Placed Successfully!',
+          description: 'Your order has been confirmed.',
+          duration: 3000,
+        });
         navigate(`/consumer/order-success/${data.order_id}`);
       }
     },
@@ -227,6 +232,11 @@ const Checkout = () => {
   });
 
   const handlePaymentSuccess = () => {
+    toast({
+      title: '✅ Order Placed Successfully!',
+      description: 'Your order has been confirmed.',
+      duration: 3000,
+    });
     if (orderId) {
       navigate(`/consumer/order-success/${orderId}`);
     } else {

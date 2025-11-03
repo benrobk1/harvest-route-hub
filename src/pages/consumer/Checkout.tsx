@@ -148,9 +148,12 @@ const Checkout = () => {
       }
 
       // Call checkout edge function with validated contract payload
+      // Convert date string to ISO datetime format
+      const deliveryDateTime = new Date(selectedDate + 'T00:00:00').toISOString();
+      
       const checkoutPayload: CheckoutRequest = {
         cart_id: cart.id,
-        delivery_date: selectedDate,
+        delivery_date: deliveryDateTime,
         use_credits: useCredits,
         tip_amount: tipAmount,
       };

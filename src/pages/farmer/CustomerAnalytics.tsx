@@ -8,12 +8,27 @@ import { useNavigate } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatMoney } from '@/lib/formatMoney';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
+import { useDemoMode } from '@/contexts/DemoModeContext';
 
 const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))', 'hsl(var(--muted))'];
+
+// Demo data for Brooklyn zip code
+const DEMO_ZIP_DATA = [
+  {
+    zip_code: '11201',
+    order_count: 264,
+    total_revenue: 10032,
+    unique_customers: 40,
+    most_common_produce: 'Tomatoes, Lettuce, Carrots',
+    avg_days_between_orders: 14,
+    avg_order_size: 38
+  }
+];
 
 export default function CustomerAnalytics() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { isDemoMode } = useDemoMode();
 
   // Check if user is a lead farmer
   const { data: userRoles } = useQuery({
@@ -31,56 +46,70 @@ export default function CustomerAnalytics() {
   const isLeadFarmer = userRoles?.some(r => r.role === 'lead_farmer');
 
   const { data: zipCodeData, isLoading: zipLoading } = useQuery({
-    queryKey: ['customer-zip-analytics', user?.id, isLeadFarmer],
+    queryKey: ['customer-analytics-zip', user?.id, isLeadFarmer],
     queryFn: async () => {
       if (isLeadFarmer) {
-        // Lead farmer: show analytics for affiliated farmers
+        // For lead farmers, get aggregated data from affiliated farms
+        const { data: affiliations } = await supabase
+          .from('farm_affiliations')
+          .select('farm_profile_id')
+          .eq('lead_farmer_id', user?.id)
+          .eq('active', true);
+
+        if (!affiliations?.length) return [];
+
+        const farmProfileIds = affiliations.map(a => a.farm_profile_id);
+
         const { data: orders } = await supabase
-          .from('order_items')
+          .from('orders')
           .select(`
-            subtotal,
-            order:orders (
-              consumer_id,
-              created_at,
-              consumer:profiles!orders_consumer_id_fkey (
-                zip_code
-              )
-            ),
-            product:products (
-              farm_profile:farm_profiles (
-                farm_affiliations!farm_affiliations_farm_profile_id_fkey (
-                  lead_farmer_id
-                )
+            id,
+            consumer_id,
+            total_amount,
+            created_at,
+            profiles!inner(zip_code),
+            order_items!inner(
+              product_id,
+              products!inner(
+                farm_profile_id
               )
             )
-          `);
+          `)
+          .in('order_items.products.farm_profile_id', farmProfileIds)
+          .eq('status', 'delivered');
 
-        const zipStats: Record<string, { count: number; revenue: number; customers: Set<string> }> = {};
-        
-        orders?.forEach((item: any) => {
-          const zip = item.order?.consumer?.zip_code;
-          const isAffiliated = item.product?.farm_profile?.farm_affiliations?.some(
-            (fa: any) => fa.lead_farmer_id === user?.id
-          );
-          
-          if (zip && isAffiliated) {
-            if (!zipStats[zip]) {
-              zipStats[zip] = { count: 0, revenue: 0, customers: new Set() };
-            }
-            zipStats[zip].count += 1;
-            zipStats[zip].revenue += Number(item.subtotal);
-            zipStats[zip].customers.add(item.order.consumer_id);
+        if (!orders?.length) return [];
+
+        // Aggregate by zip code
+        const zipMap = new Map();
+        orders.forEach(order => {
+          const zip = order.profiles?.zip_code;
+          if (!zip) return;
+
+          if (!zipMap.has(zip)) {
+            zipMap.set(zip, {
+              zip_code: zip,
+              order_count: 0,
+              total_revenue: 0,
+              unique_customers: new Set(),
+            });
           }
+
+          const zipData = zipMap.get(zip);
+          zipData.order_count++;
+          zipData.total_revenue += Number(order.total_amount);
+          zipData.unique_customers.add(order.consumer_id);
         });
 
-        return Object.entries(zipStats).map(([zip_code, stats]) => ({
-          zip_code,
-          order_count: stats.count,
-          total_revenue: stats.revenue,
-          unique_customers: stats.customers.size,
-        })).sort((a, b) => b.total_revenue - a.total_revenue);
+        return Array.from(zipMap.values()).map(data => ({
+          zip_code: data.zip_code,
+          order_count: data.order_count,
+          total_revenue: data.total_revenue,
+          unique_customers: data.unique_customers.size,
+        }));
+
       } else {
-        // Regular farmer: show analytics only for their own products
+        // For regular farmers, get their own farm's data
         const { data: farmProfile } = await supabase
           .from('farm_profiles')
           .select('id')
@@ -90,58 +119,72 @@ export default function CustomerAnalytics() {
         if (!farmProfile) return [];
 
         const { data: orders } = await supabase
-          .from('order_items')
+          .from('orders')
           .select(`
-            subtotal,
-            order:orders (
-              consumer_id,
-              created_at,
-              consumer:profiles!orders_consumer_id_fkey (
-                zip_code
+            id,
+            consumer_id,
+            total_amount,
+            created_at,
+            profiles!inner(zip_code),
+            order_items!inner(
+              product_id,
+              products!inner(
+                farm_profile_id
               )
-            ),
-            product:products!inner (
-              farm_profile_id
             )
           `)
-          .eq('product.farm_profile_id', farmProfile.id);
+          .eq('order_items.products.farm_profile_id', farmProfile.id)
+          .eq('status', 'delivered');
 
-        const zipStats: Record<string, { count: number; revenue: number; customers: Set<string> }> = {};
-        
-        orders?.forEach((item: any) => {
-          const zip = item.order?.consumer?.zip_code;
-          
-          if (zip) {
-            if (!zipStats[zip]) {
-              zipStats[zip] = { count: 0, revenue: 0, customers: new Set() };
-            }
-            zipStats[zip].count += 1;
-            zipStats[zip].revenue += Number(item.subtotal);
-            zipStats[zip].customers.add(item.order.consumer_id);
+        if (!orders?.length) return [];
+
+        // Aggregate by zip code
+        const zipMap = new Map();
+        orders.forEach(order => {
+          const zip = order.profiles?.zip_code;
+          if (!zip) return;
+
+          if (!zipMap.has(zip)) {
+            zipMap.set(zip, {
+              zip_code: zip,
+              order_count: 0,
+              total_revenue: 0,
+              unique_customers: new Set(),
+            });
           }
+
+          const zipData = zipMap.get(zip);
+          zipData.order_count++;
+          zipData.total_revenue += Number(order.total_amount);
+          zipData.unique_customers.add(order.consumer_id);
         });
 
-        return Object.entries(zipStats).map(([zip_code, stats]) => ({
-          zip_code,
-          order_count: stats.count,
-          total_revenue: stats.revenue,
-          unique_customers: stats.customers.size,
-        })).sort((a, b) => b.total_revenue - a.total_revenue);
+        return Array.from(zipMap.values()).map(data => ({
+          zip_code: data.zip_code,
+          order_count: data.order_count,
+          total_revenue: data.total_revenue,
+          unique_customers: data.unique_customers.size,
+        }));
       }
     },
-    enabled: !!user?.id && userRoles !== undefined,
+    enabled: !!user?.id,
   });
 
+  // Use demo data if in demo mode and no real data
+  const displayZipData = isDemoMode && (!zipCodeData || zipCodeData.length === 0) 
+    ? DEMO_ZIP_DATA 
+    : zipCodeData || [];
+
   const { data: summary, isLoading: summaryLoading } = useQuery({
-    queryKey: ['customer-summary', user?.id],
+    queryKey: ['customer-summary', user?.id, displayZipData],
     queryFn: async () => {
-      if (!Array.isArray(zipCodeData)) {
+      if (!Array.isArray(displayZipData)) {
         return { totalCustomers: 0, totalOrders: 0, totalRevenue: 0, avgOrderValue: 0 };
       }
 
-      const totalCustomers = zipCodeData.reduce((sum: number, z: any) => sum + Number(z.unique_customers), 0);
-      const totalOrders = zipCodeData.reduce((sum: number, z: any) => sum + Number(z.order_count), 0);
-      const totalRevenue = zipCodeData.reduce((sum: number, z: any) => sum + Number(z.total_revenue), 0);
+      const totalCustomers = displayZipData.reduce((sum: number, z: any) => sum + Number(z.unique_customers), 0);
+      const totalOrders = displayZipData.reduce((sum: number, z: any) => sum + Number(z.order_count), 0);
+      const totalRevenue = displayZipData.reduce((sum: number, z: any) => sum + Number(z.total_revenue), 0);
 
       return {
         totalCustomers,
@@ -150,7 +193,7 @@ export default function CustomerAnalytics() {
         avgOrderValue: totalOrders > 0 ? totalRevenue / totalOrders : 0,
       };
     },
-    enabled: !!zipCodeData && Array.isArray(zipCodeData),
+    enabled: !!displayZipData && Array.isArray(displayZipData),
   });
 
   if (zipLoading || summaryLoading) {
@@ -229,9 +272,9 @@ export default function CustomerAnalytics() {
           <CardDescription>Revenue and order distribution across customer locations</CardDescription>
         </CardHeader>
         <CardContent>
-          {zipCodeData && Array.isArray(zipCodeData) && zipCodeData.length > 0 ? (
+          {displayZipData && Array.isArray(displayZipData) && displayZipData.length > 0 ? (
             <ResponsiveContainer width="100%" height={400}>
-              <BarChart data={zipCodeData.slice(0, 10)}>
+              <BarChart data={displayZipData.slice(0, 10)}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="zip_code" />
                 <YAxis yAxisId="left" orientation="left" stroke="hsl(var(--primary))" />
@@ -263,28 +306,40 @@ export default function CustomerAnalytics() {
           <CardTitle>Detailed ZIP Code Breakdown</CardTitle>
         </CardHeader>
         <CardContent>
-          {zipCodeData && Array.isArray(zipCodeData) && zipCodeData.length > 0 ? (
+          {displayZipData && Array.isArray(displayZipData) && displayZipData.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b">
                     <th className="text-left py-2">ZIP Code</th>
-                    <th className="text-right py-2">Orders</th>
                     <th className="text-right py-2">Customers</th>
+                    <th className="text-right py-2">Orders</th>
                     <th className="text-right py-2">Revenue</th>
                     <th className="text-right py-2">Avg Order</th>
+                    {isDemoMode && displayZipData.some((d: any) => d.most_common_produce) && (
+                      <>
+                        <th className="text-left py-2">Common Produce</th>
+                        <th className="text-right py-2">Time Between Orders</th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
-                  {zipCodeData.map((row: any) => (
+                  {displayZipData.map((row: any) => (
                     <tr key={row.zip_code} className="border-b">
                       <td className="py-2 font-mono">{row.zip_code}</td>
-                      <td className="text-right py-2">{row.order_count}</td>
                       <td className="text-right py-2">{row.unique_customers}</td>
+                      <td className="text-right py-2">{row.order_count}</td>
                       <td className="text-right py-2">{formatMoney(row.total_revenue)}</td>
                       <td className="text-right py-2">
                         {formatMoney(Number(row.total_revenue) / Number(row.order_count))}
                       </td>
+                      {isDemoMode && row.most_common_produce && (
+                        <>
+                          <td className="text-left py-2">{row.most_common_produce}</td>
+                          <td className="text-right py-2">{row.avg_days_between_orders} days</td>
+                        </>
+                      )}
                     </tr>
                   ))}
                 </tbody>

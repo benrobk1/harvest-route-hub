@@ -38,6 +38,7 @@ import ProductApproval from "./pages/admin/ProductApproval";
 import FarmAffiliations from "./pages/admin/FarmAffiliations";
 import TaxDocuments from "./pages/admin/TaxDocuments";
 import ConsumerOrderTracking from "./pages/consumer/OrderTracking";
+import LiveTracking from "./pages/consumer/LiveTracking";
 import OrderSuccess from "./pages/consumer/OrderSuccess";
 import ConsumerProfile from "./pages/profile/ConsumerProfile";
 import FarmerProfile from "./pages/profile/FarmerProfile";
@@ -107,6 +108,16 @@ const AppContent = () => {
           <Route path="/consumer/orders" element={
             <RoleGate roles={['consumer']}>
               <ConsumerOrderTracking />
+            </RoleGate>
+          } />
+          <Route path="/consumer/live-tracking" element={
+            <RoleGate roles={['consumer']}>
+              <LiveTracking />
+            </RoleGate>
+          } />
+          <Route path="/demo/live-orders" element={
+            <RoleGate roles={['consumer']}>
+              <LiveTracking />
             </RoleGate>
           } />
           <Route path="/consumer/order-success/:orderId" element={

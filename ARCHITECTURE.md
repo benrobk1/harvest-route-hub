@@ -1,21 +1,34 @@
 # Blue Harvests Architecture Guide
 
-**Last Updated**: January 2025  
+**Last Updated**: November 2025  
 **Code Quality Initiative Status**: ✅ Phases 1-4 Complete | 🔄 Phase 5 In Progress
 
 ## 📋 Migration Summary
 
 ### Completed Phases
 - ✅ **Phase 1**: Standardized Query Keys - All React Query keys use factory pattern
-- ✅ **Phase 2**: Feature Migration - All features moved to `src/features/` structure
-- ✅ **Phase 3**: Middleware Pattern - Edge function middleware examples & guide created
+- ✅ **Phase 2**: Feature Migration - Cart, Orders, Products moved to `src/features/`
+- ✅ **Phase 3**: Middleware Pattern - Utilities created in `_shared/middleware/`
 - ✅ **Phase 4**: Error Handling - Standardized error types & useErrorHandler hook
+- 🔄 **Phase 5**: Documentation - JSDoc complete, feature READMEs in progress
 
-### Phase 5: Documentation (In Progress)
-- 🔄 Architecture documentation updates
-- ⏳ Feature-level READMEs
-- ⏳ JSDoc comments on public APIs
-- ⏳ Inline comments for complex logic
+### Remaining Work
+**Feature Migration** (Phase 2 continuation):
+- ⏳ Migrate `drivers` feature to `src/features/drivers/`
+- ⏳ Migrate `farmers` feature to `src/features/farmers/`
+- ⏳ Migrate `admin` feature to `src/features/admin/`
+- ⏳ Migrate `consumers` feature to `src/features/consumers/`
+
+**Middleware Application** (Phase 3 continuation):
+- ⏳ Apply `composeMiddleware` to all edge functions (currently only utilities exist)
+- ⏳ Update `checkout`, `generate-batches`, `process-payouts` to use composition pattern
+- ⏳ Migrate remaining functions: `claim-route`, `stripe-webhook`, `send-notification`
+
+**Documentation** (Phase 5):
+- ✅ JSDoc comments on all public APIs
+- 🔄 Feature-level READMEs (3 of 8 complete)
+- ⏳ Inline comments for complex business logic
+- ⏳ Address privacy system documentation
 
 ---
 
@@ -69,8 +82,10 @@ Blue Harvests is a full-stack local food delivery marketplace built on React, Ty
 
 ### Frontend (`src/`)
 
-#### `/features` - **Feature Modules (NEW - Phase 4)**
+#### `/features` - **Feature Modules (Phase 2 - Partially Complete)**
 Feature-based architecture with colocated code:
+
+**Migrated Features** (✅):
 - **Cart** (`/cart`): Shopping cart, saved carts, cart actions
   - Components: CartDrawer, SaveCartDialog, SavedCartsList
   - Hooks: useCart, useCartActions
@@ -84,6 +99,12 @@ Feature-based architecture with colocated code:
   - Hooks: useShopProducts, useProductSearch
   - Types: Product, ProductWithFarmer, ShopData
   - Queries: productQueries
+
+**Pending Migration** (⏳):
+- **Drivers** - Route claiming, delivery tracking, earnings
+- **Farmers** - Inventory management, batches, payouts
+- **Admin** - User approvals, KPIs, tax documents
+- **Consumers** - Credits, subscriptions, referrals
 
 Each feature exports a clean public API via `index.ts`
 
@@ -125,7 +146,7 @@ Each feature exports a clean public API via `index.ts`
 ### Backend (`supabase/functions/`)
 
 #### `/_shared` - **Shared Modules**
-- **`/middleware`**: Composable request handlers with middleware composition
+- **`/middleware`**: Composable request handlers (**utilities created, not yet applied**)
   - `withAuth.ts`: JWT validation
   - `withAdminAuth.ts`: Admin role verification
   - `withCORS.ts`: CORS validation and headers
@@ -133,8 +154,9 @@ Each feature exports a clean public API via `index.ts`
   - `withRateLimit.ts`: Rate limiting per user
   - `withRequestId.ts`: Request ID tracking for logs
   - `withErrorHandling.ts`: Structured error responses
-  - **`compose.ts` (NEW)**: Middleware composition utility
+  - **`compose.ts`**: Middleware composition utility
   - **`index.ts`**: Centralized middleware exports
+  - **⚠️ STATUS**: Utilities exist but are **not yet applied** to edge functions
 - **`/services`**: Business logic services
   - `CheckoutService.ts`: Order processing logic
   - `BatchOptimizationService.ts`: AI and geographic batching
@@ -145,10 +167,11 @@ Each feature exports a clean public API via `index.ts`
 - `rateLimiter.ts`: Rate limit implementation
 
 #### `/[function-name]` - Edge Function Handlers
-- **Thin handlers**: Compose middleware, call services
-- **Pattern**: `composeMiddleware([withErrorHandling, withCORS, withAuth])(handler)`
-- **Alternative**: `createMiddlewareStack()` for explicit ordering
-- Functions: `checkout`, `optimize-delivery-batches`, `process-payouts`, etc.
+- **Current Pattern**: Manual middleware implementation (Phase 3 not yet applied)
+- **Target Pattern**: `composeMiddleware([withErrorHandling, withCORS, withAuth])(handler)`
+- **Alternative Pattern**: `createMiddlewareStack()` for explicit ordering
+- Functions: `checkout`, `optimize-delivery-batches`, `generate-batches`, `process-payouts`, etc.
+- **⚠️ TODO**: Migrate all functions to use middleware composition
 
 ## 🔒 Security Model
 

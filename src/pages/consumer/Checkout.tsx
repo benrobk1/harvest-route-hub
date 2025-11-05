@@ -10,7 +10,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, Calendar, CreditCard, MapPin, Coins, DollarSign, AlertCircle, CheckCircle2 } from "lucide-react";
-import { useCart } from "@/hooks/useCart";
+import { useCart } from "@/features/cart";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { formatMoney } from "@/lib/formatMoney";

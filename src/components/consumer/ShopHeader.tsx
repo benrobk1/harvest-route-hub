@@ -5,7 +5,7 @@ import { Search, MapPin, Package, User, Clock, Truck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import logo from '@/assets/blue-harvests-logo.jpeg';
 import { SpendingProgressCard } from './SpendingProgressCard';
-import { CartDrawer } from '../CartDrawer';
+import { CartDrawer } from '@/features/cart';
 import { isCutoffPassed, getNextAvailableDate } from '@/lib/marketHelpers';
 
 interface ShopHeaderProps {

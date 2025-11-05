@@ -10,7 +10,7 @@ import PriceBreakdownDrawer from './PriceBreakdownDrawer';
 import { LoadingButton } from './LoadingButton';
 import { calculateFarmToConsumerDistance } from '@/lib/distanceHelpers';
 import { FarmStoryModal } from './FarmStoryModal';
-import { useCartActions } from '@/hooks/useCartActions';
+import { useCartActions } from '@/features/cart';
 import { QuantitySelector } from './consumer/QuantitySelector';
 
 interface Product {

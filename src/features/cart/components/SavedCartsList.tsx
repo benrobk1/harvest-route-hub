@@ -3,13 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Trash2, ShoppingCart } from 'lucide-react';
 import { formatMoney } from '@/lib/formatMoney';
 import { format } from 'date-fns';
-
-interface SavedCart {
-  id: string;
-  name: string;
-  items: any[];
-  created_at: string;
-}
+import type { SavedCart } from '../types';
 
 interface SavedCartsListProps {
   savedCarts: SavedCart[];

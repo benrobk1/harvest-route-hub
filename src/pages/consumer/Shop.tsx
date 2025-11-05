@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { useCart } from "@/hooks/useCart";
+import { useCart } from "@/features/cart";
 import { ReferralBanner } from "@/components/consumer/ReferralBanner";
 import { ReferralModal } from "@/components/consumer/ReferralModal";
 import { ShopHeader } from "@/components/consumer/ShopHeader";

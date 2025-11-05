@@ -3,14 +3,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ShoppingCart, Minus, Plus, Trash2, Save, History } from "lucide-react";
-import { useCart } from "@/hooks/useCart";
-import { SavedCart } from "@/types/domain/cart";
 import { formatMoney } from "@/lib/formatMoney";
 import { useNavigate, Link } from "react-router-dom";
-import { SaveCartDialog } from "@/components/SaveCartDialog";
-import { SavedCartsList } from "@/components/SavedCartsList";
-import CartItemSkeleton from "@/components/CartItemSkeleton";
 import { useState } from "react";
+import { useCart } from "../hooks/useCart";
+import { SaveCartDialog } from "./SaveCartDialog";
+import { SavedCartsList } from "./SavedCartsList";
+import CartItemSkeleton from "./CartItemSkeleton";
 
 export const CartDrawer = () => {
   const { 
@@ -165,7 +164,7 @@ export const CartDrawer = () => {
           {/* Saved Carts Tab */}
           <TabsContent value="saved" className="flex-1 overflow-y-auto mt-4">
             <SavedCartsList
-              savedCarts={savedCarts as SavedCart[]}
+              savedCarts={savedCarts}
               onLoad={(cartId) => loadSavedCart.mutate(cartId)}
               onDelete={(cartId) => deleteSavedCart.mutate(cartId)}
               isLoading={loadSavedCart.isPending || deleteSavedCart.isPending}

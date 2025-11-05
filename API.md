@@ -440,26 +440,46 @@ supabase functions logs --follow
 supabase functions new my-function
 ```
 
-2. Add rate limiting and validation:
+2. Add middleware using composition:
 ```typescript
-import { withAuth } from '../_shared/middleware/withAuth.ts';
-import { withRateLimit } from '../_shared/middleware/withRateLimit.ts';
-import { withValidation } from '../_shared/middleware/withValidation.ts';
-import { withErrorHandling } from '../_shared/middleware/withErrorHandling.ts';
+import { 
+  composeMiddleware,
+  withErrorHandling,
+  withCORS,
+  withAuth,
+  withRateLimit,
+  withValidation 
+} from '../_shared/middleware/index.ts';
 
-const handler = withErrorHandling(
-  withAuth(
-    withRateLimit(RATE_LIMITS.MY_FUNCTION,
-      withValidation(MyRequestSchema,
-        async (req, ctx) => {
-          // Your logic here
-        }
-      )
-    )
-  )
-);
+// Compose middleware (right to left execution)
+const handler = composeMiddleware([
+  withErrorHandling,
+  withCORS,
+  withAuth,
+  withRateLimit(RATE_LIMITS.MY_FUNCTION),
+  withValidation(MyRequestSchema),
+]);
 
-serve(handler);
+serve(handler(async (req, ctx) => {
+  // Your logic here
+  // ctx.user - Authenticated user
+  // ctx.corsHeaders - CORS headers
+  // ctx.requestId - Request tracking ID
+  return new Response(JSON.stringify({ data: 'Hello' }));
+}));
+```
+
+**Alternative: Explicit ordering with createMiddlewareStack**
+```typescript
+import { createMiddlewareStack } from '../_shared/middleware/index.ts';
+
+// First middleware runs first (top to bottom)
+const handler = createMiddlewareStack([
+  withErrorHandling,  // Wraps everything
+  withRequestId,      // Adds tracking ID
+  withCORS,          // Validates origin
+  withAuth,          // Authenticates user
+]);
 ```
 
 3. Add to `supabase/config.toml`:

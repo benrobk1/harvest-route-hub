@@ -50,33 +50,53 @@ Blue Harvests is a full-stack local food delivery marketplace built on React, Ty
 
 ### Frontend (`src/`)
 
+#### `/features` - **Feature Modules (NEW - Phase 4)**
+Feature-based architecture with colocated code:
+- **Cart** (`/cart`): Shopping cart, saved carts, cart actions
+  - Components: CartDrawer, SaveCartDialog, SavedCartsList
+  - Hooks: useCart, useCartActions
+  - Types: CartItem, ShoppingCart, SavedCart
+  - Queries: cartQueries
+- **Orders** (`/orders`): Order management and tracking
+  - Hooks: useActiveOrder
+  - Types: Order, OrderItem, OrderWithDetails
+  - Queries: orderQueries
+- **Products** (`/products`): Product catalog and search
+  - Hooks: useShopProducts, useProductSearch
+  - Types: Product, ProductWithFarmer, ShopData
+  - Queries: productQueries
+
+Each feature exports a clean public API via `index.ts`
+
 #### `/pages` - Route Components
 - **Consumer**: Shop, Checkout, Order Tracking, Profile
 - **Farmer**: Dashboard, Inventory Management, Financials, Analytics
 - **Driver**: Available Routes, Route Details, Payout Details
 - **Admin**: Dashboard, User Approvals, Product Approval, Analytics
 
-#### `/components` - Reusable UI Components
+#### `/components` - Shared UI Components
 - **UI Components** (`/ui`): shadcn components (Button, Card, Dialog, etc.)
-- **Feature Components**: Cart, Order Tracking, Product Cards, etc.
+- **Feature Components**: Shared components not tied to a specific feature
 - **Role-Specific** (`/farmer`, `/driver`, `/consumer`, `/admin`): Role-based features
 
-#### `/contracts` - **Zod Schemas (NEW)**
+#### `/contracts` - Zod Schemas
 - Shared validation between frontend and backend
 - Single source of truth for request/response shapes
 - Runtime validation + compile-time types
 - Files: `checkout.ts`, `batching.ts`, `payouts.ts`, `subscription.ts`
 
-#### `/config` - **Configuration & Constants (NEW)**
+#### `/config` - Configuration & Constants
 - `env.ts`: Client-side environment validation (fail-fast on missing vars)
 - `constants.ts`: Business rules (revenue splits, fees, limits)
+- `ui-constants.ts`: UI-specific constants (polling intervals, etc.)
 
-#### `/hooks` - Custom React Hooks
-- API wrappers using React Query
-- Cart management, authentication, subscriptions
+#### `/hooks` - Shared Custom React Hooks
+- Shared hooks not tied to specific features
+- Authentication, toasts, mobile detection
 
 #### `/lib` - Pure Utility Functions
 - Money formatting, distance calculations, date helpers
+- Error handling and tracking
 - No side effects, easily testable
 
 #### `/integrations/supabase` - **Auto-Generated (DO NOT EDIT)**
@@ -85,20 +105,30 @@ Blue Harvests is a full-stack local food delivery marketplace built on React, Ty
 
 ### Backend (`supabase/functions/`)
 
-#### `/_shared` - **Shared Modules (NEW)**
-- **`/middleware`**: Composable request handlers
+#### `/_shared` - **Shared Modules**
+- **`/middleware`**: Composable request handlers with middleware composition
   - `withAuth.ts`: JWT validation
+  - `withAdminAuth.ts`: Admin role verification
+  - `withCORS.ts`: CORS validation and headers
   - `withValidation.ts`: Request schema validation
   - `withRateLimit.ts`: Rate limiting per user
+  - `withRequestId.ts`: Request ID tracking for logs
   - `withErrorHandling.ts`: Structured error responses
-- **`/services`**: Business logic extraction (see refactoring plan)
+  - **`compose.ts` (NEW)**: Middleware composition utility
+  - **`index.ts`**: Centralized middleware exports
+- **`/services`**: Business logic services
+  - `CheckoutService.ts`: Order processing logic
+  - `BatchOptimizationService.ts`: AI and geographic batching
+  - `PayoutService.ts`: Payout processing logic
+- **`/contracts`**: Shared Zod schemas (re-exported from src)
 - **`config.ts`**: Environment loading with fail-fast validation
 - **`constants.ts`**: Server-side business rules
 - `rateLimiter.ts`: Rate limit implementation
 
 #### `/[function-name]` - Edge Function Handlers
 - **Thin handlers**: Compose middleware, call services
-- **Pattern**: `withAuth(withRateLimit(withValidation(schema, handler)))`
+- **Pattern**: `composeMiddleware([withErrorHandling, withCORS, withAuth])(handler)`
+- **Alternative**: `createMiddlewareStack()` for explicit ordering
 - Functions: `checkout`, `optimize-delivery-batches`, `process-payouts`, etc.
 
 ## 🔒 Security Model

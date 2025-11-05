@@ -161,11 +161,10 @@ const DriverProfile = () => {
             )}
 
             <Tabs defaultValue="personal" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="personal">Personal</TabsTrigger>
                 <TabsTrigger value="documents">Documents</TabsTrigger>
                 <TabsTrigger value="payments">Payments</TabsTrigger>
-                <TabsTrigger value="payouts">Payouts</TabsTrigger>
               </TabsList>
 
               <TabsContent value="personal">
@@ -266,11 +265,12 @@ const DriverProfile = () => {
               </TabsContent>
 
               <TabsContent value="payments">
-                <StripeConnectButton />
-              </TabsContent>
-
-              <TabsContent value="payouts">
-                <PayoutsDashboard />
+                <div className="space-y-4">
+                  <StripeConnectButton />
+                  <p className="text-sm text-muted-foreground text-center pt-4">
+                    View detailed payout metrics on the <a href="/driver/payouts" className="text-primary hover:underline">Payouts Dashboard</a>
+                  </p>
+                </div>
               </TabsContent>
             </Tabs>
           </CardContent>

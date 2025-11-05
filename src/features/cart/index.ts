@@ -27,3 +27,6 @@ export type {
 
 // Queries
 export { cartQueries } from './queries';
+
+// Errors
+export * from './errors';

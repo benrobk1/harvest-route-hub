@@ -13,3 +13,6 @@ export type { Product, ProductWithFarmer, ShopData } from './types';
 
 // Queries
 export { productQueries } from './queries';
+
+// Errors
+export * from './errors';

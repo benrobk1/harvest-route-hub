@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { LoadingButton } from '@/components/LoadingButton';
-import { useToast } from '@/hooks/use-toast';
+import { useErrorHandler } from '@/lib/errors/useErrorHandler';
+import { createPaymentError } from '@/features/orders/errors';
 import { CreditCard, CheckCircle2 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
+import { toast } from '@/hooks/use-toast';
 
 interface PaymentFormProps {
   onSuccess: () => void;
@@ -13,7 +15,7 @@ interface PaymentFormProps {
 export const PaymentForm = ({ onSuccess, amount }: PaymentFormProps) => {
   const stripe = useStripe();
   const elements = useElements();
-  const { toast } = useToast();
+  const { handlePaymentError } = useErrorHandler();
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentProgress, setPaymentProgress] = useState(0);
 
@@ -43,12 +45,7 @@ export const PaymentForm = ({ onSuccess, amount }: PaymentFormProps) => {
     setPaymentProgress(100);
 
     if (error) {
-      toast({
-        title: '❌ Payment Failed',
-        description: error.message,
-        variant: 'destructive',
-        duration: 6000,
-      });
+      handlePaymentError(createPaymentError(error.message || 'Payment failed'));
       setIsProcessing(false);
       setPaymentProgress(0);
     } else {

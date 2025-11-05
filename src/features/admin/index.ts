@@ -4,6 +4,7 @@
  */
 
 export * from './queries';
+export * from './errors';
 export * from './components/AdminRoleManager';
 export * from './components/CreditsManager';
 export * from './components/FarmAffiliationManager';

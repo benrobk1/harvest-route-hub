@@ -7,7 +7,9 @@ import { Badge } from '@/components/ui/badge';
 import { Upload, Download, CheckCircle, AlertCircle, Loader2, FileSpreadsheet } from 'lucide-react';
 import { parseProductCSV, generateCSVTemplate, type CSVProductRow } from '@/lib/csvParser';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { useErrorHandler } from '@/lib/errors/useErrorHandler';
+import { createInvalidFileError, createCSVImportError } from '@/features/farmers/errors';
+import { toast } from '@/hooks/use-toast';
 
 interface CSVProductImportProps {
   open: boolean;
@@ -17,7 +19,7 @@ interface CSVProductImportProps {
 }
 
 export function CSVProductImport({ open, onOpenChange, farmProfileId, onImportComplete }: CSVProductImportProps) {
-  const { toast } = useToast();
+  const { handleError, handleValidationError } = useErrorHandler();
   const [file, setFile] = useState<File | null>(null);
   const [parsing, setParsing] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -41,11 +43,7 @@ export function CSVProductImport({ open, onOpenChange, farmProfileId, onImportCo
     if (!selectedFile) return;
 
     if (!selectedFile.name.endsWith('.csv')) {
-      toast({
-        title: 'Invalid file type',
-        description: 'Please upload a CSV file',
-        variant: 'destructive',
-      });
+      handleValidationError(createInvalidFileError('Please upload a CSV file'));
       return;
     }
 
@@ -62,18 +60,10 @@ export function CSVProductImport({ open, onOpenChange, farmProfileId, onImportCo
       setErrors(result.errors);
       
       if (result.valid.length === 0) {
-        toast({
-          title: 'No valid products found',
-          description: 'Please fix the errors and try again',
-          variant: 'destructive',
-        });
+        handleValidationError(createCSVImportError('No valid products found. Please fix the errors and try again.'));
       }
     } catch (error) {
-      toast({
-        title: 'Failed to parse CSV',
-        description: 'Please check the file format',
-        variant: 'destructive',
-      });
+      handleError(createCSVImportError('Failed to parse CSV. Please check the file format.'));
     } finally {
       setParsing(false);
     }
@@ -132,11 +122,7 @@ export function CSVProductImport({ open, onOpenChange, farmProfileId, onImportCo
       setErrors([]);
       setImportProgress(0);
     } catch (error) {
-      toast({
-        title: 'Import failed',
-        description: 'Please try again',
-        variant: 'destructive',
-      });
+      handleError(createCSVImportError('Import failed. Please try again.'));
     } finally {
       setImporting(false);
     }

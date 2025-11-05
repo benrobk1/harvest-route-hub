@@ -4,6 +4,7 @@
  */
 
 export * from './queries';
+export * from './errors';
 export * from './components/AvailableRoutes';
 export * from './components/BoxCodeScanner';
 export * from './components/RouteDensityMap';

@@ -6,7 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useToast } from '@/hooks/use-toast';
+import { toast } from '@/hooks/use-toast';
+import { useErrorHandler } from '@/lib/errors/useErrorHandler';
+import { createInvalidFileError, createCSVImportError } from '@/features/farmers/errors';
 import { supabase } from '@/integrations/supabase/client';
 import { parseProductFile, generateCSVTemplate, generateExcelTemplate, generateCSVFromProducts, CSVProductRow } from '@/lib/csvParser';
 import { uploadImageFromUrl } from '@/lib/imageUploader';
@@ -22,7 +24,7 @@ interface BulkEditDialogProps {
 }
 
 export function BulkEditDialog({ open, onOpenChange, farmProfileId, products, onComplete }: BulkEditDialogProps) {
-  const { toast } = useToast();
+  const { handleError, handleValidationError } = useErrorHandler();
   const [mode, setMode] = useState<'create' | 'update'>('create');
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<CSVProductRow[] | null>(null);
@@ -75,7 +77,7 @@ export function BulkEditDialog({ open, onOpenChange, farmProfileId, products, on
     if (!selectedFile) return;
 
     if (!selectedFile.name.endsWith('.csv') && !selectedFile.name.endsWith('.xlsx') && !selectedFile.name.endsWith('.xls')) {
-      toast({ title: 'Invalid file', description: 'Please upload a CSV or Excel file', variant: 'destructive' });
+      handleValidationError(createInvalidFileError('Please upload a CSV or Excel file'));
       return;
     }
 
@@ -85,7 +87,7 @@ export function BulkEditDialog({ open, onOpenChange, farmProfileId, products, on
       setPreview(result.valid);
       setErrors(result.errors);
     } catch (error: any) {
-      toast({ title: 'Parse failed', description: error.message, variant: 'destructive' });
+      handleError(createCSVImportError(error.message || 'Failed to parse file'));
     }
   };
 
@@ -159,7 +161,7 @@ export function BulkEditDialog({ open, onOpenChange, farmProfileId, products, on
       setPreview(null);
       setErrors([]);
     } catch (error) {
-      toast({ title: 'Import failed', description: 'Please try again', variant: 'destructive' });
+      handleError(createCSVImportError('Import failed. Please try again.'));
     } finally {
       setImporting(false);
     }

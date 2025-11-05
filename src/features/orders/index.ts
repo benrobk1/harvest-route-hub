@@ -12,3 +12,6 @@ export type { Order, OrderItem, OrderWithDetails } from './types';
 
 // Queries
 export { orderQueries } from './queries';
+
+// Errors
+export * from './errors';

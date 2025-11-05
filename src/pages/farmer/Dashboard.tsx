@@ -7,12 +7,14 @@ import { formatMoney } from '@/lib/formatMoney';
 import { DollarSign, Package, TrendingUp, Users, FileText, Boxes } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useNavigate } from 'react-router-dom';
-import { StripeConnectSimple } from '@/components/farmer/StripeConnectSimple';
-import { WeeklyInventoryReview } from '@/components/farmer/WeeklyInventoryReview';
-import { LeadFarmerInfoCard } from '@/components/farmer/LeadFarmerInfoCard';
-import { MultiFarmDashboard } from '@/components/farmer/MultiFarmDashboard';
-import { BatchConsolidation } from '@/components/farmer/BatchConsolidation';
-import { NextOrderCutoffCard } from '@/components/farmer/NextOrderCutoffCard';
+import { 
+  StripeConnectSimple,
+  WeeklyInventoryReview,
+  LeadFarmerInfoCard,
+  MultiFarmDashboard,
+  BatchConsolidation,
+  NextOrderCutoffCard
+} from '@/features/farmers';
 
 export default function FarmerDashboard() {
   const { user } = useAuth();

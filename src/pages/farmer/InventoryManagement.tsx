@@ -11,9 +11,11 @@ import { Package, Search, CheckCircle, Edit, Trash2, AlertCircle, Plus, FileSpre
 import { Skeleton } from '@/components/ui/skeleton';
 import { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { ProductForm } from '@/components/farmer/ProductForm';
-import { BulkEditDialog } from '@/components/farmer/BulkEditDialog';
-import { WeeklyInventoryReview } from '@/components/farmer/WeeklyInventoryReview';
+import { 
+  ProductForm,
+  BulkEditDialog,
+  WeeklyInventoryReview
+} from '@/features/farmers';
 import { useNavigate } from 'react-router-dom';
 import {
   AlertDialog,

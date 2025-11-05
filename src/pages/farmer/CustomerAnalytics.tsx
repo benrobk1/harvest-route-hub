@@ -9,7 +9,6 @@ import { useNavigate } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatMoney } from '@/lib/formatMoney';
 import { farmerQueries } from '@/features/farmers';
-import { userQueries } from '@/queries';
 
 const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))', 'hsl(var(--muted))'];
 
@@ -39,7 +38,7 @@ export default function CustomerAnalytics() {
 
   // Check if user is a lead farmer
   const { data: userRoles } = useQuery({
-    queryKey: userQueries.roles(user?.id || ''),
+    queryKey: ['user-roles', user?.id],
     queryFn: async () => {
       const { data } = await supabase
         .from('user_roles')

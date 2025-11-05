@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
-import { AdminRoleManager } from "@/components/admin/AdminRoleManager";
+import { AdminRoleManager } from "@/features/admin";
 
 const AdminRoles = () => {
   const navigate = useNavigate();

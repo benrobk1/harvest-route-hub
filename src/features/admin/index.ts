@@ -4,3 +4,9 @@
  */
 
 export * from './queries';
+export * from './components/AdminRoleManager';
+export * from './components/CreditsManager';
+export * from './components/FarmAffiliationManager';
+export * from './components/KPIHeader';
+export * from './components/TaxDocumentGenerator';
+export * from './components/UserRatingDisplay';

@@ -16,10 +16,9 @@ import { getRatingDisplay, MINIMUM_REVIEWS_THRESHOLD } from "@/lib/ratingHelpers
 import { StripeConnectStatusBanner } from "@/components/StripeConnectStatusBanner";
 import { calculateEstimatedExpenses } from "@/lib/driverEarningsHelpers";
 import { FLAT_DELIVERY_FEE } from "@/lib/deliveryFeeHelpers";
-import { RouteDensityMap } from "@/components/driver/RouteDensityMap";
+import { RouteDensityMap, driverQueries } from "@/features/drivers";
 import { useNavigate } from "react-router-dom";
 import { User } from "lucide-react";
-import { driverQueries } from "@/features/drivers";
 
 const DriverDashboard = () => {
   const { user } = useAuth();

@@ -8,8 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDistanceToNow } from "date-fns";
 import { Link } from "react-router-dom";
-import { KPIHeader } from "@/components/admin/KPIHeader";
-import { adminQueries } from "@/features/admin";
+import { KPIHeader, adminQueries } from "@/features/admin";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();

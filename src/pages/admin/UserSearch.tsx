@@ -8,8 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Search, Loader2, User, MapPin, Phone, Mail } from 'lucide-react';
-import { UserRatingDisplay } from '@/components/admin/UserRatingDisplay';
-import { adminQueries } from '@/features/admin';
+import { UserRatingDisplay, adminQueries } from '@/features/admin';
 import {
   Dialog,
   DialogContent,

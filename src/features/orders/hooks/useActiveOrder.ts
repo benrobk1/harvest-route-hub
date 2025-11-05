@@ -3,8 +3,8 @@ import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { POLLING_INTERVALS } from '@/config/ui-constants';
-import { orderQueries } from '@/queries';
-import { OrderWithDetails } from '@/types/domain/order';
+import { orderQueries } from '../queries';
+import type { OrderWithDetails } from '../types';
 
 export const useActiveOrder = () => {
   const { user } = useAuth();
@@ -38,6 +38,17 @@ export const useActiveOrder = () => {
         .maybeSingle();
 
       if (error) throw error;
+      
+      // Transform the data to match our expected type
+      if (data) {
+        return {
+          ...data,
+          delivery_batches: Array.isArray(data.delivery_batches) && data.delivery_batches.length > 0
+            ? data.delivery_batches[0]
+            : null,
+        } as OrderWithDetails;
+      }
+      
       return data;
     },
     enabled: !!user?.id,

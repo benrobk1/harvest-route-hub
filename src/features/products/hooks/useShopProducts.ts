@@ -2,29 +2,14 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-
-export interface Product {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  unit: string;
-  available_quantity: number;
-  image_url: string | null;
-  farm_profile_id: string;
-  harvest_date: string | null;
-  farm_profiles: {
-    id: string;
-    farm_name: string;
-    location: string | null;
-  };
-}
+import { productQueries } from '../queries';
+import type { Product } from '../types';
 
 export const useShopProducts = () => {
   const { user } = useAuth();
 
   const { data: products = [], isLoading } = useQuery({
-    queryKey: ['products'],
+    queryKey: productQueries.shop(),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("products")
@@ -51,7 +36,7 @@ export const useShopProducts = () => {
   );
 
   const { data: farmerData } = useQuery({
-    queryKey: ['farmers-batch', farmProfileIds],
+    queryKey: productQueries.farmers(farmProfileIds),
     queryFn: async () => {
       if (farmProfileIds.length === 0) return {};
       
@@ -93,7 +78,7 @@ export const useShopProducts = () => {
   });
 
   const { data: marketConfig } = useQuery({
-    queryKey: ['market-config-shop'],
+    queryKey: productQueries.marketConfig('10001'),
     queryFn: async () => {
       const { data } = await supabase
         .from('market_configs')

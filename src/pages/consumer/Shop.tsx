@@ -8,8 +8,7 @@ import { InfoBanner } from "@/components/consumer/InfoBanner";
 import { ProductGrid } from "@/components/consumer/ProductGrid";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
-import { useShopProducts, Product } from "@/hooks/useShopProducts";
-import { useProductSearch } from "@/hooks/useProductSearch";
+import { useShopProducts, useProductSearch, Product } from "@/features/products";
 
 const Shop = () => {
   const [searchParams] = useSearchParams();

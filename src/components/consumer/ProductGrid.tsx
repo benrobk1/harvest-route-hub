@@ -1,6 +1,6 @@
 import ProductCard from '@/components/ProductCard';
 import ProductCardSkeleton from '@/components/ProductCardSkeleton';
-import { Product } from '@/hooks/useShopProducts';
+import { Product } from '@/features/products';
 
 interface ProductGridProps {
   products: Product[];

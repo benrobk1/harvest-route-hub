@@ -1,6 +1,6 @@
 import { useState, useMemo, useDeferredValue, useEffect } from 'react';
 import { preloadImage } from '@/lib/imageHelpers';
-import { Product } from './useShopProducts';
+import type { Product } from '../types';
 
 export const useProductSearch = (products: Product[]) => {
   const [searchQuery, setSearchQuery] = useState("");

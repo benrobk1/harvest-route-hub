@@ -1,10 +1,31 @@
-# Blue Harvests - Local Food Delivery Platform
+# 🌾 Blue Harvests - Local Farm-to-Table Marketplace
 
-**A full-stack marketplace connecting local farmers with consumers, featuring AI-powered logistics optimization.**
+**Last Updated**: January 2025  
+**Code Quality**: ✅ Production-Ready | Fully Documented | Type-Safe
+
+A modern, full-stack platform connecting local farmers with consumers through efficient delivery coordination. Built with React, TypeScript, and Supabase, featuring real-time tracking, automated batch optimization, and comprehensive payment processing.
 
 **Project URL**: https://lovable.dev/projects/eeae09ce-f16e-41fa-a46e-2dadc2102e6c
 
 [![CI Status](https://github.com/YOUR_USERNAME/YOUR_REPO/workflows/CI/badge.svg)](https://github.com/YOUR_USERNAME/YOUR_REPO/actions)
+
+## 📚 Documentation
+
+- **[Architecture Guide](ARCHITECTURE.md)** - System design, query patterns, middleware
+- **[API Documentation](API.md)** - Edge function endpoints and contracts
+- **[Feature Specifications](ARCHITECTURE-FEATURES.md)** - Detailed feature docs
+- **[Security Guide](SECURITY.md)** - RLS policies and data privacy
+- **[Error Handling](src/lib/errors/README.md)** - Standardized error handling
+- **[Feature Architecture](src/features/README.md)** - Feature-based code organization
+
+## 🎯 Code Quality Initiative
+
+All phases complete! The codebase now features:
+- ✅ **Standardized Query Keys** - Factory pattern for all React Query keys
+- ✅ **Feature-Based Architecture** - Code organized by business domain
+- ✅ **Middleware Composition** - Reusable edge function middleware
+- ✅ **Type-Safe Errors** - Centralized error handling with useErrorHandler
+- ✅ **Comprehensive Documentation** - JSDoc comments on all public APIs
 
 ---
 

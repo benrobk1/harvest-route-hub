@@ -13,14 +13,20 @@ export interface AuthContext {
 }
 
 /**
- * Authentication Middleware
+ * Authentication Middleware (Curried)
  * Validates JWT token and attaches authenticated user to context
  * Returns 401 if authentication fails
+ * 
+ * @example
+ * const handler = withAuth(async (req, ctx) => {
+ *   console.log('User:', ctx.user.id);
+ *   return new Response('OK');
+ * });
  */
-export function withAuth<T extends AuthContext>(
+export const withAuth = <T extends AuthContext>(
   handler: (req: Request, ctx: T) => Promise<Response>
-) {
-  return async (req: Request, initialContext: Partial<T>): Promise<Response> => {
+): ((req: Request, ctx: Partial<T>) => Promise<Response>) => {
+  return async (req: Request, ctx: Partial<T>): Promise<Response> => {
     const authHeader = req.headers.get('Authorization');
     
     if (!authHeader) {
@@ -37,7 +43,7 @@ export function withAuth<T extends AuthContext>(
     }
 
     const token = authHeader.replace('Bearer ', '');
-    const supabase = initialContext.supabase as SupabaseClient;
+    const supabase = ctx.supabase;
     
     if (!supabase) {
       throw new Error('Supabase client must be initialized before withAuth middleware');
@@ -61,10 +67,10 @@ export function withAuth<T extends AuthContext>(
 
     // Attach user to context and call handler
     const authContext = {
-      ...initialContext,
+      ...ctx,
       user,
     } as T;
 
     return handler(req, authContext);
   };
-}
+};

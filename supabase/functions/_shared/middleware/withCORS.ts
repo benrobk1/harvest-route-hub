@@ -42,12 +42,18 @@ export function getCorsHeaders(origin: string | null): Record<string, string> {
 }
 
 /**
- * Middleware that validates origin and attaches CORS headers
+ * CORS Middleware (Curried)
+ * Validates origin and attaches CORS headers
  * Returns 403 for requests from non-allowed origins
+ * 
+ * @example
+ * const handler = withCORS(async (req, ctx) => {
+ *   return new Response('OK', { headers: ctx.corsHeaders });
+ * });
  */
-export function withCORS<T extends CORSContext>(
+export const withCORS = <T extends CORSContext>(
   handler: (req: Request, ctx: T) => Promise<Response>
-) {
+): ((req: Request, ctx: Partial<T>) => Promise<Response>) => {
   return async (req: Request, ctx: Partial<T>): Promise<Response> => {
     const origin = validateOrigin(req);
     
@@ -82,4 +88,4 @@ export function withCORS<T extends CORSContext>(
 
     return handler(req, corsContext);
   };
-}
+};

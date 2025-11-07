@@ -10,11 +10,18 @@ export interface RequestIdContext {
 }
 
 /**
- * Middleware that generates a request ID and adds structured logging
+ * Request ID Middleware (Curried)
+ * Generates a request ID and adds structured logging
+ * 
+ * @example
+ * const handler = withRequestId(async (req, ctx) => {
+ *   console.log('Request ID:', ctx.requestId);
+ *   return new Response('OK');
+ * });
  */
-export function withRequestId<T extends RequestIdContext>(
+export const withRequestId = <T extends RequestIdContext>(
   handler: (req: Request, ctx: T) => Promise<Response>
-) {
+): ((req: Request, ctx: Partial<T>) => Promise<Response>) => {
   return async (req: Request, ctx: Partial<T>): Promise<Response> => {
     const requestId = crypto.randomUUID();
     const url = new URL(req.url);
@@ -42,4 +49,4 @@ export function withRequestId<T extends RequestIdContext>(
       throw error;
     }
   };
-}
+};

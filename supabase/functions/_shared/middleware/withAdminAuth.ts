@@ -11,14 +11,20 @@ export interface AdminAuthContext {
 }
 
 /**
- * Admin Authentication Middleware
+ * Admin Authentication Middleware (Curried)
  * Validates JWT token and verifies user has admin role
  * Returns 403 if user is not an admin
+ * 
+ * @example
+ * const handler = withAdminAuth(async (req, ctx) => {
+ *   console.log('Admin user:', ctx.user.id);
+ *   return new Response('OK');
+ * });
  */
-export function withAdminAuth<T extends AdminAuthContext>(
+export const withAdminAuth = <T extends AdminAuthContext>(
   handler: (req: Request, ctx: T) => Promise<Response>
-) {
-  return async (req: Request, initialContext: Partial<T>): Promise<Response> => {
+): ((req: Request, ctx: Partial<T>) => Promise<Response>) => {
+  return async (req: Request, ctx: Partial<T>): Promise<Response> => {
     const authHeader = req.headers.get('Authorization');
     
     if (!authHeader) {
@@ -35,7 +41,7 @@ export function withAdminAuth<T extends AdminAuthContext>(
     }
 
     const token = authHeader.replace('Bearer ', '');
-    const supabase = initialContext.supabase as SupabaseClient;
+    const supabase = ctx.supabase;
     
     if (!supabase) {
       throw new Error('Supabase client must be initialized before withAdminAuth middleware');
@@ -92,10 +98,10 @@ export function withAdminAuth<T extends AdminAuthContext>(
 
     // Attach user to context and call handler
     const adminContext = {
-      ...initialContext,
+      ...ctx,
       user,
     } as T;
 
     return handler(req, adminContext);
   };
-}
+};

@@ -12,39 +12,47 @@ export interface RateLimitContext {
 }
 
 /**
- * Rate Limiting Middleware
+ * Rate Limiting Middleware Factory (Curried)
  * Applies rate limiting per user
  * Returns 429 if rate limit exceeded
+ * 
+ * @example
+ * const handler = withRateLimit(RATE_LIMITS.CHECKOUT)(async (req, ctx) => {
+ *   return new Response('OK');
+ * });
  */
-export function withRateLimit<T extends RateLimitContext>(
-  config: RateLimitConfig,
-  handler: (req: Request, ctx: T) => Promise<Response>
-) {
-  return async (req: Request, ctx: T): Promise<Response> => {
-    const { user, supabase } = ctx;
+export const withRateLimit = <T extends RateLimitContext>(
+  config: RateLimitConfig
+) => {
+  return (
+    handler: (req: Request, ctx: T) => Promise<Response>
+  ): ((req: Request, ctx: T) => Promise<Response>) => {
+    return async (req: Request, ctx: T): Promise<Response> => {
+      const { user, supabase } = ctx;
 
-    // Check rate limit
-    const rateCheck = await checkRateLimit(supabase, user.id, config);
+      // Check rate limit
+      const rateCheck = await checkRateLimit(supabase, user.id, config);
 
-    if (!rateCheck.allowed) {
-      console.warn(`Rate limit exceeded for user ${user.id} on ${config.keyPrefix}`);
-      return new Response(
-        JSON.stringify({ 
-          error: 'TOO_MANY_REQUESTS', 
-          message: 'Too many requests. Please try again later.',
-          retryAfter: rateCheck.retryAfter,
-        }),
-        { 
-          status: 429, 
-          headers: { 
-            ...corsHeaders, 
-            'Content-Type': 'application/json',
-            'Retry-After': String(rateCheck.retryAfter || 60),
-          } 
-        }
-      );
-    }
+      if (!rateCheck.allowed) {
+        console.warn(`Rate limit exceeded for user ${user.id} on ${config.keyPrefix}`);
+        return new Response(
+          JSON.stringify({ 
+            error: 'TOO_MANY_REQUESTS', 
+            message: 'Too many requests. Please try again later.',
+            retryAfter: rateCheck.retryAfter,
+          }),
+          { 
+            status: 429, 
+            headers: { 
+              ...corsHeaders, 
+              'Content-Type': 'application/json',
+              'Retry-After': String(rateCheck.retryAfter || 60),
+            } 
+          }
+        );
+      }
 
-    return handler(req, ctx);
+      return handler(req, ctx);
+    };
   };
-}
+};

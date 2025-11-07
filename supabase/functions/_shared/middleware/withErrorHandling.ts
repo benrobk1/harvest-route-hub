@@ -4,13 +4,18 @@ const corsHeaders = {
 };
 
 /**
- * Error Handling Middleware
+ * Error Handling Middleware (Curried)
  * Catches unhandled errors and returns structured error responses
  * Logs errors for debugging and captures to Sentry if configured
+ * 
+ * @example
+ * const handler = withErrorHandling(async (req, ctx) => {
+ *   throw new Error('Test error');
+ * });
  */
-export function withErrorHandling<T extends { requestId?: string }>(
+export const withErrorHandling = <T extends { requestId?: string; corsHeaders?: Record<string, string> }>(
   handler: (req: Request, ctx: T) => Promise<Response>
-) {
+): ((req: Request, ctx: T) => Promise<Response>) => {
   return async (req: Request, ctx: T): Promise<Response> => {
     try {
       return await handler(req, ctx);
@@ -33,6 +38,8 @@ export function withErrorHandling<T extends { requestId?: string }>(
         console.log(`[${requestId}] Error would be captured to Sentry (SENTRY_DSN configured)`);
       }
       
+      const headers = ctx.corsHeaders || corsHeaders;
+      
       return new Response(
         JSON.stringify({
           error: 'INTERNAL_ERROR',
@@ -42,9 +49,9 @@ export function withErrorHandling<T extends { requestId?: string }>(
         }),
         {
           status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          headers: { ...headers, 'Content-Type': 'application/json' }
         }
       );
     }
   };
-}
+};

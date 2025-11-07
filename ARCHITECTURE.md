@@ -103,6 +103,10 @@ Feature-based architecture with colocated code:
   - Components: CreditsBreakdown, DriverRating, EmptyOrderState, InfoBanner, ProductGrid, QuantitySelector, ReferralBanner, ReferralManager, ReferralModal, ShopHeader, SpendingProgressCard, SubscriptionManager
   - Queries: consumerQueries
   - Errors: createConsumerError
+- **Payouts** (`/payouts`): Financial transactions and earnings tracking
+  - Components: PayoutsDashboard, PayoutDetailsTable, PayoutHistoryChart
+  - Queries: payoutQueries
+  - Errors: createPayoutError
 
 **Pending Migration** (⏳):
 - **Drivers** - Route claiming, delivery tracking, earnings

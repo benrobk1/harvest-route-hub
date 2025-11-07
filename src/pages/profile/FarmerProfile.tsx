@@ -11,7 +11,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { StripeConnectButton } from "@/components/StripeConnectButton";
-import { PayoutsDashboard } from "@/components/PayoutsDashboard";
+import { PayoutsDashboard } from "@/features/payouts";
 import { DocumentUpload } from "@/components/DocumentUpload";
 import { TaxInformationForm } from "@/components/TaxInformationForm";
 import { Badge } from "@/components/ui/badge";

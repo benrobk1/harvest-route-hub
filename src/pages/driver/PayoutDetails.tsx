@@ -2,8 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, DollarSign } from "lucide-react";
-import { PayoutHistoryChart } from "@/components/PayoutHistoryChart";
-import { PayoutDetailsTable } from "@/components/PayoutDetailsTable";
+import { PayoutHistoryChart, PayoutDetailsTable } from "@/features/payouts";
 
 const PayoutDetails = () => {
   const navigate = useNavigate();

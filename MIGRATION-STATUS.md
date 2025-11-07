@@ -9,7 +9,7 @@ This document tracks the progress of the ongoing code quality initiative and arc
 | Phase | Status | Progress | Priority |
 |-------|--------|----------|----------|
 | Phase 1: Query Keys | ✅ Complete | 100% | - |
-| Phase 2: Features | 🔄 In Progress | 50% (4/8 features) | HIGH |
+| **Phase 2** | Features | 🔄 In Progress | 62.5% (5/8 features) | HIGH |
 | Phase 3: Middleware | 🔄 In Progress | 50% (utilities only) | MEDIUM |
 | Phase 4: Error Handling | ✅ Complete | 100% | - |
 | Phase 5: Documentation | 🔄 In Progress | 75% | LOW |
@@ -43,7 +43,7 @@ All React Query keys now use the factory pattern for consistency:
 ## Phase 2: Feature-Based Architecture 🔄
 
 **Status**: In Progress  
-**Progress**: 50% (4 of 8 features migrated)
+**Progress**: 62.5% (5 of 8 features migrated)
 
 ### ✅ Completed Features
 
@@ -78,9 +78,17 @@ All React Query keys now use the factory pattern for consistency:
 - **README**: ✅ Complete
 - **Migration Notes**: All 12 components moved from `src/components/consumer/` to feature folder. All imports updated across the codebase.
 
+#### 5. Payouts Feature
+- **Location**: `src/features/payouts/`
+- **Components**: PayoutsDashboard, PayoutDetailsTable, PayoutHistoryChart
+- **Queries**: payoutQueries
+- **Errors**: createPayoutError
+- **README**: ✅ Complete
+- **Migration Notes**: All 3 components moved from `src/components/` to feature folder. LazyChart.tsx updated to use new import path.
+
 ### ⏳ Pending Features
 
-#### 5. Drivers Feature
+#### 6. Drivers Feature
 - **Target**: `src/features/drivers/`
 - **Current Location**: Scattered across `/components`, `/pages/driver`
 - **Components to Migrate**: 
@@ -92,7 +100,7 @@ All React Query keys now use the factory pattern for consistency:
 - **README**: ✅ Complete
 - **Estimated Effort**: 2-3 hours
 
-#### 5. Farmers Feature
+#### 7. Farmers Feature
 - **Target**: `src/features/farmers/`
 - **Current Location**: Scattered across `/components`, `/pages/farmer`
 - **Components to Migrate**:
@@ -111,7 +119,7 @@ All React Query keys now use the factory pattern for consistency:
 - **README**: ✅ Complete
 - **Estimated Effort**: 4-5 hours
 
-#### 6. Admin Feature
+#### 8. Admin Feature
 - **Target**: `src/features/admin/`
 - **Current Location**: Scattered across `/components`, `/pages/admin`
 - **Components to Migrate**:
@@ -123,16 +131,6 @@ All React Query keys now use the factory pattern for consistency:
   - UserRatingDisplay
 - **Queries**: ✅ Already in `src/features/admin/queries/`
 - **Estimated Effort**: 3-4 hours
-
-#### 7. Payouts Feature
-- **Target**: `src/features/payouts/`
-- **Current Location**: `/components` (PayoutsDashboard, PayoutDetailsTable, PayoutHistoryChart)
-- **Components to Migrate**:
-  - PayoutsDashboard
-  - PayoutDetailsTable
-  - PayoutHistoryChart
-- **Queries**: ✅ Already in `src/features/payouts/queries/`
-- **Estimated Effort**: 1-2 hours
 
 ---
 

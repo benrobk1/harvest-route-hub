@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 // Lazy load the PayoutHistoryChart component
 const PayoutHistoryChart = lazy(() => 
-  import("@/components/PayoutHistoryChart").then(module => ({ 
+  import("@/features/payouts").then(module => ({ 
     default: module.PayoutHistoryChart 
   }))
 );

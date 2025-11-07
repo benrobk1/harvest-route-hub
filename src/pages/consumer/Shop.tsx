@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useCart } from "@/features/cart";
-import { ReferralBanner } from "@/components/consumer/ReferralBanner";
-import { ReferralModal } from "@/components/consumer/ReferralModal";
-import { ShopHeader } from "@/components/consumer/ShopHeader";
-import { InfoBanner } from "@/components/consumer/InfoBanner";
-import { ProductGrid } from "@/components/consumer/ProductGrid";
+import { 
+  ReferralBanner,
+  ReferralModal,
+  ShopHeader,
+  InfoBanner,
+  ProductGrid
+} from "@/features/consumers";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useShopProducts, useProductSearch, Product } from "@/features/products";

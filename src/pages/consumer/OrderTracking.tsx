@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import OrderTracking from "@/components/OrderTracking";
 import PreApprovedMessaging from "@/components/PreApprovedMessaging";
-import { DriverRating } from "@/components/consumer/DriverRating";
+import { DriverRating } from "@/features/consumers";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";

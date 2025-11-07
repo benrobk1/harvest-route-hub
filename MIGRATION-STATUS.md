@@ -9,7 +9,7 @@ This document tracks the progress of the ongoing code quality initiative and arc
 | Phase | Status | Progress | Priority |
 |-------|--------|----------|----------|
 | Phase 1: Query Keys | ✅ Complete | 100% | - |
-| Phase 2: Features | 🔄 In Progress | 37.5% (3/8 features) | HIGH |
+| Phase 2: Features | 🔄 In Progress | 50% (4/8 features) | HIGH |
 | Phase 3: Middleware | 🔄 In Progress | 50% (utilities only) | MEDIUM |
 | Phase 4: Error Handling | ✅ Complete | 100% | - |
 | Phase 5: Documentation | 🔄 In Progress | 75% | LOW |
@@ -43,7 +43,7 @@ All React Query keys now use the factory pattern for consistency:
 ## Phase 2: Feature-Based Architecture 🔄
 
 **Status**: In Progress  
-**Progress**: 37.5% (3 of 8 features migrated)
+**Progress**: 50% (4 of 8 features migrated)
 
 ### ✅ Completed Features
 
@@ -70,9 +70,17 @@ All React Query keys now use the factory pattern for consistency:
 - **Queries**: productQueries
 - **Errors**: createProductLoadError, createProductSearchError
 
+#### 4. Consumers Feature
+- **Location**: `src/features/consumers/`
+- **Components**: CreditsBreakdown, DriverRating, EmptyOrderState, InfoBanner, ProductGrid, QuantitySelector, ReferralBanner, ReferralManager, ReferralModal, ShopHeader, SpendingProgressCard, SubscriptionManager
+- **Queries**: consumerQueries
+- **Errors**: createConsumerError
+- **README**: ✅ Complete
+- **Migration Notes**: All 12 components moved from `src/components/consumer/` to feature folder. All imports updated across the codebase.
+
 ### ⏳ Pending Features
 
-#### 4. Drivers Feature
+#### 5. Drivers Feature
 - **Target**: `src/features/drivers/`
 - **Current Location**: Scattered across `/components`, `/pages/driver`
 - **Components to Migrate**: 
@@ -116,26 +124,7 @@ All React Query keys now use the factory pattern for consistency:
 - **Queries**: ✅ Already in `src/features/admin/queries/`
 - **Estimated Effort**: 3-4 hours
 
-#### 7. Consumers Feature
-- **Target**: `src/features/consumers/`
-- **Current Location**: Scattered across `/components/consumer`
-- **Components to Migrate**:
-  - CreditsBreakdown
-  - DriverRating
-  - EmptyOrderState
-  - InfoBanner
-  - ProductGrid
-  - QuantitySelector
-  - ReferralBanner
-  - ReferralManager
-  - ReferralModal
-  - ShopHeader
-  - SpendingProgressCard
-  - SubscriptionManager
-- **Queries**: ✅ Already in `src/features/consumers/queries/`
-- **Estimated Effort**: 4-5 hours
-
-#### 8. Payouts Feature
+#### 7. Payouts Feature
 - **Target**: `src/features/payouts/`
 - **Current Location**: `/components` (PayoutsDashboard, PayoutDetailsTable, PayoutHistoryChart)
 - **Components to Migrate**:

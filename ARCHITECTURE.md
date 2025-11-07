@@ -99,12 +99,15 @@ Feature-based architecture with colocated code:
   - Hooks: useShopProducts, useProductSearch
   - Types: Product, ProductWithFarmer, ShopData
   - Queries: productQueries
+- **Consumers** (`/consumers`): Consumer shopping experience, credits, subscriptions
+  - Components: CreditsBreakdown, DriverRating, EmptyOrderState, InfoBanner, ProductGrid, QuantitySelector, ReferralBanner, ReferralManager, ReferralModal, ShopHeader, SpendingProgressCard, SubscriptionManager
+  - Queries: consumerQueries
+  - Errors: createConsumerError
 
 **Pending Migration** (⏳):
 - **Drivers** - Route claiming, delivery tracking, earnings
 - **Farmers** - Inventory management, batches, payouts
 - **Admin** - User approvals, KPIs, tax documents
-- **Consumers** - Credits, subscriptions, referrals
 
 Each feature exports a clean public API via `index.ts`
 

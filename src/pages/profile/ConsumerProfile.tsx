@@ -8,9 +8,11 @@ import { ArrowLeft, User } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Checkbox } from "@/components/ui/checkbox";
-import { SubscriptionManager } from "@/components/consumer/SubscriptionManager";
-import { ReferralManager } from "@/components/consumer/ReferralManager";
-import { SpendingProgressCard } from "@/components/consumer/SpendingProgressCard";
+import { 
+  SubscriptionManager,
+  ReferralManager,
+  SpendingProgressCard
+} from "@/features/consumers";
 
 const ConsumerProfile = () => {
   const navigate = useNavigate();

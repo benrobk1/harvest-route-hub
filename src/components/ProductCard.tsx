@@ -11,7 +11,7 @@ import { LoadingButton } from './LoadingButton';
 import { calculateFarmToConsumerDistance } from '@/lib/distanceHelpers';
 import { FarmStoryModal } from './FarmStoryModal';
 import { useCartActions } from '@/features/cart';
-import { QuantitySelector } from './consumer/QuantitySelector';
+import { QuantitySelector } from '@/features/consumers';
 
 interface Product {
   id: string;

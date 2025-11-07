@@ -6,7 +6,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import logo from "@/assets/blue-harvests-logo.jpeg";
 import { useActiveOrder } from "@/features/orders";
 import { OrderWithDetails } from "@/features/orders";
-import { EmptyOrderState } from "@/components/consumer/EmptyOrderState";
+import { EmptyOrderState } from "@/features/consumers";
 import { mapOrderStatus, formatOrderItems, formatEstimatedTime } from "@/lib/orderHelpers";
 
 const LiveTracking = () => {

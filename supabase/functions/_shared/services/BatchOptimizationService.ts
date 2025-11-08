@@ -1,8 +1,94 @@
 /**
  * BATCH OPTIMIZATION SERVICE
  * 
- * Extracts batch generation logic into a testable service layer.
- * Implements dual-path optimization: AI-powered (primary) + geographic (fallback).
+ * @module BatchOptimizationService
+ * @description Service layer for delivery batch generation and route optimization.
+ * 
+ * ## Overview
+ * 
+ * This service implements a **dual-path optimization strategy**:
+ * 1. **AI-Powered Optimization** (Primary): Uses Lovable AI (Gemini) for intelligent batching
+ * 2. **Geographic Fallback** (Secondary): ZIP code clustering when AI unavailable
+ * 
+ * ## Optimization Goals
+ * 
+ * ### Business Objectives
+ * - **Driver Economics:** Target 37 deliveries per route (~$277.50 @ $7.50/delivery)
+ * - **Time Efficiency:** Max 7.5 hours per route (~20 min/stop including drive time)
+ * - **Geographic Density:** Minimize total drive distance within batch
+ * - **Batch Viability:** Min 30 orders (viable), Max 45 orders (manageable)
+ * 
+ * ### AI Optimization Advantages
+ * - **Route Optimization:** Considers actual road networks, not just distance
+ * - **Density Analysis:** Identifies geographic clusters for efficient routing
+ * - **Fairness:** Distributes high-value vs low-value orders across batches
+ * - **Learning:** Improves with historical delivery data
+ * 
+ * ### Geographic Fallback Behavior
+ * - Groups orders by ZIP code
+ * - Fills batches to target size (37 orders)
+ * - Marks as `is_subsidized: true` (platform absorbs lower efficiency)
+ * - Uses OSRM/Mapbox for route geometry after grouping
+ * 
+ * ## Workflow
+ * 
+ * ```
+ * 1. Fetch pending orders for delivery date
+ * 2. Group by collection point (lead farmer)
+ * 3. For each collection point:
+ *    a. Try AI optimization first
+ *    b. Fall back to geographic if AI fails
+ * 4. For each batch:
+ *    a. Create delivery_batch record
+ *    b. Create batch_stops (sequence_number determines order)
+ *    c. Set first 3 addresses visible (progressive disclosure)
+ *    d. Generate box_codes (B{batch}-{stop})
+ *    e. Store optimization metadata
+ * 5. Update orders with batch assignments
+ * ```
+ * 
+ * ## Progressive Disclosure
+ * 
+ * **Critical Security Feature**: Drivers only see addresses for:
+ * - Current delivery
+ * - Next 3 deliveries in sequence
+ * 
+ * **Implementation:**
+ * - `address_visible_at` column on `batch_stops`
+ * - First 3 stops set to `now()` on batch creation
+ * - `update_address_visibility()` trigger reveals next 3 on progress
+ * 
+ * ## Cost Tracking
+ * 
+ * **AI Optimization:**
+ * - Cost: ~$0.02 per batch (Gemini 2.5 Flash Lite)
+ * - Marked as `is_subsidized: false` (cost covered by platform fee)
+ * 
+ * **Geographic Fallback:**
+ * - Cost: Free (simple clustering algorithm)
+ * - Marked as `is_subsidized: true` (lower driver efficiency = platform absorbs)
+ * 
+ * ## Error Handling
+ * 
+ * - **AI Failures:** Automatic fallback to geographic (no batch generation failure)
+ * - **Missing Collection Points:** Skips orders, logs warning
+ * - **Route API Failures:** Estimates based on distance, marks for manual review
+ * - **Validation Errors:** Logs and skips invalid orders (missing addresses)
+ * 
+ * @example
+ * ```typescript
+ * const service = new BatchOptimizationService(supabase, LOVABLE_API_KEY);
+ * 
+ * // Optimize tomorrow's orders
+ * const result = await service.optimizeBatches('2025-01-16');
+ * // {
+ * //   success: true,
+ * //   batches_created: 5,
+ * //   total_orders: 180,
+ * //   optimization_method: 'ai',
+ * //   batches: [...]
+ * // }
+ * ```
  */
 
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -50,6 +136,18 @@ export class BatchOptimizationService {
 
   /**
    * Main entry point: Optimize batches for a delivery date
+   * 
+   * @param deliveryDate - ISO date string (YYYY-MM-DD). Defaults to tomorrow.
+   * @returns Optimization result with batch count, method used, and batch details
+   * 
+   * @remarks
+   * - Automatically groups by collection point (lead farmer location)
+   * - Tries AI optimization first, falls back to geographic clustering
+   * - Creates all database records (batches, stops, metadata)
+   * - Updates orders with batch assignments
+   * - Returns summary for monitoring/logging
+   * 
+   * @throws {Error} If database operations fail
    */
   async optimizeBatches(deliveryDate?: string): Promise<BatchOptimizationResult> {
     const targetDate = deliveryDate || new Date(Date.now() + 86400000).toISOString().split('T')[0];

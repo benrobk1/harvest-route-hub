@@ -361,6 +361,340 @@ SENTRY_DSN=https://your-sentry-dsn@sentry.io/project-id
 - ✅ **Prepared**: Hooks in place, easy to enable post-demo
 - ✅ **Thoughtful**: Shows production thinking without over-engineering
 
+## 🔄 Key Workflow Diagrams
+
+### Checkout & Payment Flow
+
+```mermaid
+sequenceDiagram
+    participant C as Consumer
+    participant UI as Frontend
+    participant CheckoutFn as checkout Function
+    participant CheckoutSvc as CheckoutService
+    participant Stripe as Stripe API
+    participant DB as Database
+    
+    C->>UI: Click "Place Order"
+    UI->>UI: Validate cart (min $25)
+    
+    UI->>CheckoutFn: POST /checkout
+    Note over CheckoutFn: Middleware: Auth → RateLimit → Validation
+    
+    CheckoutFn->>DB: Fetch cart & items
+    CheckoutFn->>DB: Validate inventory availability
+    
+    CheckoutFn->>CheckoutSvc: processCheckout()
+    
+    CheckoutSvc->>CheckoutSvc: Calculate totals<br/>(subtotal + delivery + tip)
+    
+    CheckoutSvc->>CheckoutSvc: Calculate revenue splits<br/>88% farmer | 2% lead | 10% platform
+    
+    CheckoutSvc->>DB: Create inventory_reservations
+    
+    CheckoutSvc->>Stripe: Create PaymentIntent
+    Stripe-->>CheckoutSvc: client_secret
+    
+    CheckoutSvc->>DB: Store payment_intent
+    CheckoutSvc->>DB: Create order (status: pending)
+    CheckoutSvc->>DB: Create order_items (snapshot prices)
+    CheckoutSvc->>DB: Create transaction_fees records
+    CheckoutSvc->>DB: Create payout records (status: pending)
+    
+    CheckoutSvc-->>CheckoutFn: Return client_secret + order_id
+    CheckoutFn-->>UI: 200 OK with client_secret
+    
+    UI->>Stripe: confirmPayment() via Stripe.js
+    Stripe-->>UI: Payment success
+    
+    UI->>C: Navigate to /order-success?id={order_id}
+    
+    Note over Stripe,DB: Async webhook flow
+    Stripe->>CheckoutFn: stripe-webhook (payment_intent.succeeded)
+    CheckoutFn->>DB: Update order status → confirmed
+    CheckoutFn->>DB: Update payment_intent → succeeded
+    CheckoutFn->>DB: Clear inventory_reservations
+    CheckoutFn->>DB: Deduct product inventory
+```
+
+### Batch Generation & Route Optimization Flow
+
+```mermaid
+sequenceDiagram
+    participant Cron as Scheduled Job
+    participant BatchFn as generate-batches Function
+    participant BatchSvc as BatchOptimizationService
+    participant LovableAI as Lovable AI
+    participant OSRM as OSRM/Mapbox
+    participant DB as Database
+    
+    Cron->>BatchFn: Trigger daily (6 AM)
+    Note over BatchFn: Process tomorrow's orders
+    
+    BatchFn->>DB: Fetch pending orders<br/>WHERE delivery_date = tomorrow
+    DB-->>BatchFn: Orders with addresses
+    
+    BatchFn->>BatchSvc: optimizeBatches(delivery_date)
+    
+    BatchSvc->>BatchSvc: Group orders by collection point<br/>(lead farmer locations)
+    
+    alt AI Optimization Available (has LOVABLE_API_KEY)
+        BatchSvc->>LovableAI: POST /ai/batch-optimization
+        Note over LovableAI: gemini-2.5-flash-lite<br/>Optimize: distance + density + fairness
+        LovableAI-->>BatchSvc: Optimized batches + routes
+        Note over BatchSvc: AI batches marked as<br/>is_subsidized: false
+    else Fallback: Geographic Clustering
+        BatchSvc->>BatchSvc: Geographic clustering by ZIP code
+        Note over BatchSvc: Group orders within same ZIP<br/>Target: 30-45 orders per batch
+        BatchSvc->>BatchSvc: Fallback batches marked as<br/>is_subsidized: true (platform cost)
+    end
+    
+    loop For each batch
+        BatchSvc->>OSRM: POST /route/v1/driving/<br/>coordinates[]
+        OSRM-->>BatchSvc: Optimized route geometry + timing
+        
+        BatchSvc->>DB: INSERT delivery_batches<br/>(lead_farmer_id, delivery_date, zip_codes)
+        DB-->>BatchSvc: batch_id
+        
+        BatchSvc->>DB: INSERT batch_stops (sequence_number, address, coords)
+        Note over DB: First 3 stops: address_visible_at = now()<br/>Rest: address_visible_at = NULL
+        
+        BatchSvc->>DB: INSERT batch_metadata<br/>(ai_optimization_data, is_subsidized)
+        
+        BatchSvc->>DB: UPDATE orders<br/>SET delivery_batch_id, status = 'confirmed'
+        
+        BatchSvc->>DB: Generate box_codes<br/>(B{batch_number}-{stop_sequence})
+    end
+    
+    BatchSvc-->>BatchFn: Result: {batches_created, optimization_method}
+    BatchFn-->>Cron: 200 OK with summary
+```
+
+### Driver Delivery Workflow
+
+```mermaid
+sequenceDiagram
+    participant D as Driver
+    participant UI as Mobile UI
+    participant ClaimFn as claim-route Function
+    participant DB as Database
+    participant Scanner as BoxCodeScanner
+    participant StopTrigger as update_address_visibility Trigger
+    
+    D->>UI: View Available Routes
+    UI->>DB: Fetch delivery_batches<br/>WHERE status = 'pending'<br/>AND driver_id IS NULL
+    DB-->>UI: Available batches (ZIP codes only)
+    
+    D->>UI: Claim Route
+    UI->>ClaimFn: POST /claim-route<br/>{batch_id}
+    ClaimFn->>DB: UPDATE delivery_batches<br/>SET driver_id = auth.uid(), status = 'assigned'
+    ClaimFn->>DB: INSERT routes (status: assigned)
+    ClaimFn-->>UI: 200 OK
+    
+    D->>UI: Navigate to Route Details
+    UI->>DB: Fetch batch_stops<br/>WHERE address_visible_at IS NOT NULL
+    Note over UI: Shows first 3 addresses only<br/>Rest show "ZIP: 12345"
+    
+    D->>D: Arrive at collection point
+    
+    loop For each delivery box
+        D->>Scanner: Scan QR code (B3-1)
+        Scanner->>DB: UPDATE batch_stops<br/>SET address_visible_at = now(),<br/>status = 'in_progress'<br/>WHERE order_id = {parsed_order_id}
+        
+        Scanner->>DB: INSERT delivery_scan_logs<br/>(scan_type: 'pickup', box_code, location)
+        
+        Note over StopTrigger: Trigger fires on UPDATE
+        StopTrigger->>DB: UPDATE batch_stops<br/>SET address_visible_at = now()<br/>WHERE sequence_number IN (current+1, current+2, current+3)
+        
+        Scanner-->>D: ✅ Pickup confirmed<br/>Next 3 addresses unlocked
+    end
+    
+    D->>UI: Start Navigation
+    
+    loop For each stop
+        D->>D: Drive to address
+        D->>UI: Mark Arrived
+        UI->>DB: UPDATE batch_stops<br/>SET actual_arrival = now()
+        
+        D->>UI: Upload delivery proof<br/>(photo, signature)
+        UI->>DB: INSERT delivery_proofs<br/>(batch_stop_id, photo_url, signature_url)
+        
+        D->>UI: Mark Delivered
+        UI->>DB: UPDATE batch_stops<br/>SET status = 'delivered'
+        
+        Note over StopTrigger: Trigger fires again
+        StopTrigger->>DB: Reveal next 3 addresses
+        
+        UI->>DB: UPDATE orders<br/>SET status = 'delivered'
+    end
+    
+    D->>UI: Complete Route
+    UI->>DB: UPDATE delivery_batches<br/>SET status = 'completed'
+    UI->>DB: UPDATE routes<br/>SET status = 'completed', completed_at = now()
+    
+    Note over UI,DB: Triggers payout processing
+```
+
+### Payout Processing Flow
+
+```mermaid
+sequenceDiagram
+    participant Cron as Scheduled Job
+    participant PayoutFn as process-payouts Function
+    participant PayoutSvc as PayoutService
+    participant Stripe as Stripe Connect
+    participant DB as Database
+    
+    Cron->>PayoutFn: Trigger (after delivery completion)
+    
+    PayoutFn->>PayoutSvc: processPendingPayouts()
+    
+    PayoutSvc->>DB: SELECT * FROM payouts<br/>WHERE status = 'pending'<br/>AND stripe_connect_account_id IS NOT NULL
+    DB-->>PayoutSvc: Pending payouts with order status
+    
+    loop For each payout
+        alt Order not delivered
+            PayoutSvc->>PayoutSvc: Skip (order status != 'delivered')
+            Note over PayoutSvc: Count as skipped
+        else Order delivered
+            PayoutSvc->>Stripe: accounts.retrieve(connect_account_id)
+            Stripe-->>PayoutSvc: Account details
+            
+            alt Payouts not enabled
+                PayoutSvc->>DB: UPDATE payouts<br/>SET status = 'failed'<br/>description = 'PAYOUTS_NOT_ENABLED'
+                Note over PayoutSvc: Count as failed<br/>Requires Connect onboarding
+            else Payouts enabled
+                PayoutSvc->>PayoutSvc: Calculate amount<br/>Farmer: 88% of product subtotal<br/>Lead Farmer: 2% commission<br/>Driver: $7.50 per delivery
+                
+                PayoutSvc->>Stripe: transfers.create({<br/>  amount: amount * 100,<br/>  destination: connect_account_id,<br/>  metadata: {payout_id, order_id}<br/>})
+                
+                alt Transfer succeeds
+                    Stripe-->>PayoutSvc: transfer_id
+                    PayoutSvc->>DB: UPDATE payouts<br/>SET status = 'completed',<br/>stripe_transfer_id = transfer_id,<br/>completed_at = now()
+                    Note over PayoutSvc: Count as successful
+                else Transfer fails
+                    Stripe-->>PayoutSvc: Error (insufficient balance, restricted account)
+                    PayoutSvc->>DB: UPDATE payouts<br/>SET status = 'failed',<br/>description = error.message
+                    Note over PayoutSvc: Count as failed<br/>Requires manual review
+                end
+            end
+        end
+    end
+    
+    PayoutSvc-->>PayoutFn: Result: {successful, failed, skipped, errors[]}
+    PayoutFn-->>Cron: 200 OK with summary
+    
+    Note over DB: Farmers/drivers see payouts<br/>in dashboard via RLS policies
+```
+
+### Subscription & Credits Flow
+
+```mermaid
+sequenceDiagram
+    participant C as Consumer
+    participant UI as Frontend
+    participant SubFn as create-subscription-checkout Function
+    participant Stripe as Stripe Billing
+    participant Webhook as stripe-webhook Function
+    participant DB as Database
+    participant CheckoutFn as checkout Function
+    
+    C->>UI: Click "Subscribe ($0/month)"
+    UI->>SubFn: POST /create-subscription-checkout
+    
+    SubFn->>Stripe: customers.create({email, metadata})
+    Stripe-->>SubFn: customer_id
+    
+    SubFn->>Stripe: checkout.sessions.create({<br/>  mode: 'subscription',<br/>  line_items: [{price_id, quantity: 1}],<br/>  subscription_data: {trial_period_days: 30}<br/>})
+    Stripe-->>SubFn: checkout_session_url
+    
+    SubFn-->>UI: Redirect to Stripe Checkout
+    
+    C->>Stripe: Complete Stripe Checkout
+    Stripe-->>C: Redirect to success_url
+    
+    Stripe->>Webhook: subscription.created
+    Webhook->>DB: INSERT subscriptions<br/>({consumer_id, stripe_subscription_id,<br/>status: 'trialing', trial_end: +30 days})
+    
+    Note over C: 30-day trial begins<br/>Earns credits on orders
+    
+    C->>UI: Place order ($100)
+    UI->>CheckoutFn: POST /checkout
+    
+    CheckoutFn->>DB: Check subscription status
+    alt Has active subscription
+        CheckoutFn->>DB: Calculate credits earned<br/>$10 per $100 spent
+        CheckoutFn->>DB: INSERT credits_ledger<br/>({amount: 10, transaction_type: 'earned',<br/>balance_after: current + 10,<br/>expires_at: +12 months})
+        CheckoutFn->>DB: UPDATE subscriptions<br/>SET monthly_spend += 100,<br/>credits_earned += 10
+    end
+    
+    Note over C: Next month, credits available
+    
+    C->>UI: Place order ($50)
+    UI->>CheckoutFn: POST /checkout<br/>{credits_to_use: 1}
+    
+    CheckoutFn->>DB: Check available credits<br/>WHERE expires_at > now()
+    CheckoutFn->>CheckoutFn: Apply discount<br/>$50 - $10 = $40 charged
+    
+    CheckoutFn->>DB: INSERT credits_ledger<br/>({amount: -10, transaction_type: 'redeemed',<br/>balance_after: current - 10})
+    
+    CheckoutFn->>Stripe: Create PaymentIntent($40)
+    
+    Note over C: Trial ends after 30 days
+    Stripe->>Webhook: subscription.trial_ended
+    Webhook->>DB: UPDATE subscriptions<br/>SET status = 'active'
+    
+    Note over C: Subscription continues free<br/>Keeps earning 10% credits
+```
+
+### Referral Program Flow
+
+```mermaid
+sequenceDiagram
+    participant R as Referrer
+    participant UI as Frontend
+    participant Referee as New User
+    participant AuthFn as Auth Flow
+    participant DB as Database
+    participant CheckoutFn as checkout Function
+    
+    R->>UI: View Referral Code
+    UI->>DB: SELECT referral_code FROM profiles<br/>WHERE id = auth.uid()
+    DB-->>UI: "BH4F8A2C9D"
+    
+    R->>Referee: Share referral code
+    
+    Referee->>UI: Sign up with code
+    UI->>AuthFn: signUp({email, password, metadata: {referral_code}})
+    
+    AuthFn->>DB: Check referral code exists
+    DB-->>AuthFn: Referrer profile found
+    
+    AuthFn->>DB: INSERT INTO profiles<br/>(Referee created via trigger)
+    
+    AuthFn->>DB: INSERT INTO referrals<br/>({referrer_id, referee_id,<br/>status: 'pending',<br/>credit_amount: 25})
+    
+    AuthFn-->>Referee: Account created
+    
+    Note over Referee: Browse products, add to cart
+    
+    Referee->>UI: Place first order
+    UI->>CheckoutFn: POST /checkout
+    
+    CheckoutFn->>DB: Check for pending referral<br/>WHERE referee_id = auth.uid()<br/>AND status = 'pending'
+    
+    alt First order found
+        CheckoutFn->>DB: UPDATE referrals<br/>SET status = 'credited',<br/>referee_first_order_id = order_id,<br/>credited_at = now()
+        
+        CheckoutFn->>DB: INSERT credits_ledger<br/>({consumer_id: referrer_id,<br/>amount: 25, transaction_type: 'referral_bonus',<br/>balance_after: current + 25,<br/>expires_at: +12 months})
+        
+        CheckoutFn->>DB: INSERT credits_ledger<br/>({consumer_id: referee_id,<br/>amount: 25, transaction_type: 'referral_bonus',<br/>balance_after: 25,<br/>expires_at: +12 months})
+        
+        Note over R,Referee: Both receive $25 credit
+    end
+    
+    CheckoutFn-->>Referee: Order placed + Welcome bonus!
+```
+
 ## 💰 Revenue Model
 
 | Component          | Percentage | Recipient       | Notes                        |

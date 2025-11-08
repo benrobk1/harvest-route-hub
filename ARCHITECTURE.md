@@ -27,47 +27,157 @@
 
 Blue Harvests is a full-stack local food delivery marketplace built on React, TypeScript, and Supabase (via Lovable Cloud). The architecture follows a clean separation between frontend UI, backend services, and external integrations.
 
+### Complete System Flow: Consumer to Farmer Payout
+
+This diagram shows the end-to-end flow from a consumer browsing products to farmers receiving their payouts, including all system components and external integrations.
+
+```mermaid
+flowchart TB
+    subgraph Consumer["👤 CONSUMER FLOW"]
+        A[Browse Products<br/>/shop] --> B[Add to Cart<br/>CartDrawer]
+        B --> C[Checkout<br/>/consumer/checkout]
+        C --> D[Enter Address &<br/>Delivery Date]
+        D --> E[Apply Credits<br/>$10 per $100 spent]
+    end
+
+    subgraph Payment["💳 PAYMENT PROCESSING"]
+        E --> F[PaymentForm<br/>Stripe Elements]
+        F --> G[checkout Edge Function<br/>CheckoutService]
+        G --> H{Validate Cart<br/>Min $25}
+        H -->|Valid| I[Create PaymentIntent<br/>Stripe API]
+        H -->|Invalid| F
+        I --> J[Confirm Payment<br/>Frontend]
+        J --> K{Payment<br/>Success?}
+        K -->|Yes| L[Create Order<br/>status: paid]
+        K -->|No| M[Show Error]
+        M --> F
+    end
+
+    subgraph Database["🗄️ DATABASE"]
+        L --> N[(orders table<br/>order_items<br/>products)]
+        N --> O[Calculate Revenue Split<br/>88% Farmer<br/>2% Lead Farmer<br/>10% Platform]
+        O --> P[(payouts table<br/>status: pending)]
+    end
+
+    subgraph Batching["📦 BATCH GENERATION Daily Cron"]
+        P --> Q[generate-batches<br/>Edge Function]
+        Q --> R{Batch Strategy}
+        R -->|Complex| S[Lovable AI<br/>Gemini 2.5 Flash<br/>Optimize Routes]
+        R -->|Simple| T[Geographic Fallback<br/>ZIP-based Grouping]
+        S --> U[Create delivery_batches<br/>30-45 orders each]
+        T --> U
+        U --> V[Create batch_stops<br/>address_visible_at: NULL]
+        V --> W[Mapbox Geocoding<br/>Lat/Lng Coordinates]
+    end
+
+    subgraph Driver["🚚 DRIVER FLOW"]
+        W --> X[Available Routes<br/>/driver/routes]
+        X --> Y[Driver Claims Route<br/>claim-route Function]
+        Y --> Z[Load Boxes Page<br/>/driver/load-boxes]
+        Z --> AA[Scan Box QR Code<br/>BoxCodeScanner]
+        AA --> AB[Update address_visible_at<br/>First 4 addresses revealed]
+        AB --> AC[Follow Route<br/>RouteDetails + Map]
+        AC --> AD[Mark Delivered<br/>Progressive Disclosure]
+        AD --> AE{More<br/>Stops?}
+        AE -->|Yes| AC
+        AE -->|No| AF[Complete Batch<br/>status: completed]
+    end
+
+    subgraph Payouts["💰 PAYOUT PROCESSING Weekly Cron"]
+        AF --> AG[process-payouts<br/>Edge Function<br/>PayoutService]
+        AG --> AH[Calculate Earnings<br/>From completed orders]
+        AH --> AI{Recipient<br/>Type?}
+        AI -->|Farmer| AJ[88% of Product Total<br/>Stripe Connect Transfer]
+        AI -->|Lead Farmer| AK[2% Commission<br/>Stripe Connect Transfer]
+        AI -->|Driver| AL[$7.50 per Delivery<br/>+ Tips]
+        AJ --> AM[Update payout<br/>status: paid]
+        AK --> AM
+        AL --> AM
+    end
+
+    subgraph External["🌐 EXTERNAL SERVICES"]
+        I -.->|Payment Intent| Stripe[Stripe API<br/>Payments]
+        J -.->|Confirm Payment| Stripe
+        AJ -.->|Transfer| StripeConnect[Stripe Connect<br/>Farmer Accounts]
+        AK -.->|Transfer| StripeConnect
+        W -.->|Geocode| Mapbox[Mapbox API<br/>Geocoding]
+        S -.->|Optimize| AI[Lovable AI<br/>Gemini 2.5 Flash]
+    end
+
+    subgraph Security["🔒 SECURITY LAYERS"]
+        RLS[Row Level Security<br/>RLS Policies]
+        Auth[JWT Authentication<br/>withAuth Middleware]
+        Privacy[Progressive Disclosure<br/>Address Privacy]
+    end
+
+    N -.->|Enforced by| RLS
+    V -.->|Enforced by| Privacy
+    G -.->|Protected by| Auth
+    Q -.->|Protected by| Auth
+    AG -.->|Protected by| Auth
+
+    style Consumer fill:#e1f5ff
+    style Payment fill:#fff3e0
+    style Database fill:#f3e5f5
+    style Batching fill:#e8f5e9
+    style Driver fill:#fff9c4
+    style Payouts fill:#fce4ec
+    style External fill:#f5f5f5
+    style Security fill:#ffebee
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         FRONTEND (React)                        │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐ │
-│  │    Pages     │  │  Components  │  │  React Query Hooks   │ │
-│  │  (Routes)    │──│     (UI)     │──│   (API Wrappers)     │ │
-│  └──────────────┘  └──────────────┘  └──────────────────────┘ │
-│         │                  │                     │              │
-│         └──────────────────┴─────────────────────┘              │
-│                            │                                    │
-│                   ┌────────▼────────┐                          │
-│                   │ Zod Contracts   │ ◄─── Shared Validation   │
-│                   │  (src/contracts)│                          │
-│                   └────────┬────────┘                          │
-└────────────────────────────┼──────────────────────────────────┘
-                             │
-                    HTTPS/WebSocket
-                             │
-┌────────────────────────────▼──────────────────────────────────┐
-│                    BACKEND (Edge Functions)                    │
-│  ┌──────────────────────────────────────────────────────────┐ │
-│  │            Composable Middleware Pipeline                │ │
-│  │  withAuth → withRateLimit → withValidation → Handler    │ │
-│  └──────────────────────────────────────────────────────────┘ │
-│         │                  │                     │              │
-│  ┌──────▼──────┐  ┌────────▼────────┐  ┌────────▼──────────┐ │
-│  │   Checkout  │  │  Batch          │  │   Payout          │ │
-│  │   Service   │  │  Optimization   │  │   Processing      │ │
-│  └─────────────┘  └─────────────────┘  └───────────────────┘ │
-│         │                  │                     │              │
-└─────────┼──────────────────┼─────────────────────┼─────────────┘
-          │                  │                     │
-          ▼                  ▼                     ▼
-┌──────────────────────────────────────────────────────────────┐
-│                    EXTERNAL SERVICES                         │
-│  ┌────────────┐  ┌────────────┐  ┌──────────────────────┐  │
-│  │   Stripe   │  │   Mapbox   │  │    Lovable AI        │  │
-│  │  Payments  │  │  Geocoding │  │  (Batch Optimization)│  │
-│  └────────────┘  └────────────┘  └──────────────────────┘  │
-└──────────────────────────────────────────────────────────────┘
-```
+
+### Architecture Layers
+
+The system is organized into clear architectural layers:
+
+**1. Frontend Layer (React + TypeScript)**
+- **Pages**: Route components for each user role
+- **Components**: Reusable UI components (shadcn/ui)
+- **Features**: Domain-driven feature modules (cart, orders, products, etc.)
+- **Hooks**: React Query hooks for API calls
+- **Contracts**: Zod schemas for type-safe validation
+
+**2. Backend Layer (Supabase Edge Functions)**
+- **Middleware**: Composable request handlers (auth, rate limiting, validation)
+- **Services**: Business logic classes (CheckoutService, BatchOptimizationService, PayoutService)
+- **Functions**: API endpoints for checkout, batch generation, payouts, etc.
+- **Database**: PostgreSQL with Row Level Security (RLS)
+
+**3. External Services**
+- **Stripe**: Payment processing and Connect transfers
+- **Stripe Connect**: Direct payouts to farmer/driver accounts
+- **Mapbox**: Geocoding and route optimization
+- **Lovable AI**: Intelligent batch optimization (Gemini 2.5 Flash)
+
+**4. Security Model**
+- **JWT Authentication**: All protected endpoints validate user tokens
+- **Row Level Security**: Database-level access control
+- **Progressive Disclosure**: Consumer addresses hidden until driver scans box
+- **Role-Based Access**: Separate permissions for admin, farmer, driver, consumer
+
+### Key Technical Decisions
+
+**Revenue Split Model (88/2/10)**
+- **88%** to Farmer (product seller)
+- **2%** to Lead Farmer (coordinator/aggregator)
+- **10%** to Platform (operational costs)
+- Delivery fee ($7.50) goes 100% to driver
+
+**Batch Optimization Strategy**
+- **Primary**: Lovable AI (Gemini 2.5 Flash) for complex multi-ZIP routes
+- **Fallback**: Geographic grouping by ZIP code for simple batches
+- **Constraints**: 30-45 orders per batch, 7.5 hour max route time
+
+**Address Privacy System**
+- Driver sees ZIP codes only until claiming route
+- First 4 addresses revealed after box scan at pickup
+- Next 3 addresses unlock progressively as deliveries complete
+- Prevents route cherry-picking and protects consumer privacy
+
+**Credits System**
+- Earn $10 credit per $100 spent (subscription members only)
+- Credits applied automatically at checkout
+- Tracked in `credit_ledger` table for audit trail
 
 ## 📦 Module Organization
 

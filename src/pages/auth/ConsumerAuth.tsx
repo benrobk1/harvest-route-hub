@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Link } from "react-router-dom";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ShoppingBag, AlertCircle } from "lucide-react";
@@ -35,57 +35,6 @@ const ConsumerAuth = () => {
     }
   }, [searchParams]);
 
-  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setFormError(null);
-    
-    const formData = new FormData(e.currentTarget);
-    const email = formData.get("email") as string;
-    const password = formData.get("password") as string;
-
-    try {
-      emailSchema.parse(email);
-      passwordSchema.parse(password);
-
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) throw error;
-
-      // Wait for roles to load
-      await new Promise(resolve => setTimeout(resolve, 200));
-
-      // Check if user has consumer role
-      const { data: userRoles } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', (await supabase.auth.getUser()).data.user?.id);
-
-      if (!userRoles?.some(r => r.role === 'consumer')) {
-        await supabase.auth.signOut();
-        throw new Error("Your account doesn't have consumer access");
-      }
-
-      toast({
-        title: "Welcome back!",
-        description: "Redirecting to shop...",
-      });
-      navigate("/consumer/shop");
-    } catch (error: any) {
-      const errorMsg = getAuthErrorMessage(error);
-      setFormError(errorMsg);
-      toast({
-        title: errorMsg.title,
-        description: errorMsg.description,
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -231,54 +180,15 @@ const ConsumerAuth = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="login" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="login">Login</TabsTrigger>
-                <TabsTrigger value="signup">Sign Up</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="login">
-                <form onSubmit={handleLogin} className="space-y-4">
-                  {formError && (
-                    <Alert variant="destructive">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertTitle>{formError.title}</AlertTitle>
-                      <AlertDescription>{formError.description}</AlertDescription>
-                    </Alert>
-                  )}
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email *</Label>
-                    <Input 
-                      id="email" 
-                      name="email" 
-                      type="email" 
-                      placeholder="you@example.com"
-                      required 
-                      onBlur={(e) => validateEmail(e.target.value)}
-                      className={emailError ? 'border-destructive' : ''}
-                    />
-                    {emailError && <p className="text-xs text-destructive">{emailError}</p>}
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Password *</Label>
-                    <Input 
-                      id="password" 
-                      name="password" 
-                      type="password" 
-                      placeholder="••••••••"
-                      required 
-                      onChange={(e) => validatePassword(e.target.value)}
-                      className={passwordError ? 'border-destructive' : ''}
-                    />
-                    {passwordError && <p className="text-xs text-destructive">{passwordError}</p>}
-                  </div>
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? "Logging in..." : "Login"}
-                  </Button>
-                </form>
-              </TabsContent>
-              
-              <TabsContent value="signup">
+            <div className="mb-4">
+              <p className="text-center text-sm text-muted-foreground mb-4">
+                Already have an account?{' '}
+                <Link to="/auth/login" className="text-primary hover:underline font-medium">
+                  Sign in here
+                </Link>
+              </p>
+            </div>
+            <div className="w-full">
                 <form onSubmit={handleSignup} className="space-y-4">
                   {formError && (
                     <Alert variant="destructive">
@@ -390,8 +300,7 @@ const ConsumerAuth = () => {
                     By signing up, you'll receive a 2FA code for verification
                   </p>
                 </form>
-              </TabsContent>
-            </Tabs>
+            </div>
           </CardContent>
         </Card>
       </div>

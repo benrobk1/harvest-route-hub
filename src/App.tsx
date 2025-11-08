@@ -10,6 +10,7 @@ import { ErrorBoundary } from "@/lib/errors/ErrorBoundary";
 import React from "react";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
+import Login from "./pages/auth/Login";
 import ConsumerAuth from "./pages/auth/ConsumerAuth";
 import DriverAuth from "./pages/auth/DriverAuth";
 import FarmerAuth from "./pages/auth/FarmerAuth";
@@ -93,7 +94,8 @@ const AppContent = () => {
       <InstallPromptToast />
       <Routes>
           <Route path="/" element={<Index />} />
-          <Route path="/auth/consumer" element={<ConsumerAuth />} />
+            <Route path="/auth/login" element={<Login />} />
+            <Route path="/auth/consumer" element={<ConsumerAuth />} />
           <Route path="/auth/driver" element={<DriverAuth />} />
           <Route path="/auth/farmer" element={<FarmerAuth />} />
           <Route path="/auth/admin" element={<AdminAuth />} />

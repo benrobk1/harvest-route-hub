@@ -37,35 +37,44 @@ const Index = () => {
     <div className="min-h-screen bg-gradient-earth">
       {/* Hero Section */}
       <div className="container mx-auto px-4 py-12">
-        <div className="flex flex-col items-center text-center max-w-4xl mx-auto mb-16">
-          <img 
-            src={logo} 
-            alt="Blue Harvests" 
-            className="h-32 mb-6 rounded-lg shadow-lg"
-          />
-          <h1 className="text-4xl md:text-6xl font-bold mb-4 text-foreground">
-            Fresh from Local Farms to Your Door
-          </h1>
-          <p className="text-xl md:text-2xl text-muted-foreground mb-6">
-            Supporting farmers, feeding communities, delivering fresh
-          </p>
-          <div className="flex flex-wrap gap-4 justify-center text-sm text-muted-foreground mb-8">
-            <div className="flex items-center gap-2">
-              <span className="text-primary font-bold text-lg">90%</span>
-              <span>to Farmers</span>
+          <div className="flex flex-col items-center text-center max-w-4xl mx-auto mb-16">
+            <img 
+              src={logo} 
+              alt="Blue Harvests" 
+              className="h-32 mb-6 rounded-lg shadow-lg"
+            />
+            <h1 className="text-4xl md:text-6xl font-bold mb-4 text-foreground">
+              Fresh from Local Farms to Your Door
+            </h1>
+            <p className="text-xl md:text-2xl text-muted-foreground mb-6">
+              Supporting farmers, feeding communities, delivering fresh
+            </p>
+            <div className="mb-6">
+              <Button 
+                size="lg"
+                onClick={() => navigate("/auth/login")}
+                className="px-8"
+              >
+                Sign In
+              </Button>
             </div>
-            <div className="h-4 w-px bg-border" />
-            <div className="flex items-center gap-2">
-              <span className="text-primary font-bold text-lg">100%</span>
-              <span>Fees to Drivers</span>
-            </div>
-            <div className="h-4 w-px bg-border" />
-            <div className="flex items-center gap-2">
-              <span className="text-primary font-bold text-lg">Fresh</span>
-              <span>from Local Farms</span>
+            <div className="flex flex-wrap gap-4 justify-center text-sm text-muted-foreground">
+              <div className="flex items-center gap-2">
+                <span className="text-primary font-bold text-lg">90%</span>
+                <span>to Farmers</span>
+              </div>
+              <div className="h-4 w-px bg-border" />
+              <div className="flex items-center gap-2">
+                <span className="text-primary font-bold text-lg">100%</span>
+                <span>Fees to Drivers</span>
+              </div>
+              <div className="h-4 w-px bg-border" />
+              <div className="flex items-center gap-2">
+                <span className="text-primary font-bold text-lg">Fresh</span>
+                <span>from Local Farms</span>
+              </div>
             </div>
           </div>
-        </div>
 
         {/* Consumer Section */}
         <Card className="p-8 hover:shadow-lift transition-all border-2 border-primary/20">

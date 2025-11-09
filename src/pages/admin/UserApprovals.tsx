@@ -222,6 +222,7 @@ const UserApprovals = () => {
         description: 'The user has been approved successfully',
       });
       queryClient.invalidateQueries({ queryKey: adminQueries.pendingUsers() });
+      queryClient.invalidateQueries({ queryKey: adminQueries.metrics() });
       setSelectedUser(null);
     },
     onError: (error: any) => {
@@ -276,6 +277,7 @@ const UserApprovals = () => {
         description: 'The user has been rejected',
       });
       queryClient.invalidateQueries({ queryKey: adminQueries.pendingUsers() });
+      queryClient.invalidateQueries({ queryKey: adminQueries.metrics() });
       setSelectedUser(null);
       setRejectionReason('');
     },
@@ -366,6 +368,7 @@ const UserApprovals = () => {
         description: `${userIds.length} user(s) have been approved successfully`,
       });
       queryClient.invalidateQueries({ queryKey: adminQueries.pendingUsers() });
+      queryClient.invalidateQueries({ queryKey: adminQueries.metrics() });
       setSelectedUserIds(new Set());
     },
     onError: (error: any) => {
@@ -420,6 +423,7 @@ const UserApprovals = () => {
         description: `${userIds.length} user(s) have been rejected`,
       });
       queryClient.invalidateQueries({ queryKey: adminQueries.pendingUsers() });
+      queryClient.invalidateQueries({ queryKey: adminQueries.metrics() });
       setSelectedUserIds(new Set());
       setBulkRejectionReason('');
       setShowBulkRejectDialog(false);

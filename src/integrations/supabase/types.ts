@@ -457,25 +457,31 @@ export type Database = {
           created_at: string
           driver_id: string
           feedback: string | null
+          feedback_tags: Json | null
           id: string
           order_id: string
           rating: number
+          reviewer_type: string | null
         }
         Insert: {
           created_at?: string
           driver_id: string
           feedback?: string | null
+          feedback_tags?: Json | null
           id?: string
           order_id: string
           rating: number
+          reviewer_type?: string | null
         }
         Update: {
           created_at?: string
           driver_id?: string
           feedback?: string | null
+          feedback_tags?: Json | null
           id?: string
           order_id?: string
           rating?: number
+          reviewer_type?: string | null
         }
         Relationships: [
           {
@@ -740,6 +746,61 @@ export type Database = {
           },
         ]
       }
+      farm_ratings: {
+        Row: {
+          consumer_id: string
+          created_at: string | null
+          farm_profile_id: string
+          feedback: string | null
+          feedback_tags: Json | null
+          id: string
+          order_id: string
+          rating: number
+        }
+        Insert: {
+          consumer_id: string
+          created_at?: string | null
+          farm_profile_id: string
+          feedback?: string | null
+          feedback_tags?: Json | null
+          id?: string
+          order_id: string
+          rating: number
+        }
+        Update: {
+          consumer_id?: string
+          created_at?: string | null
+          farm_profile_id?: string
+          feedback?: string | null
+          feedback_tags?: Json | null
+          id?: string
+          order_id?: string
+          rating?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "farm_ratings_consumer_id_fkey"
+            columns: ["consumer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "farm_ratings_farm_profile_id_fkey"
+            columns: ["farm_profile_id"]
+            isOneToOne: false
+            referencedRelation: "farm_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "farm_ratings_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory_reservations: {
         Row: {
           consumer_id: string
@@ -843,6 +904,71 @@ export type Database = {
             columns: ["collection_point_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_item_ratings: {
+        Row: {
+          consumer_id: string
+          created_at: string | null
+          farm_profile_id: string
+          feedback: string | null
+          feedback_tags: Json | null
+          id: string
+          order_item_id: string
+          product_id: string
+          rating: number
+        }
+        Insert: {
+          consumer_id: string
+          created_at?: string | null
+          farm_profile_id: string
+          feedback?: string | null
+          feedback_tags?: Json | null
+          id?: string
+          order_item_id: string
+          product_id: string
+          rating: number
+        }
+        Update: {
+          consumer_id?: string
+          created_at?: string | null
+          farm_profile_id?: string
+          feedback?: string | null
+          feedback_tags?: Json | null
+          id?: string
+          order_item_id?: string
+          product_id?: string
+          rating?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_item_ratings_consumer_id_fkey"
+            columns: ["consumer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_item_ratings_farm_profile_id_fkey"
+            columns: ["farm_profile_id"]
+            isOneToOne: false
+            referencedRelation: "farm_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_item_ratings_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_item_ratings_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
@@ -1753,6 +1879,8 @@ export type Database = {
         }[]
       }
       get_driver_rating: { Args: { p_driver_id: string }; Returns: number }
+      get_farm_rating: { Args: { p_farm_profile_id: string }; Returns: number }
+      get_product_rating: { Args: { p_product_id: string }; Returns: number }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

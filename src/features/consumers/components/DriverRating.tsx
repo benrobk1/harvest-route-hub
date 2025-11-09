@@ -1,10 +1,13 @@
-import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Star } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { Star } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { toast } from '@/hooks/use-toast';
+import { Badge } from '@/components/ui/badge';
+import { DRIVER_FEEDBACK_TAGS, type FeedbackTag } from '../types/feedback';
 
 interface DriverRatingProps {
   orderId: string;
@@ -13,59 +16,80 @@ interface DriverRatingProps {
   onRatingSubmitted?: () => void;
 }
 
-export const DriverRating = ({ orderId, driverId, driverName, onRatingSubmitted }: DriverRatingProps) => {
-  const { toast } = useToast();
+export const DriverRating = ({
+  orderId,
+  driverId,
+  driverName,
+  onRatingSubmitted,
+}: DriverRatingProps) => {
   const [rating, setRating] = useState(0);
-  const [hoveredRating, setHoveredRating] = useState(0);
-  const [feedback, setFeedback] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hover, setHover] = useState(0);
+  const [feedback, setFeedback] = useState('');
+  const [selectedTags, setSelectedTags] = useState<FeedbackTag[]>([]);
+  const queryClient = useQueryClient();
 
-  const handleSubmit = async () => {
+  const submitRating = useMutation({
+    mutationFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      const { error } = await supabase.from('delivery_ratings').insert({
+        order_id: orderId,
+        driver_id: driverId,
+        rating,
+        feedback: feedback || null,
+        feedback_tags: selectedTags,
+        reviewer_type: 'consumer',
+      });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Rating submitted',
+        description: 'Thank you for rating your driver!',
+      });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      onRatingSubmitted?.();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: 'Error submitting rating',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleSubmit = () => {
     if (rating === 0) {
       toast({
-        title: "Please select a rating",
-        description: "Rate your driver from 1 to 5 stars",
-        variant: "destructive",
+        title: 'Please select a rating',
+        variant: 'destructive',
       });
       return;
     }
+    submitRating.mutate();
+  };
 
-    try {
-      setIsSubmitting(true);
-      const { error } = await supabase
-        .from('delivery_ratings')
-        .insert({
-          order_id: orderId,
-          driver_id: driverId,
-          rating,
-          feedback: feedback.trim() || null,
-        });
+  const toggleTag = (tag: FeedbackTag) => {
+    setSelectedTags(prev =>
+      prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+    );
+  };
 
-      if (error) throw error;
-
-      toast({
-        title: "Thank you for your feedback!",
-        description: "Your rating has been submitted",
-      });
-
-      onRatingSubmitted?.();
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+  const getTagVariant = (tag: FeedbackTag): 'default' | 'secondary' | 'destructive' => {
+    if (DRIVER_FEEDBACK_TAGS.positive.includes(tag)) return 'default';
+    if (DRIVER_FEEDBACK_TAGS.negative.includes(tag)) return 'destructive';
+    return 'secondary';
   };
 
   return (
-    <Card>
+    <Card className="w-full">
       <CardHeader>
         <CardTitle>Rate Your Driver</CardTitle>
         <CardDescription>
-          How was your delivery experience{driverName ? ` with ${driverName}` : ''}?
+          {driverName ? `How was your experience with ${driverName}?` : 'How was your delivery experience?'}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -75,13 +99,13 @@ export const DriverRating = ({ orderId, driverId, driverName, onRatingSubmitted 
               key={star}
               type="button"
               onClick={() => setRating(star)}
-              onMouseEnter={() => setHoveredRating(star)}
-              onMouseLeave={() => setHoveredRating(0)}
+              onMouseEnter={() => setHover(star)}
+              onMouseLeave={() => setHover(0)}
               className="transition-transform hover:scale-110"
             >
               <Star
-                className={`h-10 w-10 ${
-                  star <= (hoveredRating || rating)
+                className={`h-8 w-8 ${
+                  star <= (hover || rating)
                     ? 'fill-yellow-400 text-yellow-400'
                     : 'text-gray-300'
                 }`}
@@ -91,35 +115,46 @@ export const DriverRating = ({ orderId, driverId, driverName, onRatingSubmitted 
         </div>
 
         {rating > 0 && (
-          <p className="text-center text-sm text-muted-foreground">
-            {rating === 5 && "Excellent!"}
-            {rating === 4 && "Great job!"}
-            {rating === 3 && "Good"}
-            {rating === 2 && "Could be better"}
-            {rating === 1 && "Needs improvement"}
-          </p>
-        )}
+          <>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Quick Feedback (Optional)</label>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(DRIVER_FEEDBACK_TAGS).map(([category, tags]) =>
+                  tags.map(tag => (
+                    <Badge
+                      key={tag}
+                      variant={selectedTags.includes(tag) ? getTagVariant(tag) : 'outline'}
+                      className="cursor-pointer"
+                      onClick={() => toggleTag(tag)}
+                    >
+                      {tag}
+                    </Badge>
+                  ))
+                )}
+              </div>
+            </div>
 
-        <div className="space-y-2">
-          <label htmlFor="feedback" className="text-sm font-medium">
-            Additional Feedback (Optional)
-          </label>
-          <Textarea
-            id="feedback"
-            placeholder="Tell us more about your experience..."
-            value={feedback}
-            onChange={(e) => setFeedback(e.target.value)}
-            rows={3}
-            maxLength={500}
-          />
-        </div>
+            <div className="space-y-2">
+              <label htmlFor="feedback" className="text-sm font-medium">
+                Additional Comments (Optional)
+              </label>
+              <Textarea
+                id="feedback"
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+                placeholder="Share more details about your experience..."
+                rows={3}
+              />
+            </div>
+          </>
+        )}
 
         <Button
           onClick={handleSubmit}
-          disabled={isSubmitting || rating === 0}
+          disabled={rating === 0 || submitRating.isPending}
           className="w-full"
         >
-          {isSubmitting ? "Submitting..." : "Submit Rating"}
+          {submitRating.isPending ? 'Submitting...' : 'Submit Rating'}
         </Button>
       </CardContent>
     </Card>

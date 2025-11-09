@@ -83,6 +83,9 @@ const DriverAuth = () => {
       if (signUpError) throw signUpError;
       if (!authData.user) throw new Error("Failed to create user account");
 
+      // Wait for auth trigger to complete
+      await new Promise(resolve => setTimeout(resolve, 300));
+
       // Assign driver role
       const { error: roleError } = await supabase
         .from('user_roles')
@@ -91,7 +94,12 @@ const DriverAuth = () => {
           role: 'driver'
         });
 
-      if (roleError) throw roleError;
+      if (roleError) {
+        // Check if it's a duplicate key error (role already exists)
+        if (!roleError.message?.includes('duplicate key')) {
+          throw roleError;
+        }
+      }
 
       // Update profile with driver information
       const { error: profileError } = await supabase
@@ -109,6 +117,7 @@ const DriverAuth = () => {
           vehicle_year: formData.vehicleYear,
           license_number: formData.licenseNumber,
           approval_status: 'pending',
+          applied_role: 'driver',
           acquisition_channel: acquisitionChannel,
           delivery_days: formData.availability ? [formData.availability] : null,
           additional_info: formData.additionalInfo || null,

@@ -135,6 +135,20 @@ const FarmerAuth = () => {
       // Wait for auth trigger to complete before updating profile
       await new Promise(resolve => setTimeout(resolve, 500));
 
+      // Assign farmer role immediately (prevents role assignment issues)
+      const roleToAssign = farmerType === "lead" ? 'lead_farmer' : 'farmer';
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .insert({ 
+          user_id: authData.user.id, 
+          role: roleToAssign 
+        });
+
+      if (roleError) {
+        // Role already exists or other error - log but don't fail
+        console.error('Role assignment warning:', roleError);
+      }
+
       // For lead farmers, use their farm address as the collection point
       const collectionPointAddress = farmerType === "lead" 
         ? `${formData.streetAddress}${formData.streetAddressLine2 ? `, ${formData.streetAddressLine2}` : ''}, ${formData.city}, ${formData.state} ${formData.zipCode}`

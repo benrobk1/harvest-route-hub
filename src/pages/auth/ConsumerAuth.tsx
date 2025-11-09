@@ -87,12 +87,20 @@ const ConsumerAuth = () => {
       if (error) throw error;
 
       if (data.user) {
+        // Wait for auth trigger to complete
+        await new Promise(resolve => setTimeout(resolve, 300));
+
         // Assign consumer role
         const { error: roleError } = await supabase
           .from('user_roles')
           .insert({ user_id: data.user.id, role: 'consumer' });
 
-        if (roleError) throw roleError;
+        if (roleError) {
+          // Check if it's a duplicate key error (role already exists)
+          if (!roleError.message?.includes('duplicate key')) {
+            throw roleError;
+          }
+        }
 
         // Process referral code if provided
         if (referralCodeInput) {

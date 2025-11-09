@@ -189,31 +189,53 @@ const UserApprovals = () => {
         .single();
       if (profileFetchError) throw profileFetchError;
 
-      // Assign role based on applied_role (default to 'farmer')
-      const appliedRole = (profileData?.applied_role as 'farmer' | 'lead_farmer') ?? 'farmer';
-      const { error: roleAssignError } = await supabase
+      // Validate and assign role based on applied_role
+      const appliedRole = profileData?.applied_role as 'farmer' | 'lead_farmer' | 'driver' | null;
+      if (!appliedRole) {
+        throw new Error('User has no applied role specified. Cannot approve.');
+      }
+
+      // Validate it's a valid role
+      const validRoles: Array<'farmer' | 'lead_farmer' | 'driver'> = ['farmer', 'lead_farmer', 'driver'];
+      if (!validRoles.includes(appliedRole)) {
+        throw new Error(`Invalid applied role: ${appliedRole}`);
+      }
+
+      // Check if role already exists to prevent duplicates
+      const { data: existingRole } = await supabase
         .from('user_roles')
-        .upsert({ user_id: userId, role: appliedRole }, { onConflict: 'user_id,role' });
-      if (roleAssignError) throw roleAssignError;
-
-      // Ensure a farm profile exists for dropdowns
-      const { data: existingFarm, error: farmCheckError } = await supabase
-        .from('farm_profiles')
-        .select('id')
-        .eq('farmer_id', userId)
+        .select('role')
+        .eq('user_id', userId)
+        .eq('role', appliedRole)
         .maybeSingle();
-      if (farmCheckError) throw farmCheckError;
 
-      if (!existingFarm) {
-        const { error: farmInsertError } = await supabase
+      if (!existingRole) {
+        const { error: roleAssignError } = await supabase
+          .from('user_roles')
+          .insert([{ user_id: userId, role: appliedRole }]);
+        if (roleAssignError) throw roleAssignError;
+      }
+
+      // Ensure a farm profile exists for farmers/lead_farmers only
+      if (appliedRole === 'farmer' || appliedRole === 'lead_farmer') {
+        const { data: existingFarm, error: farmCheckError } = await supabase
           .from('farm_profiles')
-          .insert({
-            farmer_id: userId,
-            farm_name: profileData?.farm_name || 'Untitled Farm',
-            description: profileData?.additional_info || null,
-            location: [profileData?.city, profileData?.state].filter(Boolean).join(', ') || null,
-          });
-        if (farmInsertError) throw farmInsertError;
+          .select('id')
+          .eq('farmer_id', userId)
+          .maybeSingle();
+        if (farmCheckError) throw farmCheckError;
+
+        if (!existingFarm) {
+          const { error: farmInsertError } = await supabase
+            .from('farm_profiles')
+            .insert({
+              farmer_id: userId,
+              farm_name: profileData?.farm_name || 'Untitled Farm',
+              description: profileData?.additional_info || null,
+              location: [profileData?.city, profileData?.state].filter(Boolean).join(', ') || null,
+            });
+          if (farmInsertError) throw farmInsertError;
+        }
       }
     },
     onSuccess: () => {
@@ -317,10 +339,34 @@ const UserApprovals = () => {
           .single();
 
         if (profileData) {
-          const appliedRole = (profileData?.applied_role as 'farmer' | 'lead_farmer' | 'driver') ?? 'farmer';
-          await supabase
+          const appliedRole = profileData?.applied_role as 'farmer' | 'lead_farmer' | 'driver' | null;
+          
+          // Validate role exists
+          if (!appliedRole) {
+            console.error(`User ${userId} has no applied role, skipping role assignment`);
+            continue;
+          }
+
+          // Validate it's a valid role
+          const validRoles: Array<'farmer' | 'lead_farmer' | 'driver'> = ['farmer', 'lead_farmer', 'driver'];
+          if (!validRoles.includes(appliedRole)) {
+            console.error(`User ${userId} has invalid applied role: ${appliedRole}, skipping`);
+            continue;
+          }
+
+          // Check if role already exists to prevent duplicates
+          const { data: existingRole } = await supabase
             .from('user_roles')
-            .upsert({ user_id: userId, role: appliedRole }, { onConflict: 'user_id,role' });
+            .select('role')
+            .eq('user_id', userId)
+            .eq('role', appliedRole)
+            .maybeSingle();
+
+          if (!existingRole) {
+            await supabase
+              .from('user_roles')
+              .insert([{ user_id: userId, role: appliedRole }]);
+          }
 
           // Create farm profile if it's a farmer/lead_farmer
           if (appliedRole === 'farmer' || appliedRole === 'lead_farmer') {

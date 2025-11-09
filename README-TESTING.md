@@ -102,17 +102,36 @@ describe('calculateDeliveryFee', () => {
 - ✅ Credits system (`src/lib/__tests__/creditsHelpers.test.ts`)
 - ✅ Delivery fees & revenue split (`src/lib/__tests__/deliveryFeeHelpers.test.ts`)
 - ✅ Driver expense estimation (`src/lib/__tests__/driverEarningsHelpers.test.ts`)
+- ✅ Address helpers (`src/lib/__tests__/addressHelpers.test.ts`)
+- ✅ Distance calculations (`src/lib/__tests__/distanceHelpers.test.ts`)
+- ✅ Order helpers (`src/lib/__tests__/orderHelpers.test.ts`)
+- ✅ Rating helpers (`src/lib/__tests__/ratingHelpers.test.ts`)
+- ✅ Market helpers (`src/lib/__tests__/marketHelpers.test.ts`)
+- ✅ Image helpers (`src/lib/__tests__/imageHelpers.test.ts`)
+- ✅ CSV parser (`src/lib/__tests__/csvParser.test.ts`)
+- ✅ PDF generator (`src/lib/__tests__/pdfGenerator.test.ts`)
 
-#### Feature Modules (To Add)
+#### Edge Functions Tests
+- ✅ Checkout flow (`supabase/functions/__tests__/checkout.test.ts`)
+- ✅ Stripe webhooks (`supabase/functions/__tests__/stripe-webhook.test.ts`)
+- ✅ Payout processing (`supabase/functions/__tests__/process-payouts.test.ts`)
+- ✅ Batch generation (`supabase/functions/__tests__/generate-batches.test.ts`)
+
+#### Test Infrastructure
+- ✅ Supabase mock (`src/test/mocks/supabase.ts`)
+- ✅ Stripe mock (`src/test/mocks/stripe.ts`)
+- ✅ Auth context mock (`src/test/mocks/authContext.ts`)
+- ✅ User factory (`src/test/factories/userFactory.ts`)
+- ✅ Product factory (`src/test/factories/productFactory.ts`)
+- ✅ Order factory (`src/test/factories/orderFactory.ts`)
+- ✅ Cart factory (`src/test/factories/cartFactory.ts`)
+- ✅ Render with providers (`src/test/helpers/renderWithProviders.tsx`)
+
+#### Feature Modules (To Add in Phase 2)
 - ⏳ Cart operations (`src/features/cart/`)
 - ⏳ Order management (`src/features/orders/`)
 - ⏳ Product queries (`src/features/products/`)
 - ⏳ Payout calculations (`src/features/payouts/`)
-
-#### Utilities (To Add)
-- ⏳ Address helpers (`src/lib/addressHelpers.ts`)
-- ⏳ Distance calculations (`src/lib/distanceHelpers.ts`)
-- ⏳ Rating helpers (`src/lib/ratingHelpers.ts`)
 
 ### E2E Tests Coverage
 - ✅ Consumer checkout flow (`e2e/checkout-flow.spec.ts`)
@@ -126,11 +145,34 @@ describe('calculateDeliveryFee', () => {
 
 ## Unit Tests (Vitest)
 
-Run unit tests:
+### Running Tests
+
+Run all tests:
 ```bash
-npm run test
-# or
-npx vitest
+npm test
+```
+
+Run specific test types:
+```bash
+# Unit tests for helper functions
+npm run test:unit
+
+# Component tests
+npm run test:components
+
+# Integration tests
+npm run test:integration
+```
+
+Run tests in watch mode (for development):
+```bash
+npm run test:watch
+```
+
+Run tests with coverage:
+```bash
+npm run test:coverage
+npm run test:coverage:detailed  # HTML report
 ```
 
 Run tests with UI:
@@ -138,13 +180,6 @@ Run tests with UI:
 npm run test:ui
 # or
 npx vitest --ui
-```
-
-Run tests with coverage:
-```bash
-npm run test:coverage
-# or
-npx vitest --coverage
 ```
 
 ### Writing Unit Tests
@@ -159,14 +194,45 @@ describe('formatMoney', () => {
   it('formats amounts correctly', () => {
     expect(formatMoney(100)).toBe('$100.00');
   });
+  
+  it('handles edge cases', () => {
+    expect(formatMoney(0)).toBe('$0.00');
+    expect(formatMoney(-50.25)).toBe('-$50.25');
+  });
 });
+```
+
+### Test Utilities
+
+Use test mocks and factories for consistent test data:
+
+```typescript
+import { createMockSupabaseClient } from '@/test/mocks/supabase';
+import { createMockProduct } from '@/test/factories/productFactory';
+import { renderWithProviders } from '@/test/helpers/renderWithProviders';
+
+// Mock Supabase client
+const supabase = createMockSupabaseClient();
+
+// Create test product
+const product = createMockProduct({ price: 9.99 });
+
+// Render component with providers
+renderWithProviders(<ProductCard product={product} />);
 ```
 
 ## E2E Tests (Playwright)
 
 Run e2e tests:
 ```bash
+npm run test:e2e
+# or
 npx playwright test
+```
+
+Run only critical path tests:
+```bash
+npm run test:e2e:critical
 ```
 
 Run tests in UI mode:
@@ -193,6 +259,26 @@ test('user can checkout', async ({ page }) => {
   await expect(page.getByText(/1/)).toBeVisible();
 });
 ```
+
+## Edge Function Tests (Deno)
+
+Edge functions use Deno's test runner:
+
+```bash
+npm run test:edge-functions
+# or
+cd supabase/functions && deno test --allow-env --allow-net __tests__/
+```
+
+Edge function tests validate:
+- Authentication and authorization
+- Rate limiting
+- Input validation
+- Business logic
+- Error handling
+- Integration with Stripe and other services
+
+See `supabase/functions/__tests__/` for examples.
 
 ## Error Tracking (Sentry)
 

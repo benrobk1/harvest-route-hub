@@ -58,6 +58,9 @@ const AdminAuth = () => {
         title: "Access granted",
         description: "Redirecting to management portal...",
       });
+
+      // Wait for AuthContext to load roles before navigating
+      await new Promise(resolve => setTimeout(resolve, 500));
       navigate("/admin/dashboard");
     } catch (error: any) {
       toast({

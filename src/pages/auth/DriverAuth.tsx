@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "react-router-dom";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Truck, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -42,7 +42,7 @@ const DriverAuth = () => {
     city: "",
     state: "",
     zipCode: "",
-    availability: "",
+    availability: [] as string[],
     additionalInfo: "",
   });
 
@@ -119,7 +119,7 @@ const DriverAuth = () => {
           approval_status: 'pending',
           applied_role: 'driver',
           acquisition_channel: acquisitionChannel,
-          delivery_days: formData.availability ? [formData.availability] : null,
+          delivery_days: formData.availability.length > 0 ? formData.availability : null,
           additional_info: formData.additionalInfo || null,
         })
         .eq('id', authData.user.id);
@@ -147,7 +147,7 @@ const DriverAuth = () => {
         city: "",
         state: "",
         zipCode: "",
-        availability: "",
+        availability: [],
         additionalInfo: "",
       });
     } catch (error: any) {
@@ -387,25 +387,30 @@ const DriverAuth = () => {
                       onChange={(e) => setFormData({...formData, zipCode: e.target.value})}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="availability">Availability</Label>
-                    <Select
-                      value={formData.availability}
-                      onValueChange={(value) => setFormData({...formData, availability: value})}
-                    >
-                      <SelectTrigger id="availability">
-                        <SelectValue placeholder="Select preferred delivery day" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Monday">Monday</SelectItem>
-                        <SelectItem value="Tuesday">Tuesday</SelectItem>
-                        <SelectItem value="Wednesday">Wednesday</SelectItem>
-                        <SelectItem value="Thursday">Thursday</SelectItem>
-                        <SelectItem value="Friday">Friday</SelectItem>
-                        <SelectItem value="Saturday">Saturday</SelectItem>
-                        <SelectItem value="Sunday">Sunday</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="space-y-3">
+                    <Label>Preferred Delivery Days</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Select days you're available to deliver
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day) => (
+                        <div key={day} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`signup-day-${day}`}
+                            checked={formData.availability.includes(day)}
+                            onCheckedChange={(checked) => {
+                              const newDays = checked
+                                ? [...formData.availability, day]
+                                : formData.availability.filter(d => d !== day);
+                              setFormData({ ...formData, availability: newDays });
+                            }}
+                          />
+                          <Label htmlFor={`signup-day-${day}`} className="font-normal cursor-pointer">
+                            {day}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
                   </div>
 
                   <div className="space-y-2">

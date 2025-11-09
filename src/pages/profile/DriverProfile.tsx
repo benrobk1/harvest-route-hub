@@ -14,6 +14,7 @@ import { DocumentUpload } from "@/components/DocumentUpload";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const DriverProfile = () => {
   const navigate = useNavigate();
@@ -37,6 +38,7 @@ const DriverProfile = () => {
     driver_license_url: null,
     insurance_url: null,
     rejected_reason: null,
+    delivery_days: [] as string[],
   });
 
   useEffect(() => {
@@ -81,6 +83,7 @@ const DriverProfile = () => {
         driver_license_url: data.driver_license_url,
         insurance_url: data.insurance_url,
         rejected_reason: data.rejected_reason,
+        delivery_days: data.delivery_days || [],
       });
     }
   };
@@ -106,6 +109,7 @@ const DriverProfile = () => {
         vehicle_make: profile.vehicle_make,
         vehicle_year: profile.vehicle_year,
         license_number: profile.license_number,
+        delivery_days: profile.delivery_days,
       })
       .eq("id", user.id);
 
@@ -305,6 +309,41 @@ const DriverProfile = () => {
                   onChange={(e) => setProfile({ ...profile, vehicle_year: e.target.value })}
                   placeholder="2020"
                 />
+              </div>
+
+              <div className="space-y-3">
+                <Label>Preferred Delivery Days</Label>
+                <p className="text-sm text-muted-foreground">
+                  Select days you're available to deliver. Routes on these days will appear first in Available Routes.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day) => (
+                    <div key={day} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`day-${day}`}
+                        checked={profile.delivery_days.includes(day)}
+                        onCheckedChange={(checked) => {
+                          const newDays = checked
+                            ? [...profile.delivery_days, day]
+                            : profile.delivery_days.filter(d => d !== day);
+                          setProfile({ ...profile, delivery_days: newDays });
+                        }}
+                      />
+                      <Label htmlFor={`day-${day}`} className="font-normal cursor-pointer">
+                        {day}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+                {profile.delivery_days.length > 0 && (
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    {profile.delivery_days.map((day) => (
+                      <Badge key={day} variant="secondary">
+                        {day}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
               </div>
 
                   <Button type="submit" className="w-full" disabled={isLoading}>

@@ -38,6 +38,7 @@ interface UserProfile {
   // Farmer fields
   farm_name: string | null;
   street_address: string | null;
+  address_line_2: string | null;
   city: string | null;
   state: string | null;
   zip_code: string | null;
@@ -491,18 +492,35 @@ const UserApprovals = () => {
                         <h3 className="font-semibold mb-3 text-sm text-muted-foreground uppercase tracking-wide">Driver Details</h3>
                         <div className="grid grid-cols-2 gap-4 text-sm">
                           <div>
-                            <span className="text-muted-foreground">Vehicle:</span>{' '}
-                            {[user.vehicle_type, user.vehicle_make, user.vehicle_year].filter(Boolean).join(' ') || 'N/A'}
-                          </div>
-                          <div>
                             <span className="text-muted-foreground">License #:</span> {user.license_number || 'N/A'}
                           </div>
                           <div>
-                            <span className="text-muted-foreground">ZIP Code:</span> {user.zip_code || 'N/A'}
+                            <span className="text-muted-foreground">Vehicle Type:</span> {user.vehicle_type || 'N/A'}
                           </div>
-                          {user.delivery_days && user.delivery_days.length > 0 && (
+                          {user.vehicle_make && (
                             <div>
+                              <span className="text-muted-foreground">Vehicle Make/Model:</span> {user.vehicle_make}
+                            </div>
+                          )}
+                          {user.vehicle_year && (
+                            <div>
+                              <span className="text-muted-foreground">Vehicle Year:</span> {user.vehicle_year}
+                            </div>
+                          )}
+                          {user.delivery_days && user.delivery_days.length > 0 && (
+                            <div className="col-span-2">
                               <span className="text-muted-foreground">Availability:</span> {user.delivery_days.join(', ')}
+                            </div>
+                          )}
+                          {user.street_address && (
+                            <div className="col-span-2">
+                              <span className="text-muted-foreground">Full Address:</span>
+                              <div className="text-sm mt-1">
+                                {user.street_address}
+                                {user.address_line_2 && <><br />{user.address_line_2}</>}
+                                <br />
+                                {user.city}, {user.state} {user.zip_code}
+                              </div>
                             </div>
                           )}
                           {user.additional_info && (
@@ -735,17 +753,48 @@ const UserApprovals = () => {
                   )}
 
                   {/* Driver-specific fields */}
-                  {user.roles.includes('driver') && (
+                  {(user.applied_role === 'driver' || user.roles.includes('driver')) && (
                     <div>
                       <h3 className="font-semibold mb-3 text-sm text-muted-foreground uppercase tracking-wide">Driver Details</h3>
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
-                          <span className="text-muted-foreground">Vehicle:</span>{' '}
-                          {[user.vehicle_type, user.vehicle_make, user.vehicle_year].filter(Boolean).join(' ') || 'N/A'}
-                        </div>
-                        <div>
                           <span className="text-muted-foreground">License #:</span> {user.license_number || 'N/A'}
                         </div>
+                        <div>
+                          <span className="text-muted-foreground">Vehicle Type:</span> {user.vehicle_type || 'N/A'}
+                        </div>
+                        {user.vehicle_make && (
+                          <div>
+                            <span className="text-muted-foreground">Vehicle Make/Model:</span> {user.vehicle_make}
+                          </div>
+                        )}
+                        {user.vehicle_year && (
+                          <div>
+                            <span className="text-muted-foreground">Vehicle Year:</span> {user.vehicle_year}
+                          </div>
+                        )}
+                        {user.delivery_days && user.delivery_days.length > 0 && (
+                          <div className="col-span-2">
+                            <span className="text-muted-foreground">Availability:</span> {user.delivery_days.join(', ')}
+                          </div>
+                        )}
+                        {user.street_address && (
+                          <div className="col-span-2">
+                            <span className="text-muted-foreground">Full Address:</span>
+                            <div className="text-sm mt-1">
+                              {user.street_address}
+                              {user.address_line_2 && <><br />{user.address_line_2}</>}
+                              <br />
+                              {user.city}, {user.state} {user.zip_code}
+                            </div>
+                          </div>
+                        )}
+                        {user.additional_info && (
+                          <div className="col-span-2">
+                            <span className="text-muted-foreground">Additional Information:</span>
+                            <div className="text-sm mt-1 whitespace-pre-wrap">{user.additional_info}</div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}

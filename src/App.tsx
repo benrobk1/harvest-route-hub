@@ -7,7 +7,6 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { RoleGate } from "@/components/RoleGate";
 import { InstallPromptToast } from "@/components/InstallPromptToast";
 import { ErrorBoundary } from "@/lib/errors/ErrorBoundary";
-import { SentryHealthCheck } from "@/lib/errors/SentryHealthCheck";
 import React from "react";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
@@ -91,7 +90,6 @@ const AppContent = () => {
 
   return (
     <>
-      <SentryHealthCheck />
       <CookieConsent />
       <InstallPromptToast />
       <Routes>

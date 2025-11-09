@@ -1,6 +1,17 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Stripe from "https://esm.sh/stripe@18.5.0";
+import { loadConfig } from '../_shared/config.ts';
+import { RATE_LIMITS } from '../_shared/constants.ts';
+import { checkRateLimit } from '../_shared/rateLimiter.ts';
+import { StripeConnectOnboardRequestSchema } from '../_shared/contracts/stripe.ts';
+
+/**
+ * STRIPE CONNECT ONBOARDING
+ * 
+ * Creates Stripe Connect accounts and generates onboarding links.
+ * Only farmers and drivers can initiate onboarding.
+ */
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,57 +23,77 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-    );
+  const requestId = crypto.randomUUID();
+  console.log(`[${requestId}] [STRIPE-CONNECT-ONBOARD] Request started`);
 
-    // Parse optional body for overrides (origin/returnPath)
-    let body: any = {};
-    try {
-      body = await req.json();
-    } catch (_) {
-      body = {};
-    }
+  try {
+    const config = loadConfig();
+    const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey);
 
     // Authenticate user
-    const authHeader = req.headers.get('Authorization')!;
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
-    
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'UNAUTHORIZED' }), {
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'UNAUTHORIZED', code: 'UNAUTHORIZED' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    console.log('Stripe Connect onboarding request for user:', user.id);
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'UNAUTHORIZED', code: 'UNAUTHORIZED' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
-    // Verify user is farmer or driver - use service role to bypass RLS
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    // Rate limiting
+    const rateCheck = await checkRateLimit(supabase, user.id, RATE_LIMITS.STRIPE_CONNECT_ONBOARD);
+    if (!rateCheck.allowed) {
+      console.warn(`[${requestId}] ⚠️ Rate limit exceeded for user ${user.id}`);
+      return new Response(JSON.stringify({ 
+        error: 'TOO_MANY_REQUESTS', 
+        message: 'Too many requests. Please try again later.',
+        retryAfter: rateCheck.retryAfter,
+      }), {
+        status: 429,
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json',
+          'Retry-After': String(rateCheck.retryAfter || 60),
+        }
+      });
+    }
 
-    const { data: userRoles, error: rolesError } = await supabaseAdmin
+    // Validate input (optional body)
+    let body: any = {};
+    try {
+      const rawBody = await req.json();
+      const validationResult = StripeConnectOnboardRequestSchema.safeParse(rawBody);
+      if (validationResult.success) {
+        body = validationResult.data;
+      }
+    } catch (_) {
+      body = {};
+    }
+
+    // Verify user is farmer or driver
+    const { data: userRoles, error: rolesError } = await supabase
       .from('user_roles')
       .select('role')
       .eq('user_id', user.id);
 
-    console.log('User roles query result:', { userRoles, rolesError });
-
     const roles = userRoles?.map(r => r.role) || [];
-    console.log('User roles:', roles);
-    
     const isFarmerOrDriver = roles.includes('farmer') || roles.includes('lead_farmer') || roles.includes('driver');
 
     if (!isFarmerOrDriver) {
+      console.warn(`[${requestId}] ⚠️ Invalid role for user ${user.id}: ${roles.join(', ')}`);
       return new Response(JSON.stringify({ 
         error: 'INVALID_ROLE',
         message: 'Only farmers and drivers can connect Stripe accounts',
-        debug: { roles, userId: user.id }
+        code: 'INVALID_ROLE'
       }), {
         status: 403,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -70,22 +101,22 @@ serve(async (req) => {
     }
 
     // Get user profile
-    const { data: profile } = await supabaseClient
+    const { data: profile } = await supabase
       .from('profiles')
       .select('stripe_connect_account_id, email, full_name')
       .eq('id', user.id)
       .single();
 
     // Initialize Stripe
-    const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') || '', {
-      // Using account default API version for compatibility
+    const stripe = new Stripe(config.stripe.secretKey, {
+      // Using account default API version
     });
 
     let accountId = profile?.stripe_connect_account_id;
 
     // Create Connect account if doesn't exist
     if (!accountId) {
-      console.log('Creating new Stripe Connect account...');
+      console.log(`[${requestId}] Creating new Stripe Connect account...`);
       
       const account = await stripe.accounts.create({
         type: 'express',
@@ -101,16 +132,16 @@ serve(async (req) => {
       });
 
       accountId = account.id;
-      console.log('Created Stripe Connect account:', accountId);
+      console.log(`[${requestId}] Created Stripe Connect account: ${accountId}`);
 
       // Update profile with account ID
-      await supabaseClient
+      await supabase
         .from('profiles')
         .update({ stripe_connect_account_id: accountId })
         .eq('id', user.id);
     }
 
-    // Create account link for onboarding - prefer client-provided origin/returnPath if present
+    // Create account link for onboarding
     const headerOrigin = req.headers.get('origin') || '';
     const baseOrigin = body.origin || headerOrigin || 'http://localhost:3000';
     const defaultPath = roles.includes('driver') ? '/driver/profile' : '/farmer/profile';
@@ -123,7 +154,7 @@ serve(async (req) => {
       type: 'account_onboarding',
     });
 
-    console.log('Account link created:', accountLink.url);
+    console.log(`[${requestId}] ✅ Account link created for ${accountId}`);
 
     return new Response(JSON.stringify({
       success: true,
@@ -135,10 +166,11 @@ serve(async (req) => {
     });
 
   } catch (error: any) {
-    console.error('Stripe Connect onboarding error:', error);
+    console.error(`[${requestId}] ❌ Stripe Connect onboarding error:`, error);
     return new Response(JSON.stringify({ 
       error: 'SERVER_ERROR',
-      message: error.message 
+      message: error.message,
+      code: 'STRIPE_ERROR'
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

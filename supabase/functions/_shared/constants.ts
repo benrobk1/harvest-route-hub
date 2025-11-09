@@ -76,6 +76,31 @@ export const RATE_LIMITS = {
     windowMs: 15 * 60 * 1000, // 15 minutes
     keyPrefix: 'create-subscription'
   },
+  GENERATE_1099: {
+    maxRequests: 2,
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    keyPrefix: 'generate-1099'
+  },
+  CHECK_STRIPE_CONNECT: {
+    maxRequests: 50,
+    windowMs: 15 * 60 * 1000, // 15 minutes (read-heavy)
+    keyPrefix: 'check-stripe-connect'
+  },
+  CHECK_SUBSCRIPTION: {
+    maxRequests: 100,
+    windowMs: 15 * 60 * 1000, // 15 minutes (very high-traffic)
+    keyPrefix: 'check-subscription'
+  },
+  STRIPE_CONNECT_ONBOARD: {
+    maxRequests: 10,
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    keyPrefix: 'stripe-connect-onboard'
+  },
+  GENERATE_BATCHES: {
+    maxRequests: 1,
+    windowMs: 10 * 60 * 1000, // 10 minutes
+    keyPrefix: 'generate-batches'
+  },
 } as const;
 
 // Subscription

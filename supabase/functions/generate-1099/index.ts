@@ -1,56 +1,126 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { PDFDocument, rgb, StandardFonts } from "https://esm.sh/pdf-lib@1.17.1";
+import { loadConfig } from '../_shared/config.ts';
+import { withAdminAuth } from '../_shared/middleware/withAdminAuth.ts';
+import { withCORS } from '../_shared/middleware/withCORS.ts';
+import { withRequestId } from '../_shared/middleware/withRequestId.ts';
+import { withErrorHandling } from '../_shared/middleware/withErrorHandling.ts';
+import { withRateLimit } from '../_shared/middleware/withRateLimit.ts';
+import { RATE_LIMITS } from '../_shared/constants.ts';
+import { Generate1099RequestSchema } from '../_shared/contracts/admin.ts';
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+/**
+ * GENERATE 1099 EDGE FUNCTION
+ * 
+ * Generates IRS Form 1099-NEC PDFs for recipients with $600+ earnings.
+ * Requires admin authentication and validation.
+ */
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
-
+  const requestId = crypto.randomUUID();
+  
   try {
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
+    const config = loadConfig();
+    const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey);
+    const corsHeaders = {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    };
 
-    // Verify admin role
-    const authHeader = req.headers.get("Authorization")!;
-    const token = authHeader.replace("Bearer ", "");
-    const { data: userData } = await supabaseClient.auth.getUser(token);
+    // Handle CORS preflight
+    if (req.method === 'OPTIONS') {
+      return new Response(null, { headers: corsHeaders });
+    }
+
+    console.log(`[${requestId}] [GENERATE-1099] Request started`);
+
+    // Authenticate admin user
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'UNAUTHORIZED', code: 'UNAUTHORIZED' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: userData } = await supabase.auth.getUser(token);
     const user = userData.user;
     
-    if (!user) throw new Error("Unauthorized");
+    if (!user) {
+      return new Response(JSON.stringify({ error: 'UNAUTHORIZED', code: 'UNAUTHORIZED' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // Check admin role
-    const { data: roles } = await supabaseClient
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id)
-      .eq('role', 'admin')
-      .single();
+    const { data: hasAdmin } = await supabase.rpc('has_role', {
+      _user_id: user.id,
+      _role: 'admin'
+    });
 
-    if (!roles) throw new Error("Admin access required");
+    if (!hasAdmin) {
+      return new Response(JSON.stringify({ error: 'Admin access required', code: 'UNAUTHORIZED' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
-    const { year, recipient_id } = await req.json();
+    // Rate limiting
+    const rateCheck = await checkRateLimit(supabase, user.id, RATE_LIMITS.GENERATE_1099);
+    if (!rateCheck.allowed) {
+      return new Response(JSON.stringify({ 
+        error: 'TOO_MANY_REQUESTS', 
+        message: 'Too many requests. Please try again later.',
+        retryAfter: rateCheck.retryAfter,
+      }), {
+        status: 429,
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json',
+          'Retry-After': String(rateCheck.retryAfter || 60),
+        }
+      });
+    }
+
+    // Validate input
+    const body = await req.json();
+    const result = Generate1099RequestSchema.safeParse(body);
+
+    if (!result.success) {
+      return new Response(JSON.stringify({
+        error: 'VALIDATION_ERROR',
+        message: 'Request validation failed',
+        details: result.error.flatten(),
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const { year, recipient_id } = result.data;
     
     // Fetch recipient tax info
-    const { data: profile, error: profileError } = await supabaseClient
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', recipient_id)
       .single();
     
     if (profileError || !profile?.tax_id_encrypted) {
-      throw new Error('Recipient has not submitted tax information');
+      return new Response(JSON.stringify({ 
+        error: 'Recipient has not submitted tax information',
+        code: 'NO_TAX_INFO'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
     
     // Fetch all completed payouts for the year
-    const { data: payouts } = await supabaseClient
+    const { data: payouts } = await supabase
       .from('payouts')
       .select('amount, description')
       .eq('recipient_id', recipient_id)
@@ -62,6 +132,7 @@ serve(async (req) => {
     
     // Only generate 1099 if total >= $600 (IRS threshold)
     if (totalAmount < 600) {
+      console.log(`[${requestId}] ✅ Below threshold: $${totalAmount}`);
       return new Response(JSON.stringify({ 
         below_threshold: true,
         message: `Total earnings $${totalAmount.toFixed(2)} below $600 threshold. 1099 not required.`,
@@ -149,9 +220,9 @@ serve(async (req) => {
     });
     
     const pdfBytes = await pdfDoc.save();
-    
-    // Convert to plain Uint8Array for Response compatibility
     const buffer = new Uint8Array(pdfBytes);
+    
+    console.log(`[${requestId}] ✅ Generated 1099-NEC for ${recipient_id}: $${totalAmount.toFixed(2)}`);
     
     return new Response(buffer, {
       headers: {
@@ -161,10 +232,58 @@ serve(async (req) => {
       },
     });
   } catch (error: any) {
-    console.error('1099 generation error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    console.error(`[${requestId}] ❌ 1099 generation error:`, error);
+    return new Response(JSON.stringify({ 
+      error: error.message,
+      code: 'GENERATION_FAILED'
+    }), {
+      headers: { 
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type': 'application/json' 
+      },
       status: 500,
     });
   }
 });
+
+// Helper function for rate limiting
+async function checkRateLimit(
+  supabase: any,
+  userId: string,
+  config: { maxRequests: number; windowMs: number; keyPrefix: string }
+): Promise<{ allowed: boolean; retryAfter?: number }> {
+  const now = Date.now();
+  const windowStart = now - config.windowMs;
+  const key = `${config.keyPrefix}:${userId}`;
+
+  const { data: recentRequests, error } = await supabase
+    .from('rate_limits')
+    .select('created_at')
+    .eq('key', key)
+    .gte('created_at', new Date(windowStart).toISOString());
+
+  if (error) {
+    console.error('Rate limit check error:', error);
+    return { allowed: true };
+  }
+
+  const requestCount = recentRequests?.length || 0;
+
+  if (requestCount >= config.maxRequests) {
+    const oldestRequest = new Date(recentRequests[0].created_at).getTime();
+    const retryAfter = Math.ceil((oldestRequest + config.windowMs - now) / 1000);
+    return { allowed: false, retryAfter };
+  }
+
+  await supabase
+    .from('rate_limits')
+    .insert({ key, created_at: new Date().toISOString() });
+
+  await supabase
+    .from('rate_limits')
+    .delete()
+    .eq('key', key)
+    .lt('created_at', new Date(windowStart).toISOString());
+
+  return { allowed: true };
+}

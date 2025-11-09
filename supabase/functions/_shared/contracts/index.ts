@@ -11,3 +11,6 @@ export * from './payouts.ts';
 export * from './taxInfo.ts';
 export * from './routes.ts';
 export * from './orders.ts';
+export * from './admin.ts';
+export * from './stripe.ts';
+export * from './subscription.ts';

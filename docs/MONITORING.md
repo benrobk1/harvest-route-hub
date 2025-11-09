@@ -6,7 +6,28 @@ This guide covers monitoring, logging, error tracking, and performance observabi
 
 ## Error Tracking (Sentry)
 
-### Setup
+### Production Setup (CRITICAL)
+
+**⚠️ IMPORTANT:** Sentry is disabled by default. You MUST configure it for production monitoring.
+
+**Setup Steps:**
+1. Create a free account at [https://sentry.io/](https://sentry.io/)
+2. Create a new project (select "React")
+3. Copy your DSN from the project settings
+4. Add `VITE_SENTRY_DSN` to your production environment variables
+5. Deploy your application
+
+**Validation:**
+- Development: Console will show warning if DSN not set
+- Production: Error banner will appear if DSN not set + console error logged
+
+Without Sentry configured in production:
+- ❌ No error tracking
+- ❌ No incident alerts
+- ❌ No performance monitoring
+- ❌ No user feedback collection
+
+### Local Development Setup
 
 Sentry is configured in `src/lib/sentry.ts` for comprehensive error tracking.
 
@@ -34,11 +55,23 @@ try {
 
 ### Environment Variables
 
-Set `VITE_SENTRY_DSN` in your environment:
-
+**Development (.env):**
 ```env
+# Optional in development - logs warning if not set
 VITE_SENTRY_DSN=https://your-dsn@sentry.io/project-id
 ```
+
+**Production (hosting platform environment variables):**
+```env
+# REQUIRED for production monitoring
+VITE_SENTRY_DSN=https://your-dsn@sentry.io/project-id
+```
+
+**Verification:**
+- Run the app and check the browser console
+- Development: Should see "⚠️ Sentry DSN not configured" warning
+- Production: Should see "❌ CRITICAL: Sentry DSN not configured" error + banner
+- With DSN set: Should see "✅ Initializing Sentry error tracking..."
 
 ### What Sentry Captures
 

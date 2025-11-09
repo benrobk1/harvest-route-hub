@@ -101,6 +101,16 @@ export const RATE_LIMITS = {
     windowMs: 10 * 60 * 1000, // 10 minutes
     keyPrefix: 'generate-batches'
   },
+  SEND_NOTIFICATION: {
+    maxRequests: 50,
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    keyPrefix: 'send-notification'
+  },
+  SEND_PUSH_NOTIFICATION: {
+    maxRequests: 20,
+    windowMs: 60 * 60 * 1000, // 1 hour (push service quota protection)
+    keyPrefix: 'send-push-notification'
+  },
 } as const;
 
 // Subscription

@@ -1,49 +1,97 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Resend } from "https://esm.sh/resend@2.0.0";
+import { loadConfig } from '../_shared/config.ts';
+import { RATE_LIMITS } from '../_shared/constants.ts';
+import { checkRateLimit } from '../_shared/rateLimiter.ts';
+import { SendNotificationRequestSchema } from '../_shared/contracts/notifications.ts';
+
+/**
+ * SEND NOTIFICATION EDGE FUNCTION
+ * 
+ * Sends email notifications for various events (orders, batches, reminders).
+ * Requires authentication and uses Resend for email delivery.
+ */
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
-
-interface NotificationRequest {
-  event_type: 'order_confirmation' | 'order_locked' | 'batch_assigned_driver' | 'batch_assigned_farmer' | 'cutoff_reminder';
-  recipient_id: string;
-  recipient_email?: string;
-  data: {
-    order_id?: string;
-    batch_id?: string;
-    delivery_date?: string;
-    total_amount?: number;
-    credits_used?: number;
-    batch_number?: number;
-    order_count?: number;
-    stop_count?: number;
-  };
-}
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
+  const requestId = crypto.randomUUID();
+  console.log(`[${requestId}] [SEND-NOTIFICATION] Request started`);
+
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const config = loadConfig();
+    const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey);
 
-    const { event_type, recipient_id, recipient_email, data }: NotificationRequest = await req.json();
+    // Authenticate user (admin or system)
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'UNAUTHORIZED', code: 'UNAUTHORIZED' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
-    console.log('Sending notification:', { event_type, recipient_id });
+    const token = authHeader.replace('Bearer ', '');
+    const { data: userData } = await supabase.auth.getUser(token);
+    const user = userData.user;
+    
+    if (!user) {
+      return new Response(JSON.stringify({ error: 'UNAUTHORIZED', code: 'UNAUTHORIZED' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Rate limiting
+    const rateCheck = await checkRateLimit(supabase, user.id, RATE_LIMITS.SEND_NOTIFICATION);
+    if (!rateCheck.allowed) {
+      console.warn(`[${requestId}] ⚠️ Rate limit exceeded for user ${user.id}`);
+      return new Response(JSON.stringify({ 
+        error: 'TOO_MANY_REQUESTS', 
+        message: 'Too many requests. Please try again later.',
+        retryAfter: rateCheck.retryAfter,
+      }), {
+        status: 429,
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json',
+          'Retry-After': String(rateCheck.retryAfter || 60),
+        }
+      });
+    }
+
+    // Validate input
+    const body = await req.json();
+    const result = SendNotificationRequestSchema.safeParse(body);
+
+    if (!result.success) {
+      return new Response(JSON.stringify({
+        error: 'VALIDATION_ERROR',
+        message: 'Request validation failed',
+        details: result.error.flatten(),
+        code: 'VALIDATION_ERROR',
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    const { event_type, recipient_id, recipient_email, data } = result.data;
+
+    console.log(`[${requestId}] Sending notification:`, { event_type, recipient_id });
 
     // Get recipient email if not provided
     let toEmail = recipient_email;
     if (!toEmail) {
-      const { data: profile } = await supabaseClient
+      const { data: profile } = await supabase
         .from('profiles')
         .select('email')
         .eq('id', recipient_id)
@@ -53,8 +101,11 @@ serve(async (req) => {
     }
 
     if (!toEmail) {
-      console.error('No email found for recipient:', recipient_id);
-      return new Response(JSON.stringify({ error: 'No email found' }), {
+      console.error(`[${requestId}] ❌ No email found for recipient: ${recipient_id}`);
+      return new Response(JSON.stringify({ 
+        error: 'No email found',
+        code: 'NO_EMAIL_FOUND'
+      }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -167,6 +218,20 @@ serve(async (req) => {
     }
 
     // Send email via Resend
+    const resendApiKey = Deno.env.get("RESEND_API_KEY");
+    if (!resendApiKey) {
+      console.warn(`[${requestId}] ⚠️ RESEND_API_KEY not configured - notification not sent`);
+      return new Response(JSON.stringify({ 
+        success: false,
+        error: 'Email service not configured',
+        code: 'NOTIFICATION_ERROR'
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const resend = new Resend(resendApiKey);
     const emailResponse = await resend.emails.send({
       from: "Blue Harvests <onboarding@resend.dev>",
       to: [toEmail],
@@ -174,7 +239,7 @@ serve(async (req) => {
       html,
     });
 
-    console.log('Email sent successfully:', emailResponse);
+    console.log(`[${requestId}] ✅ Email sent successfully:`, emailResponse);
 
     return new Response(JSON.stringify({ 
       success: true,
@@ -185,10 +250,11 @@ serve(async (req) => {
     });
 
   } catch (error: any) {
-    console.error('Notification error:', error);
+    console.error(`[${requestId}] ❌ Notification error:`, error);
     return new Response(JSON.stringify({ 
       error: 'NOTIFICATION_ERROR',
-      message: error.message 
+      message: error.message,
+      code: 'NOTIFICATION_ERROR'
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

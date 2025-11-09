@@ -8,3 +8,6 @@
 export * from './checkout.ts';
 export * from './batching.ts';
 export * from './payouts.ts';
+export * from './taxInfo.ts';
+export * from './routes.ts';
+export * from './orders.ts';

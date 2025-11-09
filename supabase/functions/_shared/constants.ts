@@ -56,6 +56,26 @@ export const RATE_LIMITS = {
     windowMs: 5 * 60 * 1000, // 5 minutes
     keyPrefix: 'process-payouts'
   },
+  TAX_INFO: {
+    maxRequests: 5,
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    keyPrefix: 'tax-info'
+  },
+  CLAIM_ROUTE: {
+    maxRequests: 20,
+    windowMs: 5 * 60 * 1000, // 5 minutes
+    keyPrefix: 'claim-route'
+  },
+  CANCEL_ORDER: {
+    maxRequests: 10,
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    keyPrefix: 'cancel-order'
+  },
+  CREATE_SUBSCRIPTION: {
+    maxRequests: 5,
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    keyPrefix: 'create-subscription'
+  },
 } as const;
 
 // Subscription

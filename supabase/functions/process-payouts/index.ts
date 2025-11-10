@@ -20,18 +20,18 @@ import {
   withRateLimit,
   withErrorHandling,
   createMiddlewareStack,
+  type RequestIdContext,
+  type CORSContext,
+  type AuthContext,
 } from '../_shared/middleware/index.ts';
 
-type PayoutContext = {
-  requestId: string;
-  corsHeaders: Record<string, string>;
-  user: any;
-  supabase: any;
-  config: any;
-};
+type Context = RequestIdContext & CORSContext & AuthContext;
 
-const handler = async (req: Request, ctx: PayoutContext) => {
-  const { requestId, corsHeaders, supabase, config } = ctx;
+const handler = async (req: Request, ctx: Context): Promise<Response> => {
+  const { requestId, corsHeaders } = ctx;
+  
+  const config = loadConfig();
+  const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey);
 
   console.log(`[${requestId}] Processing pending payouts`);
 
@@ -58,21 +58,14 @@ const handler = async (req: Request, ctx: PayoutContext) => {
   );
 };
 
-// Compose middleware manually
-const composed = withErrorHandling(
-  withRequestId(
-    withCORS(
-      withAuth(
-        withAdminAuth(
-          withRateLimit(RATE_LIMITS.PROCESS_PAYOUTS)(handler)
-        )
-      )
-    )
-  )
-);
+// Compose middleware stack
+const middlewareStack = createMiddlewareStack<Context>([
+  withRequestId,
+  withCORS,
+  withAuth,
+  withAdminAuth,
+  withRateLimit(RATE_LIMITS.PROCESS_PAYOUTS),
+  withErrorHandling,
+]);
 
-serve(async (req) => {
-  const config = loadConfig();
-  const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey);
-  return composed(req, { supabase, config });
-});
+serve((req) => middlewareStack(handler)(req, {} as any));

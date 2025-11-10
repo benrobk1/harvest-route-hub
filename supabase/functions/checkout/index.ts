@@ -21,20 +21,28 @@ import {
   withValidation,
   withErrorHandling,
   createMiddlewareStack,
+  type RequestIdContext,
+  type CORSContext,
+  type AuthContext,
+  type ValidationContext,
 } from '../_shared/middleware/index.ts';
 
-// Define context type for this endpoint
-type CheckoutContext = {
-  requestId: string;
-  corsHeaders: Record<string, string>;
-  user: any;
-  supabase: any;
-  config: any;
-  input: any;
+type CheckoutInput = {
+  cart_id: string;
+  delivery_date: string;
+  use_credits?: boolean;
+  payment_method_id?: string;
+  tip_amount?: number;
+  is_demo_mode?: boolean;
 };
 
-const handler = async (req: Request, ctx: CheckoutContext) => {
-  const { requestId, corsHeaders, user, supabase, input, config } = ctx;
+type Context = RequestIdContext & CORSContext & AuthContext & ValidationContext<CheckoutInput>;
+
+const handler = async (req: Request, ctx: Context): Promise<Response> => {
+  const { requestId, corsHeaders, user, input } = ctx;
+  
+  const config = loadConfig();
+  const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey);
 
   console.log(`[${requestId}] Processing checkout for cart ${input.cart_id}`);
 
@@ -91,21 +99,14 @@ const handler = async (req: Request, ctx: CheckoutContext) => {
   }
 };
 
-// Compose middleware manually (proper order)
-const composed = withErrorHandling(
-  withRequestId(
-    withCORS(
-      withAuth(
-        withRateLimit(RATE_LIMITS.CHECKOUT)(
-          withValidation(CheckoutRequestSchema)(handler)
-        )
-      )
-    )
-  )
-);
+// Compose middleware stack
+const middlewareStack = createMiddlewareStack<Context>([
+  withRequestId,
+  withCORS,
+  withAuth,
+  withRateLimit(RATE_LIMITS.CHECKOUT),
+  withValidation(CheckoutRequestSchema),
+  withErrorHandling,
+]);
 
-serve(async (req) => {
-  const config = loadConfig();
-  const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey);
-  return composed(req, { supabase, config });
-});
+serve((req) => middlewareStack(handler)(req, {} as any));

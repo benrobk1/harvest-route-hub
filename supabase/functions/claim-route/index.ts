@@ -20,18 +20,23 @@ import {
   withValidation,
   withErrorHandling,
   createMiddlewareStack,
+  type RequestIdContext,
+  type CORSContext,
+  type AuthContext,
+  type ValidationContext,
 } from '../_shared/middleware/index.ts';
 
-type ClaimRouteContext = {
-  requestId: string;
-  corsHeaders: Record<string, string>;
-  user: any;
-  supabase: any;
-  input: any;
+type ClaimRouteInput = {
+  batch_id: string;
 };
 
-const handler = async (req: Request, ctx: ClaimRouteContext) => {
-  const { requestId, corsHeaders, user, supabase, input } = ctx;
+type Context = RequestIdContext & CORSContext & AuthContext & ValidationContext<ClaimRouteInput>;
+
+const handler = async (req: Request, ctx: Context): Promise<Response> => {
+  const { requestId, corsHeaders, user, input } = ctx;
+  
+  const config = loadConfig();
+  const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey);
 
   console.log(`[${requestId}] Driver ${user.id} claiming batch ${input.batch_id}`);
 
@@ -84,23 +89,15 @@ const handler = async (req: Request, ctx: ClaimRouteContext) => {
   );
 };
 
-// Compose middleware manually
-const composed = withErrorHandling(
-  withRequestId(
-    withCORS(
-      withAuth(
-        withDriverAuth(
-          withRateLimit(RATE_LIMITS.CLAIM_ROUTE)(
-            withValidation(ClaimRouteRequestSchema)(handler)
-          )
-        )
-      )
-    )
-  )
-);
+// Compose middleware stack
+const middlewareStack = createMiddlewareStack<Context>([
+  withRequestId,
+  withCORS,
+  withAuth,
+  withDriverAuth,
+  withRateLimit(RATE_LIMITS.CLAIM_ROUTE),
+  withValidation(ClaimRouteRequestSchema),
+  withErrorHandling,
+]);
 
-serve(async (req) => {
-  const config = loadConfig();
-  const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey);
-  return composed(req, { supabase, config });
-});
+serve((req) => middlewareStack(handler)(req, {} as any));

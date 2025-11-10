@@ -13,6 +13,11 @@ import {
   withErrorHandling,
   withMetrics,
   createMiddlewareStack,
+  type RequestIdContext,
+  type CORSContext,
+  type AuthContext,
+  type ValidationContext,
+  type MetricsContext,
 } from '../_shared/middleware/index.ts';
 
 /**
@@ -23,17 +28,21 @@ import {
  * Full middleware: RequestId + Metrics + CORS + Auth + AdminAuth + RateLimit + Validation + ErrorHandling
  */
 
-type AwardCreditsContext = {
-  requestId: string;
-  corsHeaders: Record<string, string>;
-  user: any;
-  supabase: any;
-  metrics: any;
-  input: any;
+type AwardCreditsInput = {
+  consumer_id: string;
+  amount: number;
+  description: string;
+  transaction_type?: 'earned' | 'bonus' | 'refund';
+  expires_in_days?: number;
 };
 
-const handler = async (req: Request, ctx: AwardCreditsContext) => {
-  const { requestId, corsHeaders, supabase, metrics, input } = ctx;
+type Context = RequestIdContext & CORSContext & AuthContext & ValidationContext<AwardCreditsInput> & MetricsContext;
+
+const handler = async (req: Request, ctx: Context): Promise<Response> => {
+  const { requestId, corsHeaders, metrics, input } = ctx;
+  
+  const config = loadConfig();
+  const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey);
 
   const { 
     consumer_id, 
@@ -118,25 +127,16 @@ const handler = async (req: Request, ctx: AwardCreditsContext) => {
   });
 };
 
-// Compose middleware manually
-const composed = withErrorHandling(
-  withRequestId(
-    withMetrics('award-credits')(
-      withCORS(
-        withAuth(
-          withAdminAuth(
-            withRateLimit(RATE_LIMITS.AWARD_CREDITS)(
-              withValidation(AwardCreditsRequestSchema)(handler)
-            )
-          )
-        )
-      )
-    )
-  )
-);
+// Compose middleware stack
+const middlewareStack = createMiddlewareStack<Context>([
+  withRequestId,
+  withMetrics('award-credits'),
+  withCORS,
+  withAuth,
+  withAdminAuth,
+  withRateLimit(RATE_LIMITS.AWARD_CREDITS),
+  withValidation(AwardCreditsRequestSchema),
+  withErrorHandling,
+]);
 
-serve(async (req) => {
-  const config = loadConfig();
-  const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey);
-  return composed(req, { supabase, config });
-});
+serve((req) => middlewareStack(handler)(req, {} as any));

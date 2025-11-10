@@ -20,6 +20,10 @@ import {
   withValidation,
   withErrorHandling,
   createMiddlewareStack,
+  type RequestIdContext,
+  type CORSContext,
+  type AuthContext,
+  type ValidationContext,
 } from '../_shared/middleware/index.ts';
 
 const ReportIssueSchema = z.object({
@@ -45,16 +49,14 @@ const ReportIssueSchema = z.object({
   photo_urls: z.array(z.string().url()).optional(),
 });
 
-type ReportIssueContext = {
-  requestId: string;
-  corsHeaders: Record<string, string>;
-  user: any;
-  supabase: any;
-  input: z.infer<typeof ReportIssueSchema>;
-};
+type ReportIssueInput = z.infer<typeof ReportIssueSchema>;
+type Context = RequestIdContext & CORSContext & AuthContext & ValidationContext<ReportIssueInput>;
 
-const handler = async (req: Request, ctx: ReportIssueContext) => {
-  const { requestId, corsHeaders, user, supabase, input } = ctx;
+const handler = async (req: Request, ctx: Context): Promise<Response> => {
+  const { requestId, corsHeaders, user, input } = ctx;
+  
+  const config = loadConfig();
+  const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey);
 
   // Check user role
   const { data: isDriver } = await supabase.rpc('has_role', {
@@ -191,24 +193,17 @@ async function notifyAdmins(supabase: any, issue: any, requestId: string) {
   }
 }
 
-// Compose middleware manually
-const composed = withErrorHandling(
-  withRequestId(
-    withCORS(
-      withAuth(
-        withRateLimit(RATE_LIMITS.REPORT_ISSUE)(
-          withValidation(ReportIssueSchema)(handler)
-        )
-      )
-    )
-  )
-);
+// Compose middleware stack
+const middlewareStack = createMiddlewareStack<Context>([
+  withRequestId,
+  withCORS,
+  withAuth,
+  withRateLimit(RATE_LIMITS.REPORT_ISSUE),
+  withValidation(ReportIssueSchema),
+  withErrorHandling,
+]);
 
-serve(async (req) => {
-  const config = loadConfig();
-  const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey);
-  return composed(req, { supabase });
-});
+serve((req) => middlewareStack(handler)(req, {} as any));
 
 async function notifyAffectedCustomers(supabase: any, issue: any, requestId: string) {
   try {

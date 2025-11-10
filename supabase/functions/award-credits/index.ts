@@ -4,13 +4,14 @@ import { loadConfig } from '../_shared/config.ts';
 import { RATE_LIMITS } from '../_shared/constants.ts';
 import { checkRateLimit } from '../_shared/rateLimiter.ts';
 import { AwardCreditsRequestSchema } from '../_shared/contracts/credits.ts';
+import { createMetricsCollector } from '../_shared/monitoring/metrics.ts';
 
 /**
  * AWARD CREDITS EDGE FUNCTION
  * 
  * Admin-only function to award credits to consumers.
  * Supports earned, bonus, and refund transaction types.
- * Full middleware: RequestId + Auth + RateLimit + Validation + ErrorHandling
+ * Full middleware: RequestId + Metrics + Auth + AdminAuth + RateLimit + Validation + ErrorHandling
  */
 
 const corsHeaders = {
@@ -19,18 +20,21 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  // CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Request ID for tracing
   const requestId = crypto.randomUUID();
+  const metrics = createMetricsCollector(requestId, 'award-credits');
   console.log(`[${requestId}] [AWARD-CREDITS] Request started`);
 
   try {
     const config = loadConfig();
     const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey);
 
-    // Authenticate admin user
+    // Authentication
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(JSON.stringify({ error: 'UNAUTHORIZED', code: 'UNAUTHORIZED' }), {
@@ -50,7 +54,9 @@ serve(async (req) => {
       });
     }
 
-    // Check admin role
+    metrics.mark('auth_complete');
+
+    // Admin authorization
     const { data: hasAdmin } = await supabase.rpc('has_role', {
       _user_id: user.id,
       _role: 'admin'
@@ -64,6 +70,7 @@ serve(async (req) => {
     }
 
     console.log(`[${requestId}] Admin user ${user.id} authorized`);
+    metrics.mark('admin_auth_complete');
 
     // Rate limiting
     const rateCheck = await checkRateLimit(supabase, user.id, RATE_LIMITS.AWARD_CREDITS);
@@ -107,6 +114,7 @@ serve(async (req) => {
       expires_in_days = 90 
     } = result.data;
 
+    metrics.mark('validation_complete');
     console.log(`[${requestId}] Awarding credits:`, { 
       consumer_id, 
       amount, 
@@ -150,6 +158,7 @@ serve(async (req) => {
       throw new Error(`Credit award failed: ${creditError.message}`);
     }
 
+    metrics.mark('credits_awarded');
     console.log(`[${requestId}] ✅ Credits awarded successfully:`, creditRecord.id);
 
     // Send notification to user (non-blocking)
@@ -170,7 +179,7 @@ serve(async (req) => {
       console.error(`[${requestId}] Notification failed (non-blocking):`, notifError);
     }
 
-    return new Response(JSON.stringify({
+    const response = new Response(JSON.stringify({
       success: true,
       credit_id: creditRecord.id,
       amount_awarded: amount,
@@ -181,8 +190,28 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
+    // Log metrics
+    metrics.log({
+      method: req.method,
+      path: new URL(req.url).pathname,
+      statusCode: 200,
+      userId: user.id,
+    });
+
+    return response;
+
   } catch (error: any) {
     console.error(`[${requestId}] ❌ Award credits error:`, error);
+    
+    // Log error metrics
+    metrics.log({
+      method: req.method,
+      path: new URL(req.url).pathname,
+      statusCode: 500,
+      errorMessage: error.message,
+      errorStack: error.stack,
+    });
+
     return new Response(JSON.stringify({ 
       error: 'SERVER_ERROR',
       message: error.message,

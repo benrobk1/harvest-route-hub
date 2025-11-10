@@ -23,6 +23,7 @@ export { SubscriptionManager } from './components/SubscriptionManager';
 export { FarmRating } from './components/FarmRating';
 export { ItemRating } from './components/ItemRating';
 export { CompleteFeedbackDrawer } from './components/CompleteFeedbackDrawer';
+export { DisputeDialog } from './components/DisputeDialog';
 
 // Consumer Types
 export * from './types/feedback';

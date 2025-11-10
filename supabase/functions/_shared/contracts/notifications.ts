@@ -12,6 +12,7 @@ export const NotificationEventTypeSchema = z.enum([
   'batch_assigned_farmer',
   'cutoff_reminder',
   'admin_alert',
+  'customer_delivery_update',
 ]);
 
 export type NotificationEventType = z.infer<typeof NotificationEventTypeSchema>;

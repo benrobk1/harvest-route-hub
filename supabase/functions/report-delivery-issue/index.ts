@@ -135,6 +135,9 @@ serve(async (req) => {
     // Notify admins
     await notifyAdmins(supabase, issue, requestId);
 
+    // Notify affected customers
+    await notifyAffectedCustomers(supabase, issue, requestId);
+
     return new Response(
       JSON.stringify({ success: true, issue_id: issue.id }),
       { 
@@ -237,5 +240,101 @@ async function notifyAdmins(supabase: any, issue: any, requestId: string) {
     } catch (notifyError) {
       console.error(`[${requestId}] Failed to notify admin ${admin.user_id}:`, notifyError);
     }
+  }
+}
+
+async function notifyAffectedCustomers(supabase: any, issue: any, requestId: string) {
+  try {
+    let customerIds: string[] = [];
+
+    // Get affected customers based on context
+    if (issue.order_id) {
+      // Single order issue - notify that customer
+      const { data: order } = await supabase
+        .from('orders')
+        .select('consumer_id')
+        .eq('id', issue.order_id)
+        .single();
+      
+      if (order) customerIds.push(order.consumer_id);
+    } else if (issue.stop_id) {
+      // Stop issue - get customer from stop's order
+      const { data: stop } = await supabase
+        .from('batch_stops')
+        .select('orders!inner(consumer_id)')
+        .eq('id', issue.stop_id)
+        .single();
+      
+      if (stop?.orders) customerIds.push(stop.orders.consumer_id);
+    } else if (issue.delivery_batch_id) {
+      // Batch-wide issue - notify all customers in batch
+      const { data: orders } = await supabase
+        .from('orders')
+        .select('consumer_id')
+        .eq('delivery_batch_id', issue.delivery_batch_id);
+      
+      if (orders) customerIds = orders.map((o: any) => o.consumer_id);
+    }
+
+    if (customerIds.length === 0) {
+      console.log(`[${requestId}] No customers to notify for this issue`);
+      return;
+    }
+
+    console.log(`[${requestId}] Notifying ${customerIds.length} affected customers`);
+
+    // Get customer profiles
+    const { data: customers } = await supabase
+      .from('profiles')
+      .select('id, email, full_name, push_subscription')
+      .in('id', customerIds);
+
+    const categoryLabels: Record<string, string> = {
+      delivery_delay: 'Delivery Delay',
+      vehicle_problem: 'Vehicle Issue',
+      customer_unavailable: 'Delivery Attempted',
+      wrong_address: 'Address Issue',
+      damaged_product: 'Product Issue',
+      missing_items: 'Missing Items',
+      collection_point_issue: 'Collection Point Issue',
+      weather_condition: 'Weather Delay',
+      other: 'Delivery Issue',
+    };
+
+    for (const customer of customers || []) {
+      try {
+        // Send email notification
+        await supabase.functions.invoke('send-notification', {
+          body: {
+            event_type: 'customer_delivery_update',
+            recipient_id: customer.id,
+            recipient_email: customer.email,
+            data: {
+              title: `Update About Your Delivery`,
+              description: `We wanted to inform you about an issue with your delivery: ${categoryLabels[issue.category]}. ${issue.severity === 'high' || issue.severity === 'critical' ? 'Our team is working to resolve this as quickly as possible.' : 'This may cause a slight delay.'}`,
+            },
+          },
+        });
+
+        // Send push notification if enabled
+        if (customer.push_subscription?.enabled) {
+          await supabase.functions.invoke('send-push-notification', {
+            body: {
+              user_id: customer.id,
+              title: '📦 Delivery Update',
+              body: `${categoryLabels[issue.category]} - We're working to resolve this.`,
+              data: { 
+                issue_id: issue.id,
+                type: 'delivery_update',
+              },
+            },
+          });
+        }
+      } catch (notifyError) {
+        console.error(`[${requestId}] Failed to notify customer ${customer.id}:`, notifyError);
+      }
+    }
+  } catch (error) {
+    console.error(`[${requestId}] Error notifying customers:`, error);
   }
 }

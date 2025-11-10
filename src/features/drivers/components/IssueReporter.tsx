@@ -221,6 +221,15 @@ export const IssueReporter = ({ batchId, orderId, stopId }: IssueReporterProps) 
         <p className="text-xs text-muted-foreground text-center">
           Admin team will be notified immediately via email and push notification
         </p>
+
+        {(orderId || stopId || batchId) && (
+          <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="text-blue-600 mt-0.5">ℹ️</div>
+            <p className="text-xs text-blue-900">
+              Affected customers will be automatically notified about this issue to keep them informed.
+            </p>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

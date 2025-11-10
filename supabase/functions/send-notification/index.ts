@@ -243,6 +243,45 @@ serve(async (req) => {
         `;
         break;
 
+      case 'customer_delivery_update':
+        subject = `📦 Update About Your Delivery - Blue Harvests`;
+        html = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h1 style="color: #2563eb;">📦 Delivery Update</h1>
+            <p>Hello,</p>
+            <p>We wanted to keep you informed about your upcoming delivery.</p>
+            <div style="background: #fef3c7; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f59e0b;">
+              <h2 style="margin-top: 0; color: #92400e;">${data.title || 'Delivery Information'}</h2>
+              <p style="margin: 0; color: #78350f;">${data.description || 'There has been an update regarding your delivery.'}</p>
+            </div>
+            <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <h3 style="margin-top: 0;">What This Means</h3>
+              <p style="margin: 10px 0;">
+                Our delivery team is working diligently to ensure your order arrives safely. We apologize for any inconvenience this may cause.
+              </p>
+              <p style="margin: 10px 0;">
+                <strong>What you can do:</strong>
+              </p>
+              <ul style="margin: 10px 0; padding-left: 20px;">
+                <li>Track your order status in your account dashboard</li>
+                <li>Contact our support team if you have questions</li>
+                <li>We'll send you another update when the issue is resolved</li>
+              </ul>
+            </div>
+            <p style="margin: 30px 0;">
+              <a href="${config.supabase.url.replace('//', '//app.')}/consumer/orders" 
+                 style="background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
+                View My Orders
+              </a>
+            </p>
+            <p style="color: #6b7280; font-size: 14px; margin-top: 40px;">
+              Thank you for your patience and for supporting local farms!<br>
+              Blue Harvests Team
+            </p>
+          </div>
+        `;
+        break;
+
       default:
         throw new Error(`Unknown event type: ${event_type}`);
     }

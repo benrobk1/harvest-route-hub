@@ -193,6 +193,14 @@ export default function DeliveryIssues() {
                           <span>Reported by {issue.reporter_type}</span>
                           <span>•</span>
                           <span>{formatDistanceToNow(new Date(issue.created_at), { addSuffix: true })}</span>
+                          {(issue.order_id || issue.stop_id || issue.delivery_batch_id) && (
+                            <>
+                              <span>•</span>
+                              <Badge variant="outline" className="text-xs">
+                                📧 Customer notified
+                              </Badge>
+                            </>
+                          )}
                         </div>
                       </div>
                       <Button

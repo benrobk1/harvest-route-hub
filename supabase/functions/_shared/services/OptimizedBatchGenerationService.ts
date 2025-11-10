@@ -24,7 +24,7 @@ export class OptimizedBatchGenerationService extends BatchGenerationService {
   /**
    * Cached geocoding with TTL
    */
-  async geocodeAddress(address: string, zipCode?: string): Promise<{ latitude: number; longitude: number } | null> {
+  override async geocodeAddress(address: string, zipCode?: string): Promise<{ latitude: number; longitude: number } | null> {
     const cacheKey = `geocode:${address}:${zipCode || 'none'}`;
     
     // Check cache first
@@ -48,7 +48,7 @@ export class OptimizedBatchGenerationService extends BatchGenerationService {
   /**
    * Cached OSRM route optimization
    */
-  async optimizeRouteWithOsrm(stops: any[]): Promise<any> {
+  override async optimizeRouteWithOsrm(stops: any[]): Promise<any> {
     // Create cache key from stop coordinates
     const coordString = stops
       .filter(s => s.latitude && s.longitude)

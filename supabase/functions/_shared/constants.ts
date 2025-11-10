@@ -121,6 +121,11 @@ export const RATE_LIMITS = {
     windowMs: 10 * 60 * 1000, // 10 minutes
     keyPrefix: 'optimize-batches'
   },
+  REPORT_ISSUE: {
+    maxRequests: 10,
+    windowMs: 60 * 60 * 1000, // 1 hour (prevent spam)
+    keyPrefix: 'report-issue'
+  },
 } as const;
 
 // Subscription

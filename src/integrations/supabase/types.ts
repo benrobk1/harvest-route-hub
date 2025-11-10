@@ -394,6 +394,108 @@ export type Database = {
           },
         ]
       }
+      delivery_issues: {
+        Row: {
+          admin_notes: string | null
+          category: Database["public"]["Enums"]["issue_category"]
+          created_at: string
+          delivery_batch_id: string | null
+          description: string
+          id: string
+          latitude: number | null
+          longitude: number | null
+          order_id: string | null
+          photo_urls: string[] | null
+          reporter_id: string
+          reporter_type: string
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: Database["public"]["Enums"]["issue_severity"]
+          status: Database["public"]["Enums"]["issue_status"]
+          stop_id: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          category: Database["public"]["Enums"]["issue_category"]
+          created_at?: string
+          delivery_batch_id?: string | null
+          description: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          order_id?: string | null
+          photo_urls?: string[] | null
+          reporter_id: string
+          reporter_type: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: Database["public"]["Enums"]["issue_severity"]
+          status?: Database["public"]["Enums"]["issue_status"]
+          stop_id?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          admin_notes?: string | null
+          category?: Database["public"]["Enums"]["issue_category"]
+          created_at?: string
+          delivery_batch_id?: string | null
+          description?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          order_id?: string | null
+          photo_urls?: string[] | null
+          reporter_id?: string
+          reporter_type?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: Database["public"]["Enums"]["issue_severity"]
+          status?: Database["public"]["Enums"]["issue_status"]
+          stop_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_issues_delivery_batch_id_fkey"
+            columns: ["delivery_batch_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_issues_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_issues_stop_id_fkey"
+            columns: ["stop_id"]
+            isOneToOne: false
+            referencedRelation: "batch_stops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_issues_stop_id_fkey"
+            columns: ["stop_id"]
+            isOneToOne: false
+            referencedRelation: "driver_batch_stops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_issues_stop_id_fkey"
+            columns: ["stop_id"]
+            isOneToOne: false
+            referencedRelation: "driver_batch_stops_secure"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delivery_proofs: {
         Row: {
           batch_stop_id: string
@@ -1902,6 +2004,23 @@ export type Database = {
     }
     Enums: {
       app_role: "consumer" | "farmer" | "lead_farmer" | "driver" | "admin"
+      issue_category:
+        | "delivery_delay"
+        | "vehicle_problem"
+        | "customer_unavailable"
+        | "wrong_address"
+        | "damaged_product"
+        | "missing_items"
+        | "collection_point_issue"
+        | "weather_condition"
+        | "other"
+      issue_severity: "low" | "medium" | "high" | "critical"
+      issue_status:
+        | "open"
+        | "acknowledged"
+        | "in_progress"
+        | "resolved"
+        | "dismissed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -2030,6 +2149,25 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["consumer", "farmer", "lead_farmer", "driver", "admin"],
+      issue_category: [
+        "delivery_delay",
+        "vehicle_problem",
+        "customer_unavailable",
+        "wrong_address",
+        "damaged_product",
+        "missing_items",
+        "collection_point_issue",
+        "weather_condition",
+        "other",
+      ],
+      issue_severity: ["low", "medium", "high", "critical"],
+      issue_status: [
+        "open",
+        "acknowledged",
+        "in_progress",
+        "resolved",
+        "dismissed",
+      ],
     },
   },
 } as const

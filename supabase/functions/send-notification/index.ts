@@ -213,6 +213,36 @@ serve(async (req) => {
         `;
         break;
 
+      case 'admin_alert':
+        subject = `🚨 ${data.title || 'Delivery Issue Alert'}`;
+        html = `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h1 style="color: #dc2626;">🚨 Delivery Issue Reported</h1>
+            <div style="background: #fee2e2; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #dc2626;">
+              <h2 style="margin-top: 0; color: #991b1b;">${data.title}</h2>
+              <p style="margin: 10px 0;"><strong>Category:</strong> ${data.category?.split('_').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}</p>
+              <p style="margin: 10px 0;"><strong>Severity:</strong> ${data.severity?.toUpperCase()}</p>
+              <p style="margin: 10px 0;"><strong>Reported by:</strong> ${data.reporter_type?.replace('_', ' ')}</p>
+            </div>
+            <div style="background: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0;">
+              <h3 style="margin-top: 0;">Description</h3>
+              <p style="white-space: pre-wrap;">${data.description}</p>
+            </div>
+            <p style="margin: 30px 0;">
+              <a href="${config.supabase.url.replace('//', '//app.')}/admin/delivery-issues" 
+                 style="background: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
+                View Issue in Dashboard
+              </a>
+            </p>
+            <p style="color: #6b7280; font-size: 14px; margin-top: 40px;">
+              Issue ID: ${data.issue_id?.substring(0, 8)}<br>
+              Please respond promptly to ensure smooth operations.<br>
+              Blue Harvests Admin Team
+            </p>
+          </div>
+        `;
+        break;
+
       default:
         throw new Error(`Unknown event type: ${event_type}`);
     }

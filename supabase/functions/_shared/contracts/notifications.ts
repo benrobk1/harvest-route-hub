@@ -11,6 +11,7 @@ export const NotificationEventTypeSchema = z.enum([
   'batch_assigned_driver',
   'batch_assigned_farmer',
   'cutoff_reminder',
+  'admin_alert',
 ]);
 
 export type NotificationEventType = z.infer<typeof NotificationEventTypeSchema>;
@@ -28,6 +29,13 @@ export const SendNotificationRequestSchema = z.object({
     batch_number: z.number().int().positive('Batch number must be positive').optional(),
     order_count: z.number().int().nonnegative('Order count must be non-negative').optional(),
     stop_count: z.number().int().nonnegative('Stop count must be non-negative').optional(),
+    // Admin alert specific fields
+    title: z.string().optional(),
+    category: z.string().optional(),
+    severity: z.string().optional(),
+    description: z.string().optional(),
+    reporter_type: z.string().optional(),
+    issue_id: z.string().uuid().optional(),
   }),
 });
 

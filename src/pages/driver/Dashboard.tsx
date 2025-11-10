@@ -17,6 +17,7 @@ import { StripeConnectStatusBanner } from "@/components/StripeConnectStatusBanne
 import { calculateEstimatedExpenses } from "@/lib/driverEarningsHelpers";
 import { FLAT_DELIVERY_FEE } from "@/lib/deliveryFeeHelpers";
 import { RouteDensityMap, driverQueries } from "@/features/drivers";
+import { IssueReporter } from "@/features/drivers/components/IssueReporter";
 import { useNavigate } from "react-router-dom";
 import { User } from "lucide-react";
 
@@ -452,6 +453,11 @@ const DriverDashboard = () => {
               </p>
             </CardContent>
           </Card>
+        )}
+
+        {/* Issue Reporter - Only show if driver has an active batch */}
+        {activeBatch?.id && (
+          <IssueReporter batchId={activeBatch.id} />
         )}
 
         {/* Earnings Overview with Expense Breakdown */}

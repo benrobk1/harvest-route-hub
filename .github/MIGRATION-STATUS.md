@@ -71,8 +71,8 @@ All edge functions have been successfully migrated to the standardized middlewar
 
 ### Integration Tests  
 - ✅ Checkout integration test (end-to-end flow)
-- ⏳ Process payouts integration test
-- ⏳ Batch generation integration test
+- ✅ Process payouts integration test (admin auth, rate limiting, Stripe integration)
+- ✅ Generate batches integration test (OSRM optimization, route generation, ZIP grouping)
 - ⏳ Stripe webhook integration test
 
 ### E2E Tests (Playwright)

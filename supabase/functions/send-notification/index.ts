@@ -1,122 +1,76 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { Resend } from "https://esm.sh/resend@2.0.0";
-import { loadConfig } from '../_shared/config.ts';
-import { RATE_LIMITS } from '../_shared/constants.ts';
-import { checkRateLimit } from '../_shared/rateLimiter.ts';
-import { SendNotificationRequestSchema } from '../_shared/contracts/notifications.ts';
-
 /**
  * SEND NOTIFICATION EDGE FUNCTION
  * 
  * Sends email notifications for various events (orders, batches, reminders).
  * Requires authentication and uses Resend for email delivery.
+ * 
+ * Middleware Stack:
+ * 1. Request ID (correlation logging)
+ * 2. CORS (origin validation)
+ * 3. Authentication (JWT validation)
+ * 4. Rate Limiting (per-user limits)
+ * 5. Validation (Zod schema)
+ * 6. Error Handling (standardized responses)
  */
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { Resend } from "https://esm.sh/resend@2.0.0";
+import { loadConfig } from '../_shared/config.ts';
+import { RATE_LIMITS } from '../_shared/constants.ts';
+import { SendNotificationRequestSchema, type SendNotificationRequest } from '../_shared/contracts/notifications.ts';
+import {
+  createMiddlewareStack,
+  withRequestId,
+  withCORS,
+  withAuth,
+  withRateLimit,
+  withValidation,
+  withErrorHandling,
+  type RequestIdContext,
+  type CORSContext,
+  type AuthContext,
+  type ValidationContext,
+} from '../_shared/middleware/index.ts';
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+// Context type includes all middleware contexts
+type Context = RequestIdContext & CORSContext & AuthContext & ValidationContext<SendNotificationRequest>;
+
+// Main handler with middleware-injected context
+const handler = async (req: Request, ctx: Context): Promise<Response> => {
+  const { requestId, corsHeaders, user, supabase, input } = ctx;
+  const { event_type, recipient_id, recipient_email, data } = input;
+
+  console.log(`[${requestId}] Sending notification:`, { event_type, recipient_id });
+
+  // Get recipient email if not provided
+  let toEmail = recipient_email;
+  if (!toEmail) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('email')
+      .eq('id', recipient_id)
+      .single();
+    
+    toEmail = profile?.email;
   }
 
-  const requestId = crypto.randomUUID();
-  console.log(`[${requestId}] [SEND-NOTIFICATION] Request started`);
+  if (!toEmail) {
+    console.error(`[${requestId}] ❌ No email found for recipient: ${recipient_id}`);
+    return new Response(JSON.stringify({ 
+      error: 'No email found',
+      code: 'NO_EMAIL_FOUND'
+    }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
 
-  try {
-    const config = loadConfig();
-    const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey);
+  let subject = '';
+  let html = '';
 
-    // Authenticate user (admin or system)
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'UNAUTHORIZED', code: 'UNAUTHORIZED' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: userData } = await supabase.auth.getUser(token);
-    const user = userData.user;
-    
-    if (!user) {
-      return new Response(JSON.stringify({ error: 'UNAUTHORIZED', code: 'UNAUTHORIZED' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Rate limiting
-    const rateCheck = await checkRateLimit(supabase, user.id, RATE_LIMITS.SEND_NOTIFICATION);
-    if (!rateCheck.allowed) {
-      console.warn(`[${requestId}] ⚠️ Rate limit exceeded for user ${user.id}`);
-      return new Response(JSON.stringify({ 
-        error: 'TOO_MANY_REQUESTS', 
-        message: 'Too many requests. Please try again later.',
-        retryAfter: rateCheck.retryAfter,
-      }), {
-        status: 429,
-        headers: { 
-          ...corsHeaders, 
-          'Content-Type': 'application/json',
-          'Retry-After': String(rateCheck.retryAfter || 60),
-        }
-      });
-    }
-
-    // Validate input
-    const body = await req.json();
-    const result = SendNotificationRequestSchema.safeParse(body);
-
-    if (!result.success) {
-      return new Response(JSON.stringify({
-        error: 'VALIDATION_ERROR',
-        message: 'Request validation failed',
-        details: result.error.flatten(),
-        code: 'VALIDATION_ERROR',
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    const { event_type, recipient_id, recipient_email, data } = result.data;
-
-    console.log(`[${requestId}] Sending notification:`, { event_type, recipient_id });
-
-    // Get recipient email if not provided
-    let toEmail = recipient_email;
-    if (!toEmail) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('email')
-        .eq('id', recipient_id)
-        .single();
-      
-      toEmail = profile?.email;
-    }
-
-    if (!toEmail) {
-      console.error(`[${requestId}] ❌ No email found for recipient: ${recipient_id}`);
-      return new Response(JSON.stringify({ 
-        error: 'No email found',
-        code: 'NO_EMAIL_FOUND'
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    let subject = '';
-    let html = '';
-
-    // Generate email based on event type
-    switch (event_type) {
-      case 'order_confirmation':
+  // Generate email based on event type
+  switch (event_type) {
+    case 'order_confirmation':
         subject = 'Order Confirmed - Blue Harvests';
         html = `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">

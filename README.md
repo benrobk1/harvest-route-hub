@@ -36,31 +36,6 @@ A modern, full-stack platform connecting local farmers with consumers through ef
 - Feature READMEs in `src/features/*/README.md`
 - [Error Handling Guide](./src/lib/errors/README.md)
 
----
-
-## ⚡ Happy Path (30 Seconds)
-
-**First-time reviewers**: Get the full platform running in under 60 seconds:
-
-```bash
-# 1. Seed demo data (creates test accounts + orders)
-npm run seed
-
-# 2. Sign in as consumer
-# Email: test-consumer@example.com | Password: password123
-# Navigate to /consumer/shop
-
-# 3. Add items to cart → Checkout
-# Use test card: 4242 4242 4242 4242 | Any future date | Any CVC
-
-# 4. Admin generates batches
-# Navigate to /admin/dashboard → Click "Generate Batches"
-
-# 5. Driver completes delivery
-# Navigate to /driver/routes → Accept batch → Scan box code → Mark delivered
-```
-
-**Result**: You've now seen the complete lifecycle: consumer order → AI batch optimization → driver delivery → automated payouts.
 
 ---
 

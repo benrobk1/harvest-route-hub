@@ -14,6 +14,7 @@ import type { CORSContext } from "../_shared/middleware/withCORS.ts";
 import type { RequestIdContext } from "../_shared/middleware/withRequestId.ts";
 import type { ValidationContext } from "../_shared/middleware/withValidation.ts";
 import type { SupabaseServiceRoleContext } from "../_shared/middleware/withSupabaseServiceRole.ts";
+import { maskEmail, truncateMessage } from "../_shared/utils.ts";
 
 const SendPushNotificationSchema = z.object({
   consumerId: z.string().min(1, { message: "consumerId is required" }),
@@ -100,7 +101,13 @@ const handler = stack(async (_req, ctx) => {
 
   console.log(
     `[${requestId}] [SEND-PUSH-NOTIFICATION] Notification placeholder`,
-    { consumerId, email: profile.email, message, eta, stopsRemaining },
+    {
+      consumerId,
+      emailMasked: profile.email ? maskEmail(profile.email) : undefined,
+      messagePreview: truncateMessage(message, 20),
+      eta,
+      stopsRemaining,
+    },
   );
 
   const updatedSubscription = {

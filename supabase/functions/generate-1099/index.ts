@@ -86,6 +86,23 @@ const handler = stack(async (_req, ctx) => {
     throw new Error("Failed to load payer information");
   }
 
+  // Validate that required payer fields are non-empty
+  const missingFields: string[] = [];
+  if (!payerInfo.legal_name || !payerInfo.legal_name.trim()) {
+    missingFields.push("legal_name");
+  }
+  if (!payerInfo.tax_id || !payerInfo.tax_id.trim()) {
+    missingFields.push("tax_id");
+  }
+
+  if (missingFields.length > 0) {
+    console.error(
+      `[${requestId}] [GENERATE-1099] Missing required payer fields: ${missingFields.join(", ")}`,
+      { legal_name: payerInfo.legal_name, tax_id: payerInfo.tax_id },
+    );
+    throw new Error("Failed to load payer information");
+  }
+
   const { data: payouts, error: payoutsError } = await supabase
     .from("payouts")
     .select("amount, description, created_at")

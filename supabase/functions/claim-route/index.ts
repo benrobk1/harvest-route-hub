@@ -72,31 +72,26 @@ const handler = stack(async (_req, ctx) => {
     );
   }
 
-  const { data: batch, error: batchError } = await supabase
+  const { data: updatedBatch, error: updateError } = await supabase
     .from("delivery_batches")
-    .select("id, status, driver_id")
+    .update({ driver_id: user.id, status: "assigned" })
     .eq("id", batch_id)
-    .single();
+    .eq("status", "pending")
+    .is("driver_id", null)
+    .select("id");
 
-  if (batchError) {
-    console.error(`[${requestId}] [CLAIM-ROUTE] Failed to load batch`, batchError);
-    throw batchError;
-  }
-
-  if (!batch) {
-    return new Response(
-      JSON.stringify({ error: "Batch not found" }),
-      {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
+  if (updateError) {
+    console.error(
+      `[${requestId}] [CLAIM-ROUTE] Failed to assign batch`,
+      updateError,
     );
+    throw updateError;
   }
 
-  if (batch.status !== "pending" || batch.driver_id !== null) {
+  if (!updatedBatch || updatedBatch.length === 0) {
     console.warn(
-      `[${requestId}] [CLAIM-ROUTE] Batch unavailable`,
-      { status: batch.status, driverId: batch.driver_id },
+      `[${requestId}] [CLAIM-ROUTE] Batch not available`,
+      { batchId: batch_id },
     );
 
     return new Response(
@@ -106,19 +101,6 @@ const handler = stack(async (_req, ctx) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       },
     );
-  }
-
-  const { error: updateError } = await supabase
-    .from("delivery_batches")
-    .update({ driver_id: user.id, status: "assigned" })
-    .eq("id", batch_id);
-
-  if (updateError) {
-    console.error(
-      `[${requestId}] [CLAIM-ROUTE] Failed to assign batch`,
-      updateError,
-    );
-    throw updateError;
   }
 
   console.log(

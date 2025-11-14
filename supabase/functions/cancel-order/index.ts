@@ -79,7 +79,7 @@ const handler = stack(async (req, ctx) => {
   if (!allowedStatuses.includes(order.status)) {
     return new Response(
       JSON.stringify({
-        error: `Cannot cancel order with status: ${order.status}. Only pending or confirmed orders can be cancelled.`
+        error: `Cannot cancel order with status: ${order.status}. Only pending, paid, or confirmed orders can be cancelled.`
       }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

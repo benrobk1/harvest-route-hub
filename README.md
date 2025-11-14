@@ -23,12 +23,18 @@ A modern, full-stack platform connecting local farmers with consumers through ef
 - [SECURITY.md](./SECURITY.md) - Security architecture
 - [src/features/README.md](./src/features/README.md) - Code organization
 
+**Technical Guides (docs/):**
+- [Middleware Pattern](./docs/MIDDLEWARE.md) - Edge function middleware
+- [Monitoring & Observability](./docs/MONITORING.md) - Error tracking & logging
+- [Testing Strategy](./docs/TESTING.md) - Unit, integration, E2E tests
+- [Mobile Apps](./docs/MOBILE.md) - PWA and native setup
+- [Deployment](./docs/DEPLOYMENT-CHECKLIST.md) - Production checklist
+- [Performance](./docs/PERFORMANCE-OPTIMIZATION.md) - Optimization guide
+- [Security Hardening](./docs/SECURITY-HARDENING.md) - Advanced security
+
 **Reference:**
 - Feature READMEs in `src/features/*/README.md`
 - [Error Handling Guide](./src/lib/errors/README.md)
-- [Testing Guide](./README-TESTING.md)
-- [PWA Setup](./README-PWA.md)
-- [Capacitor Setup](./README-CAPACITOR.md)
 
 ---
 

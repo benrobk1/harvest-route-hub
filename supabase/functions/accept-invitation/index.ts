@@ -87,6 +87,24 @@ const handler = stack(async (req, ctx) => {
     );
   }
 
+  // Immediately mark as used to prevent race conditions
+  const { error: markUsedError } = await supabase
+    .from("admin_invitations")
+    .update({ used_at: new Date().toISOString() })
+    .eq("invitation_token", token)
+    .is("used_at", null); // Optimistic lock
+
+  if (markUsedError) {
+    console.error(`[${requestId}] [ACCEPT-INVITATION] Token already used (race condition):`, markUsedError);
+    return new Response(
+      JSON.stringify({ error: "Invalid or expired invitation" }),
+      {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
+  }
+
   if (new Date(invitation.expires_at) < new Date()) {
     console.error(`[${requestId}] [ACCEPT-INVITATION] Token expired`);
     return new Response(
@@ -142,24 +160,6 @@ const handler = stack(async (req, ctx) => {
   }
 
   console.log(`[${requestId}] [ACCEPT-INVITATION] Admin role assigned`);
-
-  const { error: markUsedError } = await supabase
-    .from("admin_invitations")
-    .update({ used_at: new Date().toISOString() })
-    .eq("invitation_token", token);
-
-  if (markUsedError) {
-    console.error(
-      `[${requestId}] [ACCEPT-INVITATION] Failed to mark invitation as used`,
-      {
-        error: markUsedError,
-        token: token.substring(0, 8) + "...",
-        userId: authData.user.id,
-        email: invitation.email,
-      }
-    );
-    // Don't throw - user creation succeeded; log for manual cleanup
-  }
 
   if (invitation.invited_by) {
     const { error: logError } = await supabase.rpc("log_admin_action", {

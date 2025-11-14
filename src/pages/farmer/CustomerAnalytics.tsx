@@ -15,7 +15,17 @@ import type { Database } from '@/integrations/supabase/types';
 const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))', 'hsl(var(--muted))'];
 
 type OrderWithZip = Database['public']['Tables']['orders']['Row'] & {
-  profiles: Pick<Database['public']['Tables']['profiles']['Row'], 'zip_code'> | null;
+  profiles: {
+    zip_code: string;
+    full_name: string;
+  } | null;
+  order_items?: Array<{
+    product_id: string;
+    products: {
+      farm_profile_id: string;
+      name: string;
+    } | null;
+  }>;
 };
 
 interface CustomerDetails {
@@ -34,37 +44,127 @@ interface ZipDataWithCustomers extends CustomerZipSummary {
   avg_order_size?: number;
 }
 
-function summarizeOrdersByZip(orders: OrderWithZip[] = []): CustomerZipSummary[] {
+function summarizeOrdersByZip(orders: OrderWithZip[] = []): ZipDataWithCustomers[] {
   const zipMap = new Map<
     string,
-    { order_count: number; total_revenue: number; uniqueCustomers: Set<string> }
+    {
+      order_count: number;
+      total_revenue: number;
+      uniqueCustomers: Set<string>;
+      customerOrders: Map<string, Array<{ date: Date; amount: number; products: string[] }>>;
+      allProducts: Map<string, number>;
+    }
   >();
 
+  // Build zip-level data structures
   orders.forEach(order => {
     const zip = order.profiles?.zip_code;
-    if (!zip) return;
+    if (!zip || !order.consumer_id) return;
 
     const summary = zipMap.get(zip) ?? {
       order_count: 0,
       total_revenue: 0,
       uniqueCustomers: new Set<string>(),
+      customerOrders: new Map(),
+      allProducts: new Map(),
     };
 
     summary.order_count += 1;
     summary.total_revenue += Number(order.total_amount ?? 0);
-    if (order.consumer_id) {
-      summary.uniqueCustomers.add(order.consumer_id);
-    }
+    summary.uniqueCustomers.add(order.consumer_id);
+
+    // Track customer orders
+    const customerOrderList = summary.customerOrders.get(order.consumer_id) ?? [];
+    const products = (order.order_items ?? [])
+      .map(item => item.products?.name)
+      .filter((name): name is string => !!name);
+    
+    customerOrderList.push({
+      date: new Date(order.created_at),
+      amount: Number(order.total_amount ?? 0),
+      products,
+    });
+    summary.customerOrders.set(order.consumer_id, customerOrderList);
+
+    // Track product frequency
+    products.forEach(product => {
+      summary.allProducts.set(product, (summary.allProducts.get(product) ?? 0) + 1);
+    });
 
     zipMap.set(zip, summary);
   });
 
-  return Array.from(zipMap.entries()).map(([zip, data]) => ({
-    zip_code: zip,
-    order_count: data.order_count,
-    total_revenue: data.total_revenue,
-    unique_customers: data.uniqueCustomers.size,
-  }));
+  // Calculate customer details for each zip
+  return Array.from(zipMap.entries()).map(([zip, data]) => {
+    const customers: CustomerDetails[] = [];
+    
+    data.customerOrders.forEach((orderList, consumerId) => {
+      // Find consumer name from orders
+      const consumerName = orders.find(o => o.consumer_id === consumerId)?.profiles?.full_name ?? 'Unknown';
+      
+      // Sort orders by date
+      const sortedOrders = [...orderList].sort((a, b) => a.date.getTime() - b.date.getTime());
+      
+      // Calculate days between orders
+      let totalDaysBetween = 0;
+      for (let i = 1; i < sortedOrders.length; i++) {
+        const daysDiff = (sortedOrders[i].date.getTime() - sortedOrders[i - 1].date.getTime()) / (1000 * 60 * 60 * 24);
+        totalDaysBetween += daysDiff;
+      }
+      const avgDaysBetween = sortedOrders.length > 1 ? Math.round(totalDaysBetween / (sortedOrders.length - 1)) : 0;
+      
+      // Calculate total revenue for this customer
+      const customerRevenue = orderList.reduce((sum, o) => sum + o.amount, 0);
+      
+      // Find most common products for this customer
+      const productFreq = new Map<string, number>();
+      orderList.forEach(o => {
+        o.products.forEach(p => {
+          productFreq.set(p, (productFreq.get(p) ?? 0) + 1);
+        });
+      });
+      const topProducts = Array.from(productFreq.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([name]) => name);
+      
+      customers.push({
+        name: consumerName,
+        orders: orderList.length,
+        revenue: customerRevenue,
+        avg_order: orderList.length > 0 ? customerRevenue / orderList.length : 0,
+        common_produce: topProducts.join(', ') || 'N/A',
+        days_between: avgDaysBetween,
+      });
+    });
+
+    // Sort customers by revenue (highest first)
+    customers.sort((a, b) => b.revenue - a.revenue);
+
+    // Calculate zip-level aggregates
+    const topZipProducts = Array.from(data.allProducts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([name]) => name);
+
+    const allDaysBetween = customers
+      .map(c => c.days_between)
+      .filter(d => d > 0);
+    const avgDaysBetweenOrders = allDaysBetween.length > 0
+      ? Math.round(allDaysBetween.reduce((sum, d) => sum + d, 0) / allDaysBetween.length)
+      : 0;
+
+    return {
+      zip_code: zip,
+      order_count: data.order_count,
+      total_revenue: data.total_revenue,
+      unique_customers: data.uniqueCustomers.size,
+      customers,
+      most_common_produce: topZipProducts.join(', ') || 'N/A',
+      avg_days_between_orders: avgDaysBetweenOrders,
+      avg_order_size: data.order_count > 0 ? data.total_revenue / data.order_count : 0,
+    };
+  });
 }
 
 // Demo data for Milton zip code with customer details
@@ -128,11 +228,15 @@ export default function CustomerAnalytics() {
             consumer_id,
             total_amount,
             created_at,
-            profiles!inner(zip_code),
+            profiles!inner(
+              zip_code,
+              full_name
+            ),
             order_items!inner(
               product_id,
               products!inner(
-                farm_profile_id
+                farm_profile_id,
+                name
               )
             )
           `)
@@ -159,11 +263,15 @@ export default function CustomerAnalytics() {
             consumer_id,
             total_amount,
             created_at,
-            profiles!inner(zip_code),
+            profiles!inner(
+              zip_code,
+              full_name
+            ),
             order_items!inner(
               product_id,
               products!inner(
-                farm_profile_id
+                farm_profile_id,
+                name
               )
             )
           `)

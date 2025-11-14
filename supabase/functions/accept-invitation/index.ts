@@ -162,11 +162,24 @@ const handler = stack(async (req, ctx) => {
   }
 
   if (invitation.invited_by) {
-    await supabase.rpc("log_admin_action", {
+    const { error: logError } = await supabase.rpc("log_admin_action", {
       _action_type: "admin_invitation_accepted",
       _target_user_id: authData.user.id,
       _new_value: { email: invitation.email, full_name: fullName },
     });
+
+    if (logError) {
+      console.error(
+        `[${requestId}] [ACCEPT-INVITATION] Failed to log admin action`,
+        {
+          error: logError,
+          invited_by: invitation.invited_by,
+          target_user_id: authData.user.id,
+          email: invitation.email,
+          full_name: fullName,
+        }
+      );
+    }
   }
 
   console.log(`[${requestId}] [ACCEPT-INVITATION] Success for ${invitation.email}`);

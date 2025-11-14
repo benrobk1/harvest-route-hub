@@ -148,6 +148,6 @@ export const farmerQueries = {
    * @param displayZipData - ZIP data to display
    * @returns Query key for customer summary
    */
-  customerSummary: (userId: string, displayZipData: CustomerZipSummary[]) =>
+  customerSummary: (userId: string, displayZipData: readonly CustomerZipSummary[]) =>
     [...farmerQueries.all(), 'customer-summary', userId, displayZipData] as const,
 };

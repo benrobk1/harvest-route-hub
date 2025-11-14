@@ -18,6 +18,22 @@ type OrderWithZip = Database['public']['Tables']['orders']['Row'] & {
   profiles: Pick<Database['public']['Tables']['profiles']['Row'], 'zip_code'> | null;
 };
 
+interface CustomerDetails {
+  name: string;
+  orders: number;
+  revenue: number;
+  avg_order: number;
+  common_produce: string;
+  days_between: number;
+}
+
+interface ZipDataWithCustomers extends CustomerZipSummary {
+  customers?: CustomerDetails[];
+  most_common_produce?: string;
+  avg_days_between_orders?: number;
+  avg_order_size?: number;
+}
+
 function summarizeOrdersByZip(orders: OrderWithZip[] = []): CustomerZipSummary[] {
   const zipMap = new Map<
     string,
@@ -161,7 +177,7 @@ export default function CustomerAnalytics() {
     enabled: !!user?.id,
   });
 
-  const displayZipData: CustomerZipSummary[] = zipCodeData || [];
+  const displayZipData: ZipDataWithCustomers[] = zipCodeData || [];
 
   const { data: summary, isLoading: summaryLoading } = useQuery({
     queryKey: farmerQueries.customerSummary(user?.id || '', displayZipData),
@@ -277,7 +293,7 @@ export default function CustomerAnalytics() {
         <CardContent>
           {displayZipData && Array.isArray(displayZipData) && displayZipData.length > 0 ? (
             <Accordion type="single" collapsible className="w-full">
-              {displayZipData.map((row: any) => (
+              {displayZipData.map((row: ZipDataWithCustomers) => (
                 <AccordionItem key={row.zip_code} value={row.zip_code} className="border rounded-lg mb-2 px-4">
                   <AccordionTrigger className="hover:no-underline">
                     <div className="flex items-center justify-between w-full pr-4">
@@ -292,7 +308,7 @@ export default function CustomerAnalytics() {
                   <AccordionContent>
                     <div className="pt-4 space-y-3">
                       {row.customers && row.customers.length > 0 ? (
-                        row.customers.map((customer: any, idx: number) => (
+                        row.customers.map((customer: CustomerDetails, idx: number) => (
                           <div key={idx} className="bg-muted/30 rounded-lg p-4 space-y-2">
                             <div className="font-semibold text-base">{customer.name}</div>
                             <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">

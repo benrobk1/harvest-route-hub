@@ -79,6 +79,8 @@ function summarizeOrdersByZip(orders: OrderWithZip[] = []): ZipDataWithCustomers
       .map(item => item.products?.name)
       .filter((name): name is string => !!name);
     
+    if (!order.created_at) return;
+    
     customerOrderList.push({
       date: new Date(order.created_at),
       amount: Number(order.total_amount ?? 0),

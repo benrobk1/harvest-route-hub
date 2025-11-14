@@ -67,6 +67,11 @@ const handler = stack(async (_req, ctx) => {
     throw new Error("Recipient has not submitted tax information");
   }
 
+  // Validate tax_id_type is present to avoid runtime errors
+  if (!profile.tax_id_type) {
+    throw new Error("Recipient tax ID type is missing");
+  }
+
   const { data: payouts, error: payoutsError } = await supabase
     .from("payouts")
     .select("amount, description, created_at")
@@ -146,15 +151,19 @@ const handler = stack(async (_req, ctx) => {
     size: fontSize,
     font,
   });
-  page.drawText(
-    `${profile.tax_id_type.toUpperCase()}: XXX-XX-${profile.tax_id_encrypted.slice(-4)}`,
-    {
-      x: 350,
-      y: height - 150,
-      size: fontSize,
-      font,
-    },
-  );
+
+  // Use placeholder for last-4 digits since tax_id_encrypted is ciphertext
+  // and doesn't contain actual digits. A dedicated tax_id_last4 field
+  // would be needed to show real last-4 digits.
+  const taxIdType = profile.tax_id_type.toUpperCase();
+  const taxIdDisplay = `${taxIdType}: XXX-XX-XXXX`;
+
+  page.drawText(taxIdDisplay, {
+    x: 350,
+    y: height - 150,
+    size: fontSize,
+    font,
+  });
 
   if (profile.tax_address) {
     const addressLines = String(profile.tax_address).split("\n");

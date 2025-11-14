@@ -143,10 +143,23 @@ const handler = stack(async (req, ctx) => {
 
   console.log(`[${requestId}] [ACCEPT-INVITATION] Admin role assigned`);
 
-  await supabase
+  const { error: markUsedError } = await supabase
     .from("admin_invitations")
     .update({ used_at: new Date().toISOString() })
     .eq("invitation_token", token);
+
+  if (markUsedError) {
+    console.error(
+      `[${requestId}] [ACCEPT-INVITATION] Failed to mark invitation as used`,
+      {
+        error: markUsedError,
+        token: token.substring(0, 8) + "...",
+        userId: authData.user.id,
+        email: invitation.email,
+      }
+    );
+    throw markUsedError;
+  }
 
   if (invitation.invited_by) {
     await supabase.rpc("log_admin_action", {

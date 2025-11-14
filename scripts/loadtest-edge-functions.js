@@ -340,7 +340,7 @@ function generateSummary() {
 /**
  * Print results
  */
-function printResults() {
+async function printResults() {
   console.log('\n' + '═'.repeat(60));
   console.log('📊 LOAD TEST RESULTS');
   console.log('═'.repeat(60));
@@ -411,7 +411,7 @@ async function main() {
 
     // Generate and print results
     generateSummary();
-    printResults();
+    await printResults();
 
     // Exit with appropriate code
     const errorRate = results.summary.failed / results.summary.total;

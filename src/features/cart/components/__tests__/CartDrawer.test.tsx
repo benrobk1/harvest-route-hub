@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { screen, fireEvent } from '@testing-library/react';
 import { CartDrawer } from '../CartDrawer';
 import { renderWithProviders } from '@/test/helpers/renderWithProviders';
+import { useCart } from '../hooks/useCart';
 
 const mockNavigate = vi.fn();
 vi.mock('react-router-dom', async () => {
@@ -38,7 +39,7 @@ describe('CartDrawer', () => {
   });
 
   it('should show cart count badge when items exist', () => {
-    vi.mocked(require('../hooks/useCart').useCart).mockReturnValue({
+    vi.mocked(useCart).mockReturnValue({
       cart: { items: [{ id: '1', quantity: 2 }] },
       cartCount: 2,
       cartTotal: 25,
@@ -83,7 +84,7 @@ describe('CartDrawer', () => {
   });
 
   it('should show minimum order message when below threshold', () => {
-    vi.mocked(require('../hooks/useCart').useCart).mockReturnValue({
+    vi.mocked(useCart).mockReturnValue({
       cart: { 
         items: [{ 
           id: '1', 
@@ -111,7 +112,7 @@ describe('CartDrawer', () => {
   });
 
   it('should show Save Cart button when items exist', () => {
-    vi.mocked(require('../hooks/useCart').useCart).mockReturnValue({
+    vi.mocked(useCart).mockReturnValue({
       cart: { 
         items: [{ 
           id: '1', 

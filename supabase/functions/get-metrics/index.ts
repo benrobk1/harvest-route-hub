@@ -59,7 +59,7 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
 
   // Calculate time range
   const now = new Date();
-  let startTime = new Date();
+  const startTime = new Date();
   
   switch (timeRange) {
     case '1h':

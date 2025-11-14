@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
@@ -35,6 +35,40 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus | null>(null);
 
+  const refreshSubscription = useCallback(async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('check-subscription');
+      if (error) throw error;
+      setSubscriptionStatus(data as SubscriptionStatus);
+    } catch (error) {
+      console.error('Error fetching subscription status:', error);
+      setSubscriptionStatus(null);
+    }
+  }, []);
+
+  const fetchUserRoles = useCallback(async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId);
+
+      if (error) throw error;
+      const userRoles = data?.map(r => r.role as AppRole) || [];
+      setRoles(userRoles);
+      
+      // Check subscription status for consumers
+      if (userRoles.includes('consumer')) {
+        await refreshSubscription();
+      }
+    } catch (error) {
+      console.error('Error fetching roles:', error);
+      setRoles([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [refreshSubscription]);
+
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
@@ -66,41 +100,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
 
     return () => subscription.unsubscribe();
-  }, []);
-
-  const fetchUserRoles = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId);
-
-      if (error) throw error;
-      const userRoles = data?.map(r => r.role as AppRole) || [];
-      setRoles(userRoles);
-      
-      // Check subscription status for consumers
-      if (userRoles.includes('consumer')) {
-        await refreshSubscription();
-      }
-    } catch (error) {
-      console.error('Error fetching roles:', error);
-      setRoles([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const refreshSubscription = async () => {
-    try {
-      const { data, error } = await supabase.functions.invoke('check-subscription');
-      if (error) throw error;
-      setSubscriptionStatus(data as SubscriptionStatus);
-    } catch (error) {
-      console.error('Error fetching subscription status:', error);
-      setSubscriptionStatus(null);
-    }
-  };
+  }, [fetchUserRoles]);
 
   const signOut = async () => {
     await supabase.auth.signOut();

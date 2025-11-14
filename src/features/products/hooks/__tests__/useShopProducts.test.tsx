@@ -6,7 +6,7 @@ import { createMockSupabaseClient } from '@/test/mocks/supabase';
 import { createMockAuthContext } from '@/test/mocks/authContext';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
-import { AuthProvider } from '@/contexts/AuthContext';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ReactNode } from 'react';
 
 vi.mock('@/integrations/supabase/client', () => ({
@@ -80,7 +80,7 @@ describe('useShopProducts', () => {
   });
 
   it('should not fetch consumer profile for unauthenticated user', async () => {
-    vi.mocked(require('@/contexts/AuthContext').useAuth).mockReturnValue(
+    vi.mocked(useAuth).mockReturnValue(
       createMockAuthContext({ user: null })
     );
 

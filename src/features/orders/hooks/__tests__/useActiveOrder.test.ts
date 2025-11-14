@@ -4,7 +4,7 @@ import { useActiveOrder } from '../useActiveOrder';
 import { createTestQueryClient } from '@/test/helpers/renderWithProviders';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
-import { AuthProvider } from '@/contexts/AuthContext';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { createMockSupabaseClient } from '@/test/mocks/supabase';
 import { createMockAuthContext } from '@/test/mocks/authContext';
 import { ReactNode } from 'react';
@@ -45,7 +45,7 @@ describe('useActiveOrder', () => {
   });
 
   it('should return null for unauthenticated user', async () => {
-    vi.mocked(require('@/contexts/AuthContext').useAuth).mockReturnValue(
+    vi.mocked(useAuth).mockReturnValue(
       createMockAuthContext({ user: null })
     );
 

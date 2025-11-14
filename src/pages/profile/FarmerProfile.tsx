@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,12 +50,7 @@ const FarmerProfile = () => {
 
   const daysOfWeek = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
 
-  useEffect(() => {
-    loadProfile();
-    checkIfLeadFarmer();
-  }, []);
-
-  const checkIfLeadFarmer = async () => {
+  const checkIfLeadFarmer = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
@@ -67,9 +62,9 @@ const FarmerProfile = () => {
       .single();
 
     setIsLeadFarmer(!!data);
-  };
+  }, []);
 
-  const loadProfile = async () => {
+  const loadProfile = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       navigate("/auth/farmer");
@@ -123,7 +118,12 @@ const FarmerProfile = () => {
         location: farmData.location || "",
       });
     }
-  };
+  }, [navigate]);
+
+  useEffect(() => {
+    loadProfile();
+    checkIfLeadFarmer();
+  }, [loadProfile, checkIfLeadFarmer]);
 
   const handleSavePersonal = async (e: React.FormEvent) => {
     e.preventDefault();

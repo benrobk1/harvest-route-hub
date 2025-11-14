@@ -38,7 +38,7 @@ export const useActiveOrder = () => {
   useEffect(() => {
     if (!user?.id) return;
     return orderRepo.subscribeToOrderUpdates(user.id, () => refetch());
-  }, [user?.id, refetch]);
+  }, [user?.id, refetch, orderRepo]);
 
   return {
     activeOrder,

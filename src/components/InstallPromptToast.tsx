@@ -51,7 +51,7 @@ export const InstallPromptToast = () => {
     if (!showPrompt) {
       hasShownToast.current = false;
     }
-  }, [showPrompt]);
+  }, [showPrompt, handleInstall, handleDismiss]);
 
   return null;
 };

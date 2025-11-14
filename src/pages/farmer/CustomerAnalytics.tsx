@@ -60,6 +60,7 @@ function summarizeOrdersByZip(orders: OrderWithZip[] = []): ZipDataWithCustomers
   orders.forEach(order => {
     const zip = order.profiles?.zip_code;
     if (!zip || !order.consumer_id) return;
+    if (!order.created_at) return;
 
     const summary = zipMap.get(zip) ?? {
       order_count: 0,
@@ -78,8 +79,6 @@ function summarizeOrdersByZip(orders: OrderWithZip[] = []): ZipDataWithCustomers
     const products = (order.order_items ?? [])
       .map(item => item.products?.name)
       .filter((name): name is string => !!name);
-    
-    if (!order.created_at) return;
     
     customerOrderList.push({
       date: new Date(order.created_at),

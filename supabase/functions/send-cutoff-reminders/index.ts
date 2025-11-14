@@ -101,16 +101,23 @@ const handler = stack(async (_req, ctx) => {
 
   for (const consumerId of consumersToNotify) {
     try {
-      await supabase.functions.invoke("send-notification", {
-        body: {
-          event_type: "cutoff_reminder",
-          recipient_id: consumerId,
-          recipient_email: consumerEmails.get(consumerId),
-          data: {
-            delivery_date: tomorrowDate,
+      const { error: notifyError } = await supabase.functions.invoke(
+        "send-notification",
+        {
+          body: {
+            event_type: "cutoff_reminder",
+            recipient_id: consumerId,
+            recipient_email: consumerEmails.get(consumerId),
+            data: {
+              delivery_date: tomorrowDate,
+            },
           },
         },
-      });
+      );
+
+      if (notifyError) {
+        throw notifyError;
+      }
 
       results.reminders_sent += 1;
     } catch (error) {

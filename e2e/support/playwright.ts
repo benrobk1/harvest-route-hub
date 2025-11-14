@@ -14,23 +14,42 @@ try {
   hasPlaywright = false;
   const bun = await import('bun:test');
   const skipTest = (title: string, fn?: (...args: any[]) => unknown) => bun.test.skip(title, fn as any);
-
-  const stubTest: any = (title: string, fn?: (...args: any[]) => unknown) => skipTest(title, fn);
-  stubTest.skip = skipTest;
-  stubTest.only = skipTest;
-  stubTest.fixme = skipTest;
   const noop = () => {};
-  stubTest.describe = Object.assign(noop, {
-    skip: noop,
-    only: noop,
-    parallel: noop
-  });
-  stubTest.step = async <T>(_: string, body: () => Promise<T> | T) => body();
-  stubTest.use = () => {};
-  stubTest.beforeAll = (...args: Parameters<typeof bun.beforeAll>) => bun.beforeAll?.(...args);
-  stubTest.afterAll = (...args: Parameters<typeof bun.afterAll>) => bun.afterAll?.(...args);
-  stubTest.beforeEach = (...args: Parameters<typeof bun.beforeEach>) => bun.beforeEach?.(...args);
-  stubTest.afterEach = (...args: Parameters<typeof bun.afterEach>) => bun.afterEach?.(...args);
+
+  const stubTest: any = new Proxy(
+    (title: string, fn?: (...args: any[]) => unknown) => skipTest(title, fn),
+    {
+      get(target, prop) {
+        if (prop === 'describe') {
+          return Object.assign(noop, {
+            skip: noop,
+            only: noop,
+            parallel: noop
+          });
+        }
+        if (prop === 'step') {
+          return async <T>(_: string, body: () => Promise<T> | T) => body();
+        }
+        if (prop === 'use') {
+          return noop;
+        }
+        if (prop === 'beforeAll') {
+          return (...args: Parameters<typeof bun.beforeAll>) => bun.beforeAll?.(...args);
+        }
+        if (prop === 'afterAll') {
+          return (...args: Parameters<typeof bun.afterAll>) => bun.afterAll?.(...args);
+        }
+        if (prop === 'beforeEach') {
+          return (...args: Parameters<typeof bun.beforeEach>) => bun.beforeEach?.(...args);
+        }
+        if (prop === 'afterEach') {
+          return (...args: Parameters<typeof bun.afterEach>) => bun.afterEach?.(...args);
+        }
+        // Default: return skipTest for any unknown property
+        return skipTest;
+      }
+    }
+  );
 
   test = stubTest;
   expect = () => {

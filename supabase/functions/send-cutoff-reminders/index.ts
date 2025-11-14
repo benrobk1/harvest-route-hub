@@ -46,11 +46,17 @@ const handler = stack(async (_req, ctx) => {
     throw pendingOrdersError;
   }
 
+  // Filter carts to only those updated in the last 7 days to avoid unbounded table scan
+  const recentDate = new Date();
+  recentDate.setDate(recentDate.getDate() - 7);
+  const recentDateISO = recentDate.toISOString();
+
   const { data: cartsWithItems, error: cartsError } = await supabase
     .from("cart_items")
     .select(
       `cart_id, shopping_carts ( consumer_id, profiles (email) )`,
-    );
+    )
+    .gte("shopping_carts.updated_at", recentDateISO);
 
   if (cartsError) {
     console.error(

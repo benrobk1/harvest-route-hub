@@ -76,7 +76,7 @@ const handler = stack(async (_req, ctx) => {
     .from("delivery_batches")
     .select("id, status, driver_id")
     .eq("id", batch_id)
-    .single();
+    .maybeSingle();
 
   if (batchError) {
     console.error(`[${requestId}] [CLAIM-ROUTE] Failed to load batch`, batchError);

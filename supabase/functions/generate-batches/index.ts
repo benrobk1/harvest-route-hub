@@ -515,8 +515,8 @@ const handler = stack(async (_req, ctx) => {
             return {
               ...order,
               address,
-              latitude: order.latitude ?? fallback.latitude,
-              longitude: order.longitude ?? fallback.longitude
+              latitude: profile?.latitude ?? fallback.latitude,
+              longitude: profile?.longitude ?? fallback.longitude
             };
           }
 

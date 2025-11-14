@@ -1,100 +1,139 @@
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+import {
+  createMiddlewareStack,
+  withAuth,
+  withCORS,
+  withErrorHandling,
+  withRequestId,
+  withSupabaseServiceRole,
+  withValidation,
+} from "../_shared/middleware/index.ts";
+import type { AuthContext } from "../_shared/middleware/withAuth.ts";
+import type { CORSContext } from "../_shared/middleware/withCORS.ts";
+import type { RequestIdContext } from "../_shared/middleware/withRequestId.ts";
+import type { ValidationContext } from "../_shared/middleware/withValidation.ts";
+import type { SupabaseServiceRoleContext } from "../_shared/middleware/withSupabaseServiceRole.ts";
 
-serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+const ClaimRouteSchema = z.object({
+  batch_id: z.string().uuid({ message: "batch_id must be a valid UUID" }),
+});
+
+type ClaimRouteInput = z.infer<typeof ClaimRouteSchema>;
+
+interface ClaimRouteContext
+  extends RequestIdContext,
+    CORSContext,
+    AuthContext,
+    ValidationContext<ClaimRouteInput>,
+    SupabaseServiceRoleContext {}
+
+const stack = createMiddlewareStack<ClaimRouteContext>([
+  withErrorHandling,
+  withRequestId,
+  withCORS,
+  withSupabaseServiceRole,
+  withAuth,
+  withValidation(ClaimRouteSchema),
+]);
+
+const handler = stack(async (_req, ctx) => {
+  const { supabase, corsHeaders, requestId, user, input } = ctx;
+  const { batch_id } = input;
+
+  console.log(
+    `[${requestId}] [CLAIM-ROUTE] Driver attempting to claim batch`,
+    { userId: user.id, batchId: batch_id },
+  );
+
+  const { data: isDriver, error: roleError } = await supabase.rpc("has_role", {
+    _user_id: user.id,
+    _role: "driver",
+  });
+
+  if (roleError) {
+    console.error(`[${requestId}] [CLAIM-ROUTE] Role check failed`, roleError);
+    throw roleError;
   }
 
-  try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  if (!isDriver) {
+    console.warn(
+      `[${requestId}] [CLAIM-ROUTE] User lacks driver role`,
+      { userId: user.id },
+    );
 
-    // Anon client to read the auth user from JWT
-    const anon = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: req.headers.get("Authorization")! } },
-    });
-    // Service role client for privileged updates
-    const admin = createClient(supabaseUrl, supabaseServiceKey);
-
-    const { data: { user }, error: authError } = await anon.auth.getUser();
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const body = await req.json().catch(() => ({}));
-    const batchId: string | undefined = body.batch_id;
-    if (!batchId) {
-      return new Response(JSON.stringify({ error: "batch_id is required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Confirm user has driver role
-    const { data: isDriver, error: roleErr } = await admin.rpc("has_role", {
-      _user_id: user.id,
-      _role: "driver",
-    });
-    if (roleErr || !isDriver) {
-      return new Response(JSON.stringify({ error: "Driver role required" }), {
+    return new Response(
+      JSON.stringify({ error: "Driver role required" }),
+      {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+      },
+    );
+  }
 
-    // Ensure the batch is pending and unassigned
-    const { data: batch, error: loadErr } = await admin
-      .from("delivery_batches")
-      .select("id, status, driver_id")
-      .eq("id", batchId)
-      .single();
+  const { data: batch, error: batchError } = await supabase
+    .from("delivery_batches")
+    .select("id, status, driver_id")
+    .eq("id", batch_id)
+    .single();
 
-    if (loadErr || !batch) {
-      return new Response(JSON.stringify({ error: "Batch not found" }), {
+  if (batchError) {
+    console.error(`[${requestId}] [CLAIM-ROUTE] Failed to load batch`, batchError);
+    throw batchError;
+  }
+
+  if (!batch) {
+    return new Response(
+      JSON.stringify({ error: "Batch not found" }),
+      {
         status: 404,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+      },
+    );
+  }
 
-    if (batch.status !== "pending" || batch.driver_id !== null) {
-      return new Response(JSON.stringify({ error: "Batch not available" }), {
+  if (batch.status !== "pending" || batch.driver_id !== null) {
+    console.warn(
+      `[${requestId}] [CLAIM-ROUTE] Batch unavailable`,
+      { status: batch.status, driverId: batch.driver_id },
+    );
+
+    return new Response(
+      JSON.stringify({ error: "Batch not available" }),
+      {
         status: 409,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Assign the batch to the driver
-    const { error: updateErr } = await admin
-      .from("delivery_batches")
-      .update({ driver_id: user.id, status: "assigned" })
-      .eq("id", batchId);
-
-    if (updateErr) {
-      return new Response(JSON.stringify({ error: updateErr.message }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    return new Response(JSON.stringify({ success: true }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (e) {
-    console.error("claim-route error", e);
-    return new Response(JSON.stringify({ error: "Unexpected error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+      },
+    );
   }
+
+  const { error: updateError } = await supabase
+    .from("delivery_batches")
+    .update({ driver_id: user.id, status: "assigned" })
+    .eq("id", batch_id);
+
+  if (updateError) {
+    console.error(
+      `[${requestId}] [CLAIM-ROUTE] Failed to assign batch`,
+      updateError,
+    );
+    throw updateError;
+  }
+
+  console.log(
+    `[${requestId}] [CLAIM-ROUTE] Batch successfully claimed`,
+    { userId: user.id, batchId: batch_id },
+  );
+
+  return new Response(JSON.stringify({ success: true }), {
+    status: 200,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+});
+
+serve((req) => {
+  const initialContext: Partial<ClaimRouteContext> = {};
+
+  return handler(req, initialContext);
 });

@@ -1,119 +1,136 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import {
+  createMiddlewareStack,
+  withCORS,
+  withErrorHandling,
+  withRequestId,
+  withSupabaseServiceRole,
+} from "../_shared/middleware/index.ts";
+import type { CORSContext } from "../_shared/middleware/withCORS.ts";
+import type { RequestIdContext } from "../_shared/middleware/withRequestId.ts";
+import type { SupabaseServiceRoleContext } from "../_shared/middleware/withSupabaseServiceRole.ts";
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+interface SendCutoffRemindersContext
+  extends RequestIdContext,
+    CORSContext,
+    SupabaseServiceRoleContext {}
+
+const stack = createMiddlewareStack<SendCutoffRemindersContext>([
+  withErrorHandling,
+  withRequestId,
+  withCORS,
+  withSupabaseServiceRole,
+]);
+
+const handler = stack(async (_req, ctx) => {
+  const { supabase, corsHeaders, requestId } = ctx;
+
+  console.log(`[${requestId}] [SEND-CUTOFF-REMINDERS] Starting reminder job`);
+
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowDate = tomorrow.toISOString().split("T")[0];
+
+  const { data: pendingOrders, error: pendingOrdersError } = await supabase
+    .from("orders")
+    .select("consumer_id, profiles(email)")
+    .eq("delivery_date", tomorrowDate)
+    .eq("status", "pending");
+
+  if (pendingOrdersError) {
+    console.error(
+      `[${requestId}] [SEND-CUTOFF-REMINDERS] Failed to load pending orders`,
+      pendingOrdersError,
+    );
+    throw pendingOrdersError;
   }
 
-  try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  const { data: cartsWithItems, error: cartsError } = await supabase
+    .from("cart_items")
+    .select(
+      `cart_id, shopping_carts ( consumer_id, profiles (email) )`,
     );
 
-    console.log('Starting cutoff reminder job...');
-
-    // Calculate tomorrow's date
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowDate = tomorrow.toISOString().split('T')[0];
-
-    // Find all consumers with pending orders for tomorrow
-    const { data: pendingOrders } = await supabaseClient
-      .from('orders')
-      .select('consumer_id, profiles (email)')
-      .eq('delivery_date', tomorrowDate)
-      .eq('status', 'pending');
-
-    // Find consumers with items in cart (who haven't checked out yet)
-    const { data: cartsWithItems } = await supabaseClient
-      .from('cart_items')
-      .select(`
-        cart_id,
-        shopping_carts (
-          consumer_id,
-          profiles (email)
-        )
-      `);
-
-    // Combine and deduplicate consumers
-    const consumersToNotify = new Set<string>();
-    const consumerEmails = new Map<string, string>();
-
-    if (pendingOrders) {
-      for (const order of pendingOrders) {
-        const profile = order.profiles as any;
-        if (profile?.email) {
-          consumersToNotify.add(order.consumer_id);
-          consumerEmails.set(order.consumer_id, profile.email);
-        }
-      }
-    }
-
-    if (cartsWithItems) {
-      for (const item of cartsWithItems) {
-        const cart = item.shopping_carts as any;
-        const profile = cart?.profiles as any;
-        if (cart?.consumer_id && profile?.email) {
-          consumersToNotify.add(cart.consumer_id);
-          consumerEmails.set(cart.consumer_id, profile.email);
-        }
-      }
-    }
-
-    console.log(`Found ${consumersToNotify.size} consumers to notify`);
-
-    const results = {
-      success: true,
-      reminders_sent: 0,
-      errors: [] as any[]
-    };
-
-    // Send reminder to each consumer
-    for (const consumerId of consumersToNotify) {
-      try {
-        await supabaseClient.functions.invoke('send-notification', {
-          body: {
-            event_type: 'cutoff_reminder',
-            recipient_id: consumerId,
-            recipient_email: consumerEmails.get(consumerId),
-            data: {
-              delivery_date: tomorrowDate
-            }
-          }
-        });
-
-        results.reminders_sent++;
-      } catch (error: any) {
-        console.error('Failed to send reminder to consumer:', consumerId, error);
-        results.errors.push({
-          consumer_id: consumerId,
-          error: error.message
-        });
-      }
-    }
-
-    console.log('Cutoff reminder job complete:', results);
-
-    return new Response(JSON.stringify(results), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-
-  } catch (error: any) {
-    console.error('Cutoff reminder error:', error);
-    return new Response(JSON.stringify({ 
-      error: 'SERVER_ERROR',
-      message: error.message 
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+  if (cartsError) {
+    console.error(
+      `[${requestId}] [SEND-CUTOFF-REMINDERS] Failed to load carts`,
+      cartsError,
+    );
+    throw cartsError;
   }
+
+  const consumersToNotify = new Set<string>();
+  const consumerEmails = new Map<string, string>();
+
+  for (const order of pendingOrders ?? []) {
+    const profile = order.profiles as { email?: string } | null;
+    if (profile?.email) {
+      consumersToNotify.add(order.consumer_id);
+      consumerEmails.set(order.consumer_id, profile.email);
+    }
+  }
+
+  for (const item of cartsWithItems ?? []) {
+    const cart = item.shopping_carts as { consumer_id?: string; profiles?: { email?: string } | null } | null;
+    const consumerId = cart?.consumer_id;
+    const email = cart?.profiles?.email;
+
+    if (consumerId && email) {
+      consumersToNotify.add(consumerId);
+      consumerEmails.set(consumerId, email);
+    }
+  }
+
+  console.log(
+    `[${requestId}] [SEND-CUTOFF-REMINDERS] Notifying consumers`,
+    { count: consumersToNotify.size },
+  );
+
+  const results = {
+    success: true,
+    reminders_sent: 0,
+    errors: [] as { consumer_id: string; error: string }[],
+  };
+
+  for (const consumerId of consumersToNotify) {
+    try {
+      await supabase.functions.invoke("send-notification", {
+        body: {
+          event_type: "cutoff_reminder",
+          recipient_id: consumerId,
+          recipient_email: consumerEmails.get(consumerId),
+          data: {
+            delivery_date: tomorrowDate,
+          },
+        },
+      });
+
+      results.reminders_sent += 1;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(
+        `[${requestId}] [SEND-CUTOFF-REMINDERS] Failed to notify consumer`,
+        { consumerId, message },
+      );
+
+      results.errors.push({ consumer_id: consumerId, error: message });
+    }
+  }
+
+  console.log(
+    `[${requestId}] [SEND-CUTOFF-REMINDERS] Completed reminder job`,
+    { remindersSent: results.reminders_sent, errors: results.errors.length },
+  );
+
+  return new Response(JSON.stringify(results), {
+    status: 200,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
+});
+
+serve((req) => {
+  const initialContext: Partial<SendCutoffRemindersContext> = {};
+
+  return handler(req, initialContext);
 });

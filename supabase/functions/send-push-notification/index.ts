@@ -1,102 +1,141 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { checkRateLimit } from '../_shared/rateLimiter.ts';
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { checkRateLimit } from "../_shared/rateLimiter.ts";
+import {
+  createMiddlewareStack,
+  withCORS,
+  withErrorHandling,
+  withRequestId,
+  withSupabaseServiceRole,
+  withValidation,
+} from "../_shared/middleware/index.ts";
+import type { CORSContext } from "../_shared/middleware/withCORS.ts";
+import type { RequestIdContext } from "../_shared/middleware/withRequestId.ts";
+import type { ValidationContext } from "../_shared/middleware/withValidation.ts";
+import type { SupabaseServiceRoleContext } from "../_shared/middleware/withSupabaseServiceRole.ts";
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+const SendPushNotificationSchema = z.object({
+  consumerId: z.string().min(1, { message: "consumerId is required" }),
+  message: z.string().min(1, { message: "message is required" }),
+  eta: z.string().optional(),
+  stopsRemaining: z.number().int().nonnegative().optional(),
+});
 
-  try {
-    const { consumerId, message, eta, stopsRemaining } = await req.json();
+type SendPushNotificationInput = z.infer<typeof SendPushNotificationSchema>;
 
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+interface SendPushNotificationContext
+  extends RequestIdContext,
+    CORSContext,
+    ValidationContext<SendPushNotificationInput>,
+    SupabaseServiceRoleContext {}
+
+const stack = createMiddlewareStack<SendPushNotificationContext>([
+  withErrorHandling,
+  withRequestId,
+  withCORS,
+  withSupabaseServiceRole,
+  withValidation(SendPushNotificationSchema),
+]);
+
+const handler = stack(async (_req, ctx) => {
+  const { supabase, corsHeaders, requestId, input } = ctx;
+  const { consumerId, message, eta, stopsRemaining } = input;
+
+  const rateCheck = await checkRateLimit(supabase, consumerId, {
+    maxRequests: 20,
+    windowMs: 60 * 60 * 1000,
+    keyPrefix: "push-notification",
+  });
+
+  if (!rateCheck.allowed) {
+    console.warn(
+      `[${requestId}] [SEND-PUSH-NOTIFICATION] Rate limit exceeded`,
+      { consumerId },
     );
 
-    // NOTIFICATION THROTTLING: Rate limit to prevent:
-    // 1. Notification spam to drivers
-    // 2. Push service quota exhaustion (FCM/APNS limits)
-    // 3. Accidental notification loops
-    // Limit: 20 notifications per hour per user
-    const rateCheck = await checkRateLimit(supabase, consumerId, {
-      maxRequests: 20,
-      windowMs: 60 * 60 * 1000,
-      keyPrefix: 'push-notification',
-    });
-
-    if (!rateCheck.allowed) {
-      console.warn('Rate limit exceeded for notifications:', consumerId);
-      return new Response(
-        JSON.stringify({ 
-          error: 'TOO_MANY_REQUESTS',
-          message: 'Notification rate limit exceeded.',
-          retryAfter: rateCheck.retryAfter 
-        }),
-        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Get consumer's push subscription
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('push_subscription, email, full_name')
-      .eq('id', consumerId)
-      .single();
-
-    if (profileError || !profile) {
-      return new Response(
-        JSON.stringify({ error: 'Consumer not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Check if notifications are enabled
-    if (!profile.push_subscription?.enabled) {
-      return new Response(
-        JSON.stringify({ error: 'Notifications not enabled for this user' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // For now, just log the notification
-    // In production, you would use Web Push API with VAPID keys
-    console.log('Push notification would be sent:', {
-      to: profile.email,
-      message,
-      eta,
-      stopsRemaining,
-    });
-
-    // Log the notification attempt
-    await supabase
-      .from('profiles')
-      .update({
-        push_subscription: {
-          ...profile.push_subscription,
-          last_notification: new Date().toISOString(),
-        },
-      })
-      .eq('id', consumerId);
-
     return new Response(
-      JSON.stringify({ 
-        success: true,
-        message: 'Notification logged (push implementation requires VAPID setup)' 
+      JSON.stringify({
+        error: "TOO_MANY_REQUESTS",
+        message: "Notification rate limit exceeded.",
+        retryAfter: rateCheck.retryAfter,
       }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  } catch (error) {
-    console.error('Error sending notification:', error);
-    return new Response(
-      JSON.stringify({ error: (error as Error).message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      {
+        status: 429,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
     );
   }
+
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("push_subscription, email, full_name")
+    .eq("id", consumerId)
+    .single();
+
+  if (profileError || !profile) {
+    console.error(
+      `[${requestId}] [SEND-PUSH-NOTIFICATION] Consumer not found`,
+      profileError,
+    );
+
+    return new Response(
+      JSON.stringify({ error: "Consumer not found" }),
+      {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
+  }
+
+  if (!profile.push_subscription?.enabled) {
+    return new Response(
+      JSON.stringify({ error: "Notifications not enabled for this user" }),
+      {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
+  }
+
+  console.log(
+    `[${requestId}] [SEND-PUSH-NOTIFICATION] Notification placeholder`,
+    { consumerId, email: profile.email, message, eta, stopsRemaining },
+  );
+
+  const updatedSubscription = {
+    ...profile.push_subscription,
+    last_notification: new Date().toISOString(),
+  };
+
+  const { error: updateError } = await supabase
+    .from("profiles")
+    .update({ push_subscription: updatedSubscription })
+    .eq("id", consumerId);
+
+  if (updateError) {
+    console.error(
+      `[${requestId}] [SEND-PUSH-NOTIFICATION] Failed to log notification`,
+      updateError,
+    );
+    throw updateError;
+  }
+
+  return new Response(
+    JSON.stringify({
+      success: true,
+      message:
+        "Notification logged (push implementation requires VAPID setup)",
+    }),
+    {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    },
+  );
+});
+
+serve((req) => {
+  const initialContext: Partial<SendPushNotificationContext> = {};
+
+  return handler(req, initialContext);
 });

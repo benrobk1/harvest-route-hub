@@ -1,167 +1,165 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.2";
+import {
+  createMiddlewareStack,
+  withAuth,
+  withCORS,
+  withErrorHandling,
+  withRequestId,
+  withSupabaseServiceRole,
+} from "../_shared/middleware/index.ts";
+import type { AuthContext } from "../_shared/middleware/withAuth.ts";
+import type { CORSContext } from "../_shared/middleware/withCORS.ts";
+import type { RequestIdContext } from "../_shared/middleware/withRequestId.ts";
+import type { SupabaseServiceRoleContext } from "../_shared/middleware/withSupabaseServiceRole.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+interface CancelOrderContext
+  extends RequestIdContext,
+    CORSContext,
+    AuthContext,
+    SupabaseServiceRoleContext {}
 
-serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+const stack = createMiddlewareStack<CancelOrderContext>([
+  withErrorHandling,
+  withRequestId,
+  withCORS,
+  withSupabaseServiceRole,
+  withAuth,
+]);
+
+const handler = stack(async (req, ctx) => {
+  const { user, supabase, corsHeaders, requestId } = ctx;
+
+  let body: { orderId?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return new Response(
+      JSON.stringify({ error: "Invalid JSON payload" }),
+      {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
   }
 
-  try {
-    // Create Supabase client
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      {
-        global: {
-          headers: { Authorization: req.headers.get("Authorization")! },
-        },
-      }
+  const orderId = body.orderId;
+
+  if (!orderId) {
+    return new Response(
+      JSON.stringify({ error: 'Order ID is required' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
+  }
 
-    // Get authenticated user
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-    if (userError || !user) {
-      console.error('Authentication error:', userError);
-      return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+  console.log(`[${requestId}] [CANCEL-ORDER] User ${user.id} requested cancel for order ${orderId}`);
 
-    const { orderId } = await req.json();
+  const { data: order, error: orderError } = await supabase
+    .from('orders')
+    .select('id, consumer_id, status, total_amount, delivery_date')
+    .eq('id', orderId)
+    .single();
 
-    if (!orderId) {
-      return new Response(
-        JSON.stringify({ error: 'Order ID is required' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log(`Cancel order request from user ${user.id} for order ${orderId}`);
-
-    // Get the order
-    const { data: order, error: orderError } = await supabaseClient
-      .from('orders')
-      .select('id, consumer_id, status, total_amount, delivery_date')
-      .eq('id', orderId)
-      .eq('consumer_id', user.id)
-      .single();
-
-    if (orderError || !order) {
-      console.error('Order not found:', orderError);
-      return new Response(
-        JSON.stringify({ error: 'Order not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Check if order can be cancelled (pending, paid, or confirmed, and more than 24 hours before delivery)
-    const allowedStatuses = ['pending', 'paid', 'confirmed'];
-    if (!allowedStatuses.includes(order.status)) {
-      return new Response(
-        JSON.stringify({ 
-          error: `Cannot cancel order with status: ${order.status}. Only pending or confirmed orders can be cancelled.` 
-        }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Check if within 24 hours of delivery
-    const deliveryTime = new Date(order.delivery_date).getTime();
-    const now = Date.now();
-    const hoursUntilDelivery = (deliveryTime - now) / (1000 * 60 * 60);
-
-    if (hoursUntilDelivery <= 24) {
-      return new Response(
-        JSON.stringify({ 
-          error: 'Cannot cancel orders within 24 hours of delivery date' 
-        }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Use service role client for deletion
-    const supabaseServiceClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+  if (orderError || !order) {
+    console.error(`[${requestId}] [CANCEL-ORDER] Order not found:`, orderError);
+    return new Response(
+      JSON.stringify({ error: 'Order not found' }),
+      { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
+  }
 
-    // Return inventory to products first
-    const { data: orderItems } = await supabaseServiceClient
-      .from('order_items')
-      .select('product_id, quantity')
-      .eq('order_id', orderId);
+  if (order.consumer_id !== user.id) {
+    console.warn(`[${requestId}] [CANCEL-ORDER] User ${user.id} attempted to cancel another user's order`);
+    return new Response(
+      JSON.stringify({ error: 'Unauthorized' }),
+      { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
 
-    if (orderItems && orderItems.length > 0) {
-      for (const item of orderItems) {
-        // Get current product quantity
-        const { data: product } = await supabaseServiceClient
+  const allowedStatuses = ['pending', 'paid', 'confirmed'];
+  if (!allowedStatuses.includes(order.status)) {
+    return new Response(
+      JSON.stringify({
+        error: `Cannot cancel order with status: ${order.status}. Only pending or confirmed orders can be cancelled.`
+      }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  const deliveryTime = new Date(order.delivery_date).getTime();
+  const now = Date.now();
+  const hoursUntilDelivery = (deliveryTime - now) / (1000 * 60 * 60);
+
+  if (hoursUntilDelivery <= 24) {
+    return new Response(
+      JSON.stringify({
+        error: 'Cannot cancel orders within 24 hours of delivery date'
+      }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+  }
+
+  const { data: orderItems } = await supabase
+    .from('order_items')
+    .select('product_id, quantity')
+    .eq('order_id', orderId);
+
+  if (orderItems && orderItems.length > 0) {
+    for (const item of orderItems) {
+      const { data: product } = await supabase
+        .from('products')
+        .select('available_quantity')
+        .eq('id', item.product_id)
+        .single();
+
+      if (product) {
+        await supabase
           .from('products')
-          .select('available_quantity')
-          .eq('id', item.product_id)
-          .single();
-
-        if (product) {
-          // Increment product quantity back
-          await supabaseServiceClient
-            .from('products')
-            .update({ 
-              available_quantity: product.available_quantity + item.quantity
-            })
-            .eq('id', item.product_id);
-        }
+          .update({
+            available_quantity: product.available_quantity + item.quantity
+          })
+          .eq('id', item.product_id);
       }
     }
+  }
 
-    // Delete related records first (order_items will cascade, but delete others explicitly)
-    await supabaseServiceClient
-      .from('credits_ledger')
-      .delete()
-      .eq('order_id', orderId);
+  await supabase
+    .from('credits_ledger')
+    .delete()
+    .eq('order_id', orderId);
 
-    await supabaseServiceClient
-      .from('payment_intents')
-      .delete()
-      .eq('order_id', orderId);
+  await supabase
+    .from('payment_intents')
+    .delete()
+    .eq('order_id', orderId);
 
-    await supabaseServiceClient
-      .from('transaction_fees')
-      .delete()
-      .eq('order_id', orderId);
+  await supabase
+    .from('transaction_fees')
+    .delete()
+    .eq('order_id', orderId);
 
-    // Delete the order (order_items will cascade via foreign key)
-    const { error: deleteError } = await supabaseServiceClient
-      .from('orders')
-      .delete()
-      .eq('id', orderId);
+  const { error: deleteError } = await supabase
+    .from('orders')
+    .delete()
+    .eq('id', orderId);
 
-    if (deleteError) {
-      console.error('Error deleting order:', deleteError);
-      return new Response(
-        JSON.stringify({ error: 'Failed to delete order' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log(`Order ${orderId} permanently deleted`);
-
+  if (deleteError) {
+    console.error(`[${requestId}] [CANCEL-ORDER] Error deleting order:`, deleteError);
     return new Response(
-      JSON.stringify({ success: true, message: 'Order cancelled and deleted successfully' }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-
-  } catch (error) {
-    console.error('Unexpected error:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ error: 'Failed to delete order' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
+
+  console.log(`[${requestId}] [CANCEL-ORDER] Order ${orderId} permanently deleted`);
+
+  return new Response(
+    JSON.stringify({ success: true, message: 'Order cancelled and deleted successfully' }),
+    { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+});
+
+serve((req) => {
+  const initialContext: Partial<CancelOrderContext> = {};
+
+  return handler(req, initialContext);
 });

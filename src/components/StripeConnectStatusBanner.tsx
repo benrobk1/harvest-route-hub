@@ -14,7 +14,7 @@ interface StripeStatus {
 }
 
 export const StripeConnectStatusBanner = () => {
-  const { user } = useAuth();
+  const { user, roles } = useAuth();
   const navigate = useNavigate();
   const [status, setStatus] = useState<StripeStatus | null>(null);
   const [loading, setLoading] = useState(true);
@@ -109,7 +109,15 @@ export const StripeConnectStatusBanner = () => {
               if (statusInfo.title === 'Payouts Under Review') {
                 checkStatus();
               } else {
-                navigate('/profile');
+                if (roles.includes('driver')) {
+                  navigate('/driver/profile');
+                } else if (roles.includes('farmer') || roles.includes('lead_farmer')) {
+                  navigate('/farmer/profile');
+                } else if (roles.includes('consumer')) {
+                  navigate('/consumer/profile');
+                } else {
+                  navigate('/');
+                }
               }
             }}
             disabled={checking}

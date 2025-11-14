@@ -1,92 +1,84 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import Stripe from "https://esm.sh/stripe@18.5.0";
-import { loadConfig } from '../_shared/config.ts';
-import { checkRateLimit } from '../_shared/rateLimiter.ts';
-import { PayoutService } from '../_shared/services/PayoutService.ts';
-import { withAdminAuth } from '../_shared/middleware/withAdminAuth.ts';
-import { getCorsHeaders, validateOrigin } from '../_shared/middleware/withCORS.ts';
 
-serve(async (req) => {
-  // Handle CORS preflight
-  const origin = validateOrigin(req);
-  const corsHeaders = getCorsHeaders(origin);
-  
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+import {
+  createMiddlewareStack,
+  withAdminAuth,
+  withCORS,
+  withErrorHandling,
+  withRateLimit,
+  withRequestId,
+  withSupabaseServiceRole,
+} from "../_shared/middleware/index.ts";
+import type { AdminAuthContext } from "../_shared/middleware/withAdminAuth.ts";
+import type { CORSContext } from "../_shared/middleware/withCORS.ts";
+import type { RequestIdContext } from "../_shared/middleware/withRequestId.ts";
+import type { SupabaseServiceRoleContext } from "../_shared/middleware/withSupabaseServiceRole.ts";
 
-  try {
-    // Load config
-    const config = loadConfig();
-    
-    const supabaseClient = createClient(
-      config.supabase.url,
-      config.supabase.serviceRoleKey
-    );
+import { PayoutService } from "../_shared/services/PayoutService.ts";
 
-    // Apply admin auth + rate limiting middleware
-    const adminAuthHandler = withAdminAuth(async (req, ctx) => {
-      // Rate limiting for admin user
-      const rateCheck = await checkRateLimit(supabaseClient, ctx.user.id, {
-        maxRequests: 1,
-        windowMs: 5 * 60 * 1000,
-        keyPrefix: 'process-payouts',
-      });
+interface ProcessPayoutsContext
+  extends RequestIdContext,
+    CORSContext,
+    AdminAuthContext,
+    SupabaseServiceRoleContext {}
 
-      if (!rateCheck.allowed) {
-        return new Response(
-          JSON.stringify({ 
-            error: 'TOO_MANY_REQUESTS',
-            message: 'Please wait before processing payouts again.',
-            retryAfter: rateCheck.retryAfter 
-          }),
-          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
+const stack = createMiddlewareStack<ProcessPayoutsContext>([
+  withErrorHandling,
+  withRequestId,
+  withCORS,
+  withSupabaseServiceRole,
+  withAdminAuth,
+  withRateLimit({
+    maxRequests: 1,
+    windowMs: 5 * 60 * 1000,
+    keyPrefix: "process-payouts",
+  }),
+]);
 
-      const requestId = crypto.randomUUID();
-      console.log(`[${requestId}] [PAYOUTS] Starting payout processing by admin ${ctx.user.id}`);
+const handler = stack(async (_req, ctx) => {
+  const { supabase, corsHeaders, requestId, user, config } = ctx;
 
-      // Initialize Stripe
-      const stripe = new Stripe(config.stripe.secretKey);
+  console.log(
+    `[${requestId}] [PROCESS-PAYOUTS] Starting payout run`,
+    { adminId: user.id },
+  );
 
-      // Initialize service
-      const payoutService = new PayoutService(supabaseClient, stripe);
+  const stripe = new Stripe(config.stripe.secretKey, {});
+  const payoutService = new PayoutService(supabase, stripe);
+  const result = await payoutService.processPendingPayouts();
 
-      // Process payouts
-      const result = await payoutService.processPendingPayouts();
+  console.log(
+    `[${requestId}] [PROCESS-PAYOUTS] Completed payout run`,
+    {
+      successful: result.successful,
+      failed: result.failed,
+      skipped: result.skipped,
+    },
+  );
 
-      console.log(`[${requestId}] [PAYOUTS] ✅ Complete: ${result.successful} successful, ${result.failed} failed, ${result.skipped} skipped`);
+  return new Response(
+    JSON.stringify({
+      success: true,
+      payouts_processed: result.successful + result.failed,
+      total_amount: 0,
+      failures:
+        result.errors.length > 0
+          ? result.errors.map((error) => ({
+              payout_id: error.payoutId,
+              error: error.error,
+            }))
+          : undefined,
+    }),
+    {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    },
+  );
+});
 
-      return new Response(
-        JSON.stringify({
-          success: true,
-          payouts_processed: result.successful + result.failed,
-          total_amount: 0,
-          failures: result.errors.length > 0 ? result.errors.map(e => ({
-            payout_id: e.payoutId,
-            error: e.error
-          })) : undefined
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    });
-    
-    // Execute with admin auth check
-    return await adminAuthHandler(req, { supabase: supabaseClient });
-    
-  } catch (error: any) {
-    console.error('Payout processing error:', error);
-    return new Response(JSON.stringify({ 
-      error: 'SERVER_ERROR',
-      message: error.message 
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
-  }
+serve((req) => {
+  const initialContext: Partial<ProcessPayoutsContext> = {};
+
+  return handler(req, initialContext);
 });

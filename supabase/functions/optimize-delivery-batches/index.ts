@@ -11,11 +11,21 @@
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
 import { BatchOptimizationService } from '../_shared/services/BatchOptimizationService.ts';
-import { withAdminAuth } from '../_shared/middleware/withAdminAuth.ts';
-import { getCorsHeaders, validateOrigin } from '../_shared/middleware/withCORS.ts';
+import {
+  createMiddlewareStack,
+  withAdminAuth,
+  withCORS,
+  withErrorHandling,
+  withRequestId,
+  withSupabaseServiceRole,
+  withValidation,
+} from '../_shared/middleware/index.ts';
+import type { AdminAuthContext } from '../_shared/middleware/withAdminAuth.ts';
+import type { CORSContext } from '../_shared/middleware/withCORS.ts';
+import type { RequestIdContext } from '../_shared/middleware/withRequestId.ts';
+import type { SupabaseServiceRoleContext } from '../_shared/middleware/withSupabaseServiceRole.ts';
 
 // Input validation schema
 const OptimizeBatchesSchema = z.object({
@@ -24,84 +34,52 @@ const OptimizeBatchesSchema = z.object({
     .refine(date => !isNaN(Date.parse(date)), { message: "Invalid date value" })
 });
 
-serve(async (req) => {
-  // Handle CORS preflight
-  const origin = validateOrigin(req);
-  const corsHeaders = getCorsHeaders(origin);
-  
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+type OptimizeInput = z.infer<typeof OptimizeBatchesSchema>;
+
+interface OptimizeContext
+  extends RequestIdContext,
+    CORSContext,
+    AdminAuthContext,
+    SupabaseServiceRoleContext {
+  input: OptimizeInput;
+}
+
+const stack = createMiddlewareStack<OptimizeContext>([
+  withErrorHandling,
+  withRequestId,
+  withCORS,
+  withSupabaseServiceRole,
+  withAdminAuth,
+  withValidation(OptimizeBatchesSchema),
+]);
+
+const handler = stack(async (_req, ctx) => {
+  const { supabase, user, corsHeaders, requestId, config, input } = ctx;
+
+  const lovableApiKey = config.lovable?.apiKey;
+
+  if (!lovableApiKey) {
+    console.warn(`[${requestId}] [BATCH_OPT] ⚠️  LOVABLE_API_KEY not configured - using geographic fallback`);
   }
 
-  const requestId = crypto.randomUUID();
-  console.log(`[${requestId}] [BATCH_OPT] Received batch optimization request`);
+  console.log(`[${requestId}] [BATCH_OPT] Admin user ${user.id} authorized for ${input.delivery_date}`);
 
-  try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+  const service = new BatchOptimizationService(supabase, lovableApiKey);
+  const result = await service.optimizeBatches(input.delivery_date);
 
-    if (!supabaseUrl || !supabaseKey) {
-      throw new Error('Missing required environment variables');
+  console.log(`[${requestId}] [BATCH_OPT] ✅ Created ${result.batches_created} batches for ${result.total_orders} orders`);
+
+  return new Response(
+    JSON.stringify(result),
+    {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     }
-    
-    if (!lovableApiKey) {
-      console.warn(`[${requestId}] [BATCH_OPT] ⚠️  LOVABLE_API_KEY not configured - will use fallback batching`);
-    }
-    
-    const supabase = createClient(supabaseUrl, supabaseKey);
-    
-    // Apply admin auth middleware
-    const adminAuthHandler = withAdminAuth(async (req, ctx) => {
-      console.log(`[${requestId}] [BATCH_OPT] Admin user ${ctx.user.id} authorized`);
-      
-      // Parse and validate input
-      let delivery_date: string;
-      try {
-        const body = await req.json();
-        const validated = OptimizeBatchesSchema.parse(body);
-        delivery_date = validated.delivery_date;
-      } catch (error) {
-        if (error instanceof z.ZodError) {
-          console.error(`[${requestId}] [BATCH_OPT] Validation error:`, error.errors);
-          return new Response(JSON.stringify({
-            error: 'VALIDATION_ERROR',
-            message: 'Request validation failed',
-            details: error.errors
-          }), {
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          });
-        }
-        throw error;
-      }
+  );
+});
 
-      const service = new BatchOptimizationService(supabase, lovableApiKey);
-      const result = await service.optimizeBatches(delivery_date);
+serve((req) => {
+  const initialContext: Partial<OptimizeContext> = {};
 
-      console.log(`[${requestId}] [BATCH_OPT] ✅ Created ${result.batches_created} batches for ${result.total_orders} orders`);
-
-      return new Response(
-        JSON.stringify(result),
-        { 
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
-    });
-    
-    // Execute with admin auth check
-    return await adminAuthHandler(req, { supabase });
-
-  } catch (error) {
-    console.error(`[${requestId}] [BATCH_OPT] ❌ Error:`, error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-    return new Response(
-      JSON.stringify({ error: errorMessage }),
-      { 
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
-  }
+  return handler(req, initialContext);
 });

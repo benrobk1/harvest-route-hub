@@ -36,13 +36,15 @@ export function calculateEstimatedExpenses(
   // - 20 MPG vehicle efficiency
   // - $50 tolls per day for NYC bridges
   
-  const miles = totalDistance || (deliveryCount * 3); // ~3mi per stop avg
+  const miles = totalDistance ?? (deliveryCount * 3); // ~3mi per stop avg
   const fuelCost = (miles / 20) * 3.50;
   const tollsCost = 50.00; // Flat rate for NYC area tolls
-  
+
+  const roundToCents = (amount: number) => Math.round(amount * 100) / 100;
+
   return {
-    fuel: Number(fuelCost.toFixed(2)),
-    tolls: Number(tollsCost.toFixed(2)),
-    total: Number((fuelCost + tollsCost).toFixed(2))
+    fuel: roundToCents(fuelCost),
+    tolls: roundToCents(tollsCost),
+    total: roundToCents(fuelCost + tollsCost)
   };
 }

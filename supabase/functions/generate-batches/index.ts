@@ -1,11 +1,26 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { loadConfig } from '../_shared/config.ts';
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import {
+  createMiddlewareStack,
+  withCORS,
+  withErrorHandling,
+  withRequestId,
+  withSupabaseServiceRole,
+} from '../_shared/middleware/index.ts';
+import type { CORSContext } from '../_shared/middleware/withCORS.ts';
+import type { RequestIdContext } from '../_shared/middleware/withRequestId.ts';
+import type { SupabaseServiceRoleContext } from '../_shared/middleware/withSupabaseServiceRole.ts';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+interface GenerateBatchesContext
+  extends RequestIdContext,
+    CORSContext,
+    SupabaseServiceRoleContext {}
+
+const stack = createMiddlewareStack<GenerateBatchesContext>([
+  withErrorHandling,
+  withRequestId,
+  withCORS,
+  withSupabaseServiceRole,
+]);
 
 // ZIP code center coordinates fallback (NYC demo ZIPs)
 function getZipCenterCoordinates(zipCode: string): { latitude: number; longitude: number } {
@@ -407,30 +422,22 @@ async function calculateEstimatedArrivalsWithOsrm(
   });
 }
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+
+const handler = stack(async (_req, ctx) => {
+  const supabaseClient = ctx.supabase;
+  const corsHeaders = ctx.corsHeaders;
+  const requestId = ctx.requestId;
+  const config = ctx.config;
 
   try {
-    // Load centralized config with fail-fast validation
-    const config = loadConfig();
-    
-    const supabaseClient = createClient(
-      config.supabase.url,
-      config.supabase.serviceRoleKey
-    );
+    console.log(`[${requestId}] [GENERATE-BATCHES] Starting batch generation...`);
 
-    console.log('Starting batch generation...');
-
-    // Calculate tomorrow's date
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowDate = tomorrow.toISOString().split('T')[0];
 
-    console.log('Processing orders for delivery date:', tomorrowDate);
+    console.log(`[${requestId}] [GENERATE-BATCHES] Processing orders for delivery date: ${tomorrowDate}`);
 
-    // 1. Find all pending orders for tomorrow
     const { data: pendingOrders, error: ordersError } = await supabaseClient
       .from('orders')
       .select(`
@@ -440,79 +447,89 @@ serve(async (req) => {
         profiles (
           zip_code,
           delivery_address,
-          full_name
+          latitude,
+          longitude
         )
       `)
-      .eq('delivery_date', tomorrowDate)
       .eq('status', 'pending')
-      .is('delivery_batch_id', null);
+      .eq('delivery_date', tomorrowDate);
 
     if (ordersError) {
-      console.error('Error fetching orders:', ordersError);
+      console.error(`[${requestId}] [GENERATE-BATCHES] Error fetching pending orders:`, ordersError);
       throw ordersError;
     }
 
     if (!pendingOrders || pendingOrders.length === 0) {
-      console.log('No pending orders found for tomorrow');
+      console.log(`[${requestId}] [GENERATE-BATCHES] No pending orders found for tomorrow.`);
       return new Response(JSON.stringify({
         success: true,
-        message: 'No pending orders to process',
-        batches_created: 0
+        message: 'No pending orders for tomorrow',
+        delivery_date: tomorrowDate,
+        batches_created: 0,
+        total_orders_processed: 0
       }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    console.log(`Found ${pendingOrders.length} pending orders`);
+    console.log(`[${requestId}] [GENERATE-BATCHES] Found ${pendingOrders.length} pending orders for tomorrow.`);
 
-    // 2. Geocode addresses and group orders by ZIP code
-    const ordersByZip: { [key: string]: any[] } = {};
-    
-    console.log('Geocoding addresses...');
-    const geocodedOrders = await Promise.all(
-      pendingOrders.map(async (order) => {
-        const profile = order.profiles as any;
-        const address = profile?.delivery_address;
-        const zipCode = profile?.zip_code;
-        const coords = address ? await geocodeAddress(address, zipCode, config) : null;
-        
-        // If geocoding completely failed, use ZIP center as fallback
-        const finalCoords = coords || (zipCode ? getZipCenterCoordinates(zipCode) : null);
-        
-        if (!coords && finalCoords) {
-          console.log(`Using ZIP-based coordinates for order ${order.id}`);
-        }
-        
-        return {
-          ...order,
-          latitude: finalCoords?.latitude || null,
-          longitude: finalCoords?.longitude || null
-        };
-      })
-    );
-
-    for (const order of geocodedOrders) {
+    const ordersByZip = new Map<string, any[]>();
+    for (const order of pendingOrders) {
       const profile = order.profiles as any;
       const zipCode = profile?.zip_code || 'unknown';
-      
-      if (!ordersByZip[zipCode]) {
-        ordersByZip[zipCode] = [];
+      if (!ordersByZip.has(zipCode)) {
+        ordersByZip.set(zipCode, []);
       }
-      ordersByZip[zipCode].push(order);
+      ordersByZip.get(zipCode)!.push(order);
     }
 
-    console.log(`Orders grouped into ${Object.keys(ordersByZip).length} ZIP code zones`);
+    console.log(`[${requestId}] [GENERATE-BATCHES] Processing ${ordersByZip.size} ZIP codes.`);
 
-    const batchesCreated = [];
-    const errors = [];
+    const batchesCreated: any[] = [];
+    const errors: any[] = [];
 
-    // 3. Create delivery batch for each ZIP zone
-    for (const [zipCode, orders] of Object.entries(ordersByZip)) {
+    for (const [zipCode, orders] of ordersByZip.entries()) {
       try {
-        console.log(`Creating batch for ZIP ${zipCode} with ${orders.length} orders`);
+        console.log(`[${requestId}] [GENERATE-BATCHES] Processing ZIP ${zipCode} with ${orders.length} orders...`);
 
-        // Get next batch number for this date
+        if (zipCode === 'unknown') {
+          errors.push({ zipCode, error: 'Missing ZIP code in profile' });
+          continue;
+        }
+
+        const geocodedOrders = await Promise.all(orders.map(async (order) => {
+          const profile = order.profiles as any;
+          const address = profile?.delivery_address || 'Address not provided';
+
+          const geocoded = await geocodeAddress(
+            address,
+            profile?.zip_code,
+            config
+          );
+
+          if (!geocoded) {
+            console.warn(`[${requestId}] [GENERATE-BATCHES] Geocoding failed for order ${order.id}, using existing coordinates`);
+            const fallback = getZipCenterCoordinates(profile?.zip_code || '10001');
+            return {
+              ...order,
+              address,
+              latitude: order.latitude ?? fallback.latitude,
+              longitude: order.longitude ?? fallback.longitude
+            };
+          }
+
+          return {
+            ...order,
+            address,
+            latitude: geocoded.latitude,
+            longitude: geocoded.longitude
+          };
+        }));
+
+        console.log(`[${requestId}] [GENERATE-BATCHES] Geocoded ${geocodedOrders.length} orders for ZIP ${zipCode}.`);
+
         const { data: existingBatches } = await supabaseClient
           .from('delivery_batches')
           .select('batch_number')
@@ -520,11 +537,10 @@ serve(async (req) => {
           .order('batch_number', { ascending: false })
           .limit(1);
 
-        const nextBatchNumber = existingBatches && existingBatches.length > 0 
-          ? existingBatches[0].batch_number + 1 
+        const nextBatchNumber = existingBatches && existingBatches.length > 0
+          ? existingBatches[0].batch_number + 1
           : 1;
 
-        // Create delivery batch
         const { data: batch, error: batchError } = await supabaseClient
           .from('delivery_batches')
           .insert({
@@ -532,95 +548,80 @@ serve(async (req) => {
             batch_number: nextBatchNumber,
             zip_codes: [zipCode],
             status: 'pending',
-            lead_farmer_id: null // Will be assigned later by admin
+            lead_farmer_id: null
           })
           .select()
           .single();
 
         if (batchError || !batch) {
-          console.error('Batch creation error:', batchError);
+          console.error(`[${requestId}] [GENERATE-BATCHES] Batch creation error:`, batchError);
           errors.push({ zipCode, error: batchError?.message });
           continue;
         }
 
-        console.log(`Batch ${batch.id} created with number ${nextBatchNumber}`);
+        console.log(`[${requestId}] [GENERATE-BATCHES] Batch ${batch.id} created with number ${nextBatchNumber}`);
 
-        // 4. Prepare stops with geocoded data
-        const unoptimizedStops = orders.map((order) => {
-          const orderProfile = order.profiles as any;
-          return {
-            delivery_batch_id: batch.id,
-            order_id: order.id,
-            address: orderProfile?.delivery_address || 'Address not provided',
-            latitude: order.latitude,
-            longitude: order.longitude,
-            status: 'pending'
-          };
-        });
+        const unoptimizedStops = geocodedOrders.map((order) => ({
+          delivery_batch_id: batch.id,
+          order_id: order.id,
+          address: order.address,
+          latitude: order.latitude,
+          longitude: order.longitude,
+          status: 'pending'
+        }));
 
-        // 5. Optimize route using OSRM with 2-opt
-        console.log('Optimizing route with OSRM...');
-        const { optimizedStops, method, distanceMatrix } = await optimizeRouteWithOsrm(unoptimizedStops);
-        console.log(`Route optimization method: ${method}`);
+        console.log(`[${requestId}] [GENERATE-BATCHES] Optimizing route with OSRM...`);
+        const { optimizedStops, method } = await optimizeRouteWithOsrm(unoptimizedStops);
+        console.log(`[${requestId}] [GENERATE-BATCHES] Route optimization method: ${method}`);
 
-        // 6. Calculate estimated arrival times (start at 9 AM on delivery date)
         const startTime = new Date(tomorrowDate);
         startTime.setHours(9, 0, 0, 0);
         const stopsWithTimes = await calculateEstimatedArrivalsWithOsrm(optimizedStops, startTime);
 
-        // 7. Add sequence numbers
         const batchStops = stopsWithTimes.map((stop, index) => ({
           ...stop,
           sequence_number: index + 1
         }));
 
-        // 8. Insert batch stops
         const { data: createdStops, error: stopsError } = await supabaseClient
           .from('batch_stops')
           .insert(batchStops)
           .select();
 
         if (stopsError) {
-          console.error('Batch stop creation error:', stopsError);
+          console.error(`[${requestId}] [GENERATE-BATCHES] Batch stop creation error:`, stopsError);
           errors.push({ batch_id: batch.id, error: stopsError.message });
           continue;
         }
 
-        console.log(`Created ${batchStops.length} optimized stops`);
+        console.log(`[${requestId}] [GENERATE-BATCHES] Created ${batchStops.length} optimized stops`);
 
-        // 9. Generate box codes for orders
-        console.log('Generating box codes for orders...');
-        for (let i = 0; i < createdStops.length; i++) {
-          const stop = createdStops[i];
+        for (const stop of createdStops ?? []) {
           const boxCode = `B${nextBatchNumber}-${stop.sequence_number}`;
-          
           await supabaseClient
             .from('orders')
             .update({ box_code: boxCode })
             .eq('id', stop.order_id);
         }
 
-        // 10. Get detailed OSRM route with turn-by-turn directions
         const coordinates: [number, number][] = batchStops
           .filter(s => s.latitude && s.longitude)
           .map(s => [s.longitude, s.latitude]);
-        
+
         const osrmRoute = await getOsrmRoute(coordinates);
 
-        // 10. Calculate total distance and duration
         let totalDistance = 0;
         let totalDuration = 0;
 
         if (osrmRoute) {
           totalDistance = osrmRoute.distance;
           totalDuration = osrmRoute.duration;
-          console.log('Using OSRM actual route distance and duration');
+          console.log(`[${requestId}] [GENERATE-BATCHES] Using OSRM actual route distance and duration`);
         } else {
-          // Fallback to Haversine calculations
-          console.warn('OSRM route unavailable, using Haversine fallback');
+          console.warn(`[${requestId}] [GENERATE-BATCHES] OSRM route unavailable, using Haversine fallback`);
           totalDistance = batchStops.reduce((total, stop, index) => {
             if (index === 0) return 0;
-            if (stop.latitude && stop.longitude && 
+            if (stop.latitude && stop.longitude &&
                 batchStops[index - 1].latitude && batchStops[index - 1].longitude) {
               return total + calculateDistance(
                 batchStops[index - 1].latitude,
@@ -631,13 +632,11 @@ serve(async (req) => {
             }
             return total;
           }, 0);
-          totalDuration = (totalDistance / 40) * 60; // 40 km/h average
+          totalDuration = (totalDistance / 40) * 60;
         }
 
-        // Add stop time to duration
         const estimatedDuration = Math.ceil(totalDuration + (batchStops.length * 10));
 
-        // 11. Generate enhanced route_data JSON
         const routeData: any = {
           total_distance_km: Math.round(totalDistance * 100) / 100,
           total_duration_minutes: estimatedDuration,
@@ -653,7 +652,6 @@ serve(async (req) => {
           osrm_server: Deno.env.get('OSRM_SERVER_URL') || 'https://router.project-osrm.org'
         };
 
-        // Add OSRM-specific data if available
         if (osrmRoute) {
           routeData.route_geometry = osrmRoute.geometry;
           routeData.legs = osrmRoute.legs.map((leg: any, index: number) => ({
@@ -668,35 +666,32 @@ serve(async (req) => {
               duration_minutes: Math.round(step.duration * 10) / 10
             }))
           }));
-          routeData.turn_by_turn_directions = osrmRoute.legs.flatMap((leg: any) => 
+          routeData.turn_by_turn_directions = osrmRoute.legs.flatMap((leg: any) =>
             leg.steps.map((step: any) => step.instruction)
           );
         }
 
-        // 12. Create route entry
         const { error: routeError } = await supabaseClient
           .from('routes')
           .insert({
             delivery_batch_id: batch.id,
-            driver_id: null, // Will be assigned later
+            driver_id: null,
             route_data: routeData,
             status: 'assigned'
           });
 
         if (routeError) {
-          console.error('Route creation error:', routeError);
+          console.error(`[${requestId}] [GENERATE-BATCHES] Route creation error:`, routeError);
           errors.push({ batch_id: batch.id, error: routeError.message });
         }
 
-        // 13. Update batch with estimated duration
         await supabaseClient
           .from('delivery_batches')
           .update({ estimated_duration_minutes: estimatedDuration })
           .eq('id', batch.id);
 
-        console.log(`Route optimized: ${totalDistance.toFixed(1)} km, ${estimatedDuration} minutes`);
+        console.log(`[${requestId}] [GENERATE-BATCHES] Route optimized: ${totalDistance.toFixed(1)} km, ${estimatedDuration} minutes`);
 
-        // 14. Update orders to confirmed status and link to batch
         const orderIds = orders.map(o => o.id);
         const { error: updateError } = await supabaseClient
           .from('orders')
@@ -707,15 +702,13 @@ serve(async (req) => {
           .in('id', orderIds);
 
         if (updateError) {
-          console.error('Order update error:', updateError);
+          console.error(`[${requestId}] [GENERATE-BATCHES] Order update error:`, updateError);
           errors.push({ batch_id: batch.id, error: updateError.message });
         }
 
-        // 15. Calculate lead farmer commission (if batch has a lead farmer assigned)
         if (batch.lead_farmer_id) {
-          console.log('Calculating lead farmer commission for batch', batch.id);
-          
-          // Get lead farmer's commission rate
+          console.log(`[${requestId}] [GENERATE-BATCHES] Calculating lead farmer commission for batch ${batch.id}`);
+
           const { data: leadFarmerProfile } = await supabaseClient
             .from('profiles')
             .select('commission_rate')
@@ -724,7 +717,6 @@ serve(async (req) => {
 
           const commissionRate = leadFarmerProfile?.commission_rate || 5.0;
 
-          // Get all farmer sales in this batch (excluding lead farmer's own sales)
           const { data: batchOrderItems } = await supabaseClient
             .from('order_items')
             .select(`
@@ -738,7 +730,6 @@ serve(async (req) => {
           let commissionableAmount = 0;
           batchOrderItems?.forEach((item: any) => {
             const farmerId = item.products?.farm_profiles?.farmer_id;
-            // Only commission on other farmers' sales, not lead farmer's own
             if (farmerId && farmerId !== batch.lead_farmer_id) {
               commissionableAmount += Number(item.subtotal);
             }
@@ -755,10 +746,10 @@ serve(async (req) => {
                 amount: commissionAmount,
                 status: 'pending',
                 description: `Lead farmer commission (${commissionRate}%) for batch ${nextBatchNumber}`,
-                order_id: orderIds[0] // Link to first order in batch for reference
+                order_id: orderIds[0]
               });
 
-            console.log(`Created lead farmer commission payout: $${commissionAmount.toFixed(2)}`);
+            console.log(`[${requestId}] [GENERATE-BATCHES] Created lead farmer commission payout: $${commissionAmount.toFixed(2)}`);
           }
         }
 
@@ -771,7 +762,6 @@ serve(async (req) => {
           estimated_duration_minutes: estimatedDuration
         });
 
-        // 16. Send notifications for locked orders
         for (const order of orders) {
           try {
             await supabaseClient.functions.invoke('send-notification', {
@@ -786,14 +776,14 @@ serve(async (req) => {
               }
             });
           } catch (notifError) {
-            console.error('Notification error (non-blocking):', notifError);
+            console.error(`[${requestId}] [GENERATE-BATCHES] Notification error (non-blocking):`, notifError);
           }
         }
 
-        console.log(`Batch ${batch.id} completed with ${orders.length} stops`);
+        console.log(`[${requestId}] [GENERATE-BATCHES] Batch ${batch.id} completed with ${orders.length} stops`);
 
       } catch (error: any) {
-        console.error(`Error processing ZIP ${zipCode}:`, error);
+        console.error(`[${requestId}] [GENERATE-BATCHES] Error processing ZIP ${zipCode}:`, error);
         errors.push({ zipCode, error: error.message });
       }
     }
@@ -807,7 +797,7 @@ serve(async (req) => {
       errors: errors.length > 0 ? errors : undefined
     };
 
-    console.log('Batch generation complete:', response);
+    console.log(`[${requestId}] [GENERATE-BATCHES] Batch generation complete`, response);
 
     return new Response(JSON.stringify(response), {
       status: 200,
@@ -815,13 +805,19 @@ serve(async (req) => {
     });
 
   } catch (error: any) {
-    console.error('Batch generation error:', error);
-    return new Response(JSON.stringify({ 
+    console.error(`[${requestId}] [GENERATE-BATCHES] Batch generation error:`, error);
+    return new Response(JSON.stringify({
       error: 'SERVER_ERROR',
-      message: error.message 
+      message: error.message
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
+});
+
+serve((req) => {
+  const initialContext: Partial<GenerateBatchesContext> = {};
+
+  return handler(req, initialContext);
 });

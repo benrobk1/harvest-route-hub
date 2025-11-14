@@ -1,6 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
 import { generateRouteManifestPDF, RouteManifestData } from '../pdfGenerator';
-import jsPDF from 'jspdf';
 
 // Mock jsPDF
 vi.mock('jspdf', () => ({
@@ -64,9 +63,10 @@ describe('generateRouteManifestPDF', () => {
   });
 
   it('includes all stop information', () => {
+    const jsPDF = require('jspdf').default;
     generateRouteManifestPDF(mockData);
     
-    const mockInstance = vi.mocked(jsPDF).mock.results[0].value;
+    const mockInstance = jsPDF.mock.results[0].value;
     const textCalls = mockInstance.text.mock.calls;
     
     // Check that customer names are included
@@ -80,9 +80,10 @@ describe('generateRouteManifestPDF', () => {
   });
 
   it('includes batch metadata', () => {
+    const jsPDF = require('jspdf').default;
     generateRouteManifestPDF(mockData);
     
-    const mockInstance = vi.mocked(jsPDF).mock.results[0].value;
+    const mockInstance = jsPDF.mock.results[0].value;
     const textCalls = mockInstance.text.mock.calls;
     
     expect(textCalls.some((call: any[]) => call[0]?.includes('B-001'))).toBe(true);
@@ -90,9 +91,10 @@ describe('generateRouteManifestPDF', () => {
   });
 
   it('calls save with correct filename', () => {
+    const jsPDF = require('jspdf').default;
     generateRouteManifestPDF(mockData);
     
-    const mockInstance = vi.mocked(jsPDF).mock.results[0].value;
+    const mockInstance = jsPDF.mock.results[0].value;
     expect(mockInstance.save).toHaveBeenCalledWith('route-manifest-batch-B-001.pdf');
   });
 

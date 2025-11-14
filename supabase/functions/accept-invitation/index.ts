@@ -68,16 +68,18 @@ const handler = stack(async (req, ctx) => {
 
   console.log(`[${requestId}] [ACCEPT-INVITATION] Processing token: ${token.substring(0, 8)}...`);
 
-  // Fetch and validate invitation
-  const { data: invitation, error: invitationError } = await supabase
+  // Atomically consume the token: mark as used with WHERE used_at IS NULL
+  // This prevents race conditions and ensures token can only be used once
+  const { data: consumedInvitations, error: consumeError } = await supabase
     .from("admin_invitations")
-    .select("*")
+    .update({ used_at: new Date().toISOString() })
     .eq("invitation_token", token)
     .is("used_at", null)
-    .single();
+    .gte("expires_at", new Date().toISOString())
+    .select("*");
 
-  if (invitationError || !invitation) {
-    console.error(`[${requestId}] [ACCEPT-INVITATION] Invalid token:`, invitationError);
+  if (consumeError) {
+    console.error(`[${requestId}] [ACCEPT-INVITATION] Error consuming token:`, consumeError);
     return new Response(
       JSON.stringify({ error: "Invalid or expired invitation" }),
       {
@@ -87,10 +89,11 @@ const handler = stack(async (req, ctx) => {
     );
   }
 
-  if (new Date(invitation.expires_at) < new Date()) {
-    console.error(`[${requestId}] [ACCEPT-INVITATION] Token expired`);
+  // Verify exactly one row was affected (token exists, unused, and not expired)
+  if (!consumedInvitations || consumedInvitations.length !== 1) {
+    console.error(`[${requestId}] [ACCEPT-INVITATION] Token already used or invalid`);
     return new Response(
-      JSON.stringify({ error: "This invitation has expired" }),
+      JSON.stringify({ error: "Invalid or expired invitation" }),
       {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -98,7 +101,8 @@ const handler = stack(async (req, ctx) => {
     );
   }
 
-  console.log(`[${requestId}] [ACCEPT-INVITATION] Creating user for ${invitation.email}`);
+  const invitation = consumedInvitations[0];
+  console.log(`[${requestId}] [ACCEPT-INVITATION] Token consumed, creating user for ${invitation.email}`);
 
   const { data: authData, error: authError } = await supabase.auth.admin.createUser({
     email: invitation.email,
@@ -142,24 +146,6 @@ const handler = stack(async (req, ctx) => {
   }
 
   console.log(`[${requestId}] [ACCEPT-INVITATION] Admin role assigned`);
-
-  const { error: markUsedError } = await supabase
-    .from("admin_invitations")
-    .update({ used_at: new Date().toISOString() })
-    .eq("invitation_token", token);
-
-  if (markUsedError) {
-    console.error(
-      `[${requestId}] [ACCEPT-INVITATION] Failed to mark invitation as used`,
-      {
-        error: markUsedError,
-        token: token.substring(0, 8) + "...",
-        userId: authData.user.id,
-        email: invitation.email,
-      }
-    );
-    // Don't throw - user creation succeeded; log for manual cleanup
-  }
 
   if (invitation.invited_by) {
     const { error: logError } = await supabase.rpc("log_admin_action", {

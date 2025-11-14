@@ -1,12 +1,5 @@
+import { describe, expect, it } from "bun:test";
 import { formatEstimatedTime } from "../orderHelpers";
-
-const { describe, expect, it } = await (async () => {
-  try {
-    return await import("vitest");
-  } catch {
-    return await import("bun:test");
-  }
-})();
 
 describe("formatEstimatedTime", () => {
   it("returns undefined when minutes is undefined", () => {

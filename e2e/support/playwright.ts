@@ -14,20 +14,17 @@ try {
   hasPlaywright = false;
   const bun = await import('bun:test');
   const skipTest = (title: string, fn?: (...args: any[]) => unknown) => bun.test.skip(title, fn as any);
-  const skipDescribe = (title: string, fn?: (...args: any[]) => unknown) => bun.describe.skip(title, fn as any);
 
   const stubTest: any = (title: string, fn?: (...args: any[]) => unknown) => skipTest(title, fn);
   stubTest.skip = skipTest;
   stubTest.only = skipTest;
   stubTest.fixme = skipTest;
-  stubTest.describe = Object.assign(
-    (title: string, fn?: (...args: any[]) => unknown) => skipDescribe(title, fn),
-    {
-      skip: skipDescribe,
-      only: skipDescribe,
-      parallel: skipDescribe
-    }
-  );
+  const noop = () => {};
+  stubTest.describe = Object.assign(noop, {
+    skip: noop,
+    only: noop,
+    parallel: noop
+  });
   stubTest.step = async <T>(_: string, body: () => Promise<T> | T) => body();
   stubTest.use = () => {};
   stubTest.beforeAll = (...args: Parameters<typeof bun.beforeAll>) => bun.beforeAll?.(...args);

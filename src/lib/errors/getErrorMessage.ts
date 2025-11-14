@@ -5,13 +5,12 @@ const SENSITIVE_KEYS = new Set([
   'token',
   'password',
   'secret',
-  'apiKey',
   'apikey',
   'authorization',
   'access_token',
   'refresh_token',
-  'accessToken',
-  'refreshToken',
+  'accesstoken',
+  'refreshtoken',
 ]);
 
 /**

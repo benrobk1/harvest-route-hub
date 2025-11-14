@@ -50,6 +50,7 @@
     "@stripe/stripe-js": "^8.1.0",
     "@supabase/supabase-js": "^2.75.0",
     "@tanstack/react-query": "^5.83.0",
+    "@testing-library/dom": "^10.4.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
     "@vitest/coverage-v8": "^4.0.8",

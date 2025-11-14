@@ -10,6 +10,7 @@ export interface PayoutResult {
   successful: number;
   failed: number;
   skipped: number;
+  totalAmount: number;
   errors: Array<{
     payoutId: string;
     error: string;
@@ -77,7 +78,7 @@ export class PayoutService {
     // Early return if no payouts to process
     if (!pendingPayouts || pendingPayouts.length === 0) {
       console.log(`[${requestId}] [PAYOUTS] No pending payouts to process`);
-      return { successful: 0, failed: 0, skipped: 0, errors: [] };
+      return { successful: 0, failed: 0, skipped: 0, totalAmount: 0, errors: [] };
     }
 
     console.log(`[${requestId}] [PAYOUTS] Found ${pendingPayouts.length} pending payouts`);
@@ -86,6 +87,7 @@ export class PayoutService {
       successful: 0,
       failed: 0,
       skipped: 0,
+      totalAmount: 0,
       errors: []
     };
 
@@ -144,6 +146,7 @@ export class PayoutService {
           .eq('id', payout.id);
 
         result.successful++;
+        result.totalAmount += payout.amount;
         console.log(`[${requestId}] [PAYOUTS] ✅ Payout ${payout.id} completed successfully`);
 
       } catch (error: any) {

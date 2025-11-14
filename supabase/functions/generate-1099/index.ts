@@ -72,6 +72,20 @@ const handler = stack(async (_req, ctx) => {
     throw new Error("Recipient tax ID type is missing");
   }
 
+  // Load payer information from company_settings
+  const { data: payerInfo, error: payerError } = await supabase
+    .from("company_settings")
+    .select("legal_name, tax_id")
+    .single();
+
+  if (payerError || !payerInfo) {
+    console.error(
+      `[${requestId}] [GENERATE-1099] Failed to load payer information`,
+      payerError,
+    );
+    throw new Error("Failed to load payer information");
+  }
+
   const { data: payouts, error: payoutsError } = await supabase
     .from("payouts")
     .select("amount, description, created_at")
@@ -136,8 +150,8 @@ const handler = stack(async (_req, ctx) => {
   });
 
   page.drawText("PAYER:", { x: 50, y: height - 120, size: fontSize, font: boldFont });
-  page.drawText("Blue Harvests Inc.", { x: 50, y: height - 135, size: fontSize, font });
-  page.drawText("Tax ID: XX-XXXXXXX", { x: 50, y: height - 150, size: fontSize, font });
+  page.drawText(payerInfo.legal_name, { x: 50, y: height - 135, size: fontSize, font });
+  page.drawText(`Tax ID: ${payerInfo.tax_id}`, { x: 50, y: height - 150, size: fontSize, font });
 
   page.drawText("RECIPIENT:", {
     x: 350,

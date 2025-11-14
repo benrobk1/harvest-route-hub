@@ -42,6 +42,9 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
 
   console.log(`[${requestId}] Sending notification:`, { event_type, recipient_id });
 
+  // Load config for email templates
+  const config = loadConfig();
+
   // Get recipient email if not provided
   let toEmail = recipient_email;
   if (!toEmail) {
@@ -271,16 +274,17 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
+};
 
-  } catch (error: any) {
-    console.error(`[${requestId}] ❌ Notification error:`, error);
-    return new Response(JSON.stringify({ 
-      error: 'NOTIFICATION_ERROR',
-      message: error.message,
-      code: 'NOTIFICATION_ERROR'
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
-});
+// Compose middleware stack
+const middlewareStack = createMiddlewareStack<Context>([
+  withRequestId,
+  withCORS,
+  withAuth,
+  withRateLimit(RATE_LIMITS.SEND_NOTIFICATION),
+  withValidation(SendNotificationRequestSchema),
+  withErrorHandling
+]);
+
+// Serve with composed middleware
+serve((req) => middlewareStack(handler)(req, {} as any));

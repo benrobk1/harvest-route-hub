@@ -63,7 +63,7 @@ const handler = stack(async (_req, ctx) => {
     JSON.stringify({
       success: true,
       payouts_processed: result.successful + result.failed,
-      total_amount: 0,
+      total_amount: result.totalAmount,
       failures:
         result.errors.length > 0
           ? result.errors.map((error) => ({

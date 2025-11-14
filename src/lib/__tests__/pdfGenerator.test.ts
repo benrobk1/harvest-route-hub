@@ -1,26 +1,28 @@
 import { describe, it, expect, vi } from 'vitest';
 import { generateRouteManifestPDF, RouteManifestData } from '../pdfGenerator';
+import jsPDF from 'jspdf';
 
 // Mock jsPDF
 vi.mock('jspdf', () => ({
-  default: vi.fn().mockImplementation(() => ({
-    internal: {
+  default: vi.fn(function(this: any) {
+    this.internal = {
       pageSize: {
         getWidth: () => 210,
         getHeight: () => 297,
       },
-    },
-    setFontSize: vi.fn(),
-    setFont: vi.fn(),
-    text: vi.fn(),
-    setDrawColor: vi.fn(),
-    line: vi.fn(),
-    addPage: vi.fn(),
-    rect: vi.fn(),
-    setFillColor: vi.fn(),
-    splitTextToSize: vi.fn((text) => [text]),
-    save: vi.fn(),
-  })),
+    };
+    this.setFontSize = vi.fn();
+    this.setFont = vi.fn();
+    this.text = vi.fn();
+    this.setDrawColor = vi.fn();
+    this.line = vi.fn();
+    this.addPage = vi.fn();
+    this.rect = vi.fn();
+    this.setFillColor = vi.fn();
+    this.splitTextToSize = vi.fn((text) => [text]);
+    this.save = vi.fn();
+    return this;
+  }),
 }));
 
 describe('generateRouteManifestPDF', () => {
@@ -63,10 +65,9 @@ describe('generateRouteManifestPDF', () => {
   });
 
   it('includes all stop information', () => {
-    const jsPDF = require('jspdf').default;
     generateRouteManifestPDF(mockData);
     
-    const mockInstance = jsPDF.mock.results[0].value;
+    const mockInstance = vi.mocked(jsPDF).mock.results[0].value;
     const textCalls = mockInstance.text.mock.calls;
     
     // Check that customer names are included
@@ -80,10 +81,9 @@ describe('generateRouteManifestPDF', () => {
   });
 
   it('includes batch metadata', () => {
-    const jsPDF = require('jspdf').default;
     generateRouteManifestPDF(mockData);
     
-    const mockInstance = jsPDF.mock.results[0].value;
+    const mockInstance = vi.mocked(jsPDF).mock.results[0].value;
     const textCalls = mockInstance.text.mock.calls;
     
     expect(textCalls.some((call: any[]) => call[0]?.includes('B-001'))).toBe(true);
@@ -91,10 +91,9 @@ describe('generateRouteManifestPDF', () => {
   });
 
   it('calls save with correct filename', () => {
-    const jsPDF = require('jspdf').default;
     generateRouteManifestPDF(mockData);
     
-    const mockInstance = jsPDF.mock.results[0].value;
+    const mockInstance = vi.mocked(jsPDF).mock.results[0].value;
     expect(mockInstance.save).toHaveBeenCalledWith('route-manifest-batch-B-001.pdf');
   });
 

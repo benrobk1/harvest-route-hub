@@ -6,6 +6,7 @@ import { CheckCircle2, CreditCard, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { getErrorMessage } from '@/lib/errors/getErrorMessage';
 
 interface StripeStatus {
   connected: boolean;
@@ -77,10 +78,10 @@ export const StripeConnectSimple = ({ variant = 'button' }: StripeConnectSimpleP
           description: 'Complete the setup in the new tab, then refresh this page.',
         });
       }
-    } catch (error: any) {
+    } catch (error) {
       toast({
         title: 'Connection failed',
-        description: error.message || 'Unable to connect to Stripe',
+        description: getErrorMessage(error) || 'Unable to connect to Stripe',
         variant: 'destructive',
       });
     } finally {

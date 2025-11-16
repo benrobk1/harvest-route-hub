@@ -10,6 +10,16 @@ export interface CSVProductRow {
   image_url?: string;
 }
 
+export interface ExportableProductRow {
+  id: string;
+  name: string;
+  description?: string | null;
+  price: number;
+  unit: string;
+  available_quantity: number;
+  image_url?: string | null;
+}
+
 export interface CSVParseResult {
   valid: CSVProductRow[];
   errors: Array<{ row: number; field: string; error: string }>;
@@ -87,7 +97,7 @@ export function parseProductCSV(fileContent: string, mode: 'create' | 'update' =
   // Parse data rows
   for (let i = 1; i < lines.length; i++) {
     const values = lines[i].split(',').map(v => v.trim());
-    const row: any = {};
+    const row: Record<string, string> = {};
 
     // Map values to fields
     header.forEach((field, index) => {
@@ -159,17 +169,9 @@ function isValidUrl(string: string): boolean {
 }
 
 // Export products to CSV
-export function generateCSVFromProducts(products: Array<{
-  id: string;
-  name: string;
-  description?: string;
-  price: number;
-  unit: string;
-  available_quantity: number;
-  image_url?: string;
-}>): string {
+export function generateCSVFromProducts(products: ExportableProductRow[]): string {
   const header = 'id,name,description,price,unit,available_quantity,image_url';
-  const rows = products.map(p => 
+  const rows = products.map(p =>
     `${p.id},"${p.name}","${p.description || ''}",${p.price},${p.unit},${p.available_quantity},${p.image_url || ''}`
   );
   

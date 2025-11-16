@@ -7,6 +7,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatMoney } from "@/lib/formatMoney";
 import { farmerQueries } from "@/features/farmers";
+import type { Database } from "@/integrations/supabase/types";
 
 interface BatchOrder {
   orderId: string;
@@ -16,6 +17,35 @@ interface BatchOrder {
   sequenceNumber: number;
   status: string;
 }
+
+type DeliveryBatchRow = Database['public']['Tables']['delivery_batches']['Row'];
+type BatchStopRow = Database['public']['Tables']['batch_stops']['Row'];
+type OrderRow = Database['public']['Tables']['orders']['Row'];
+type ProfileRow = Database['public']['Tables']['profiles']['Row'];
+type OrderItemRow = Database['public']['Tables']['order_items']['Row'];
+type ProductRow = Database['public']['Tables']['products']['Row'];
+type FarmProfileRow = Database['public']['Tables']['farm_profiles']['Row'];
+
+type DeliveryBatchWithRelations = DeliveryBatchRow & {
+  batch_stops: Array<
+    (BatchStopRow & {
+      orders: (OrderRow & {
+        profiles: ProfileRow | null;
+        order_items: Array<
+          (OrderItemRow & {
+            products: (ProductRow & { farm_profiles: FarmProfileRow | null }) | null;
+          }) | null
+        > | null;
+      }) | null;
+    }) | null
+  > | null;
+};
+
+type BatchStopWithOrder = NonNullable<DeliveryBatchWithRelations['batch_stops']>[number];
+
+const hasOrder = (
+  stop: BatchStopWithOrder | null
+): stop is BatchStopWithOrder & { orders: NonNullable<BatchStopWithOrder['orders']> } => Boolean(stop?.orders);
 
 export const BatchConsolidation = () => {
   const { user } = useAuth();
@@ -51,28 +81,36 @@ export const BatchConsolidation = () => {
         .eq('lead_farmer_id', user?.id)
         .gte('delivery_date', new Date().toISOString().split('T')[0])
         .order('delivery_date', { ascending: true })
-        .limit(5);
+        .limit(5)
+        .returns<DeliveryBatchWithRelations[]>();
 
       if (error) throw error;
 
-      return batchData?.map(batch => ({
+      return (batchData ?? []).map((batch) => ({
         id: batch.id,
-        batchNumber: batch.batch_number,
-        deliveryDate: batch.delivery_date,
-        status: batch.status,
-        orders: batch.batch_stops?.map((stop: any) => ({
-          orderId: stop.orders.id,
-          boxCode: stop.orders.box_code,
-          customerName: stop.orders.profiles.full_name,
-          sequenceNumber: stop.sequence_number,
-          status: stop.status,
-          items: stop.orders.order_items.map((item: any) => ({
-            name: item.products.name,
-            quantity: item.quantity,
-            farmName: item.products.farm_profiles.farm_name,
-          })),
-        })) || [],
-      })) || [];
+        batchNumber: batch.batch_number ?? 0,
+        deliveryDate: batch.delivery_date ?? '',
+        status: batch.status ?? 'pending',
+        orders: (batch.batch_stops ?? [])
+          .filter(hasOrder)
+          .map((stop) => {
+            const order = stop.orders;
+            return {
+              orderId: order.id,
+              boxCode: order.box_code ?? 'N/A',
+              customerName: order.profiles?.full_name ?? 'Unknown customer',
+              sequenceNumber: stop.sequence_number ?? 0,
+              status: stop.status ?? 'pending',
+              items: (order.order_items ?? [])
+                .filter((item): item is NonNullable<typeof item> => Boolean(item?.products))
+                .map((item) => ({
+                  name: item.products!.name ?? 'Unknown product',
+                  quantity: item.quantity ?? 0,
+                  farmName: item.products!.farm_profiles?.farm_name ?? 'Unknown farm',
+                })),
+            } satisfies BatchOrder;
+          }),
+      }));
     },
     enabled: !!user?.id,
   });

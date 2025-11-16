@@ -63,7 +63,7 @@ export const formatOrderItems = (items: any[]): string => {
  * ```
  */
 export const formatEstimatedTime = (minutes?: number): string | undefined => {
-  if (!minutes) return undefined;
+  if (minutes === undefined || minutes === null) return undefined;
   const hours = Math.floor(minutes / 60);
   const mins = minutes % 60;
   return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;

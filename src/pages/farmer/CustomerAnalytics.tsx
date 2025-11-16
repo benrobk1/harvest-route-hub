@@ -9,8 +9,164 @@ import { useNavigate } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatMoney } from '@/lib/formatMoney';
 import { farmerQueries } from '@/features/farmers';
+import type { CustomerZipSummary } from '@/features/farmers';
+import type { Database } from '@/integrations/supabase/types';
 
 const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))', 'hsl(var(--muted))'];
+
+type OrderWithZip = Database['public']['Tables']['orders']['Row'] & {
+  profiles: {
+    zip_code: string;
+    full_name: string;
+  } | null;
+  order_items?: Array<{
+    product_id: string;
+    products: {
+      farm_profile_id: string;
+      name: string;
+    } | null;
+  }>;
+};
+
+interface CustomerDetails {
+  name: string;
+  orders: number;
+  revenue: number;
+  avg_order: number;
+  common_produce: string;
+  days_between: number;
+}
+
+interface ZipDataWithCustomers extends CustomerZipSummary {
+  customers?: CustomerDetails[];
+  most_common_produce?: string;
+  avg_days_between_orders?: number;
+  avg_order_size?: number;
+}
+
+function summarizeOrdersByZip(orders: OrderWithZip[] = []): ZipDataWithCustomers[] {
+  const zipMap = new Map<
+    string,
+    {
+      order_count: number;
+      total_revenue: number;
+      uniqueCustomers: Set<string>;
+      customerOrders: Map<string, Array<{ date: Date; amount: number; products: string[] }>>;
+      allProducts: Map<string, number>;
+    }
+  >();
+
+  // Build zip-level data structures
+  orders.forEach(order => {
+    const zip = order.profiles?.zip_code;
+    if (!zip || !order.consumer_id) return;
+    if (!order.created_at) return;
+
+    const summary = zipMap.get(zip) ?? {
+      order_count: 0,
+      total_revenue: 0,
+      uniqueCustomers: new Set<string>(),
+      customerOrders: new Map(),
+      allProducts: new Map(),
+    };
+
+    summary.order_count += 1;
+    summary.total_revenue += Number(order.total_amount ?? 0);
+    summary.uniqueCustomers.add(order.consumer_id);
+
+    // Track customer orders
+    const customerOrderList = summary.customerOrders.get(order.consumer_id) ?? [];
+    const products = (order.order_items ?? [])
+      .map(item => item.products?.name)
+      .filter((name): name is string => !!name);
+    
+    customerOrderList.push({
+      date: new Date(order.created_at),
+      amount: Number(order.total_amount ?? 0),
+      products,
+    });
+    summary.customerOrders.set(order.consumer_id, customerOrderList);
+
+    // Track product frequency
+    products.forEach(product => {
+      summary.allProducts.set(product, (summary.allProducts.get(product) ?? 0) + 1);
+    });
+
+    zipMap.set(zip, summary);
+  });
+
+  // Calculate customer details for each zip
+  return Array.from(zipMap.entries()).map(([zip, data]) => {
+    const customers: CustomerDetails[] = [];
+    
+    data.customerOrders.forEach((orderList, consumerId) => {
+      // Find consumer name from orders
+      const consumerName = orders.find(o => o.consumer_id === consumerId)?.profiles?.full_name ?? 'Unknown';
+      
+      // Sort orders by date
+      const sortedOrders = [...orderList].sort((a, b) => a.date.getTime() - b.date.getTime());
+      
+      // Calculate days between orders
+      let totalDaysBetween = 0;
+      for (let i = 1; i < sortedOrders.length; i++) {
+        const daysDiff = (sortedOrders[i].date.getTime() - sortedOrders[i - 1].date.getTime()) / (1000 * 60 * 60 * 24);
+        totalDaysBetween += daysDiff;
+      }
+      const avgDaysBetween = sortedOrders.length > 1 ? Math.round(totalDaysBetween / (sortedOrders.length - 1)) : 0;
+      
+      // Calculate total revenue for this customer
+      const customerRevenue = orderList.reduce((sum, o) => sum + o.amount, 0);
+      
+      // Find most common products for this customer
+      const productFreq = new Map<string, number>();
+      orderList.forEach(o => {
+        o.products.forEach(p => {
+          productFreq.set(p, (productFreq.get(p) ?? 0) + 1);
+        });
+      });
+      const topProducts = Array.from(productFreq.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([name]) => name);
+      
+      customers.push({
+        name: consumerName,
+        orders: orderList.length,
+        revenue: customerRevenue,
+        avg_order: orderList.length > 0 ? customerRevenue / orderList.length : 0,
+        common_produce: topProducts.join(', ') || 'N/A',
+        days_between: avgDaysBetween,
+      });
+    });
+
+    // Sort customers by revenue (highest first)
+    customers.sort((a, b) => b.revenue - a.revenue);
+
+    // Calculate zip-level aggregates
+    const topZipProducts = Array.from(data.allProducts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([name]) => name);
+
+    const allDaysBetween = customers
+      .map(c => c.days_between)
+      .filter(d => d > 0);
+    const avgDaysBetweenOrders = allDaysBetween.length > 0
+      ? Math.round(allDaysBetween.reduce((sum, d) => sum + d, 0) / allDaysBetween.length)
+      : 0;
+
+    return {
+      zip_code: zip,
+      order_count: data.order_count,
+      total_revenue: data.total_revenue,
+      unique_customers: data.uniqueCustomers.size,
+      customers,
+      most_common_produce: topZipProducts.join(', ') || 'N/A',
+      avg_days_between_orders: avgDaysBetweenOrders,
+      avg_order_size: data.order_count > 0 ? data.total_revenue / data.order_count : 0,
+    };
+  });
+}
 
 // Demo data for Milton zip code with customer details
 const DEMO_ZIP_DATA = [
@@ -73,46 +229,23 @@ export default function CustomerAnalytics() {
             consumer_id,
             total_amount,
             created_at,
-            profiles!inner(zip_code),
+            profiles!inner(
+              zip_code,
+              full_name
+            ),
             order_items!inner(
               product_id,
               products!inner(
-                farm_profile_id
+                farm_profile_id,
+                name
               )
             )
           `)
           .in('order_items.products.farm_profile_id', farmProfileIds)
-          .eq('status', 'delivered');
+          .eq('status', 'delivered')
+          .returns<OrderWithZip[]>();
 
-        if (!orders?.length) return [];
-
-        // Aggregate by zip code
-        const zipMap = new Map();
-        orders.forEach(order => {
-          const zip = order.profiles?.zip_code;
-          if (!zip) return;
-
-          if (!zipMap.has(zip)) {
-            zipMap.set(zip, {
-              zip_code: zip,
-              order_count: 0,
-              total_revenue: 0,
-              unique_customers: new Set(),
-            });
-          }
-
-          const zipData = zipMap.get(zip);
-          zipData.order_count++;
-          zipData.total_revenue += Number(order.total_amount);
-          zipData.unique_customers.add(order.consumer_id);
-        });
-
-        return Array.from(zipMap.values()).map(data => ({
-          zip_code: data.zip_code,
-          order_count: data.order_count,
-          total_revenue: data.total_revenue,
-          unique_customers: data.unique_customers.size,
-        }));
+        return summarizeOrdersByZip(orders ?? []);
 
       } else {
         // For regular farmers, get their own farm's data
@@ -131,52 +264,29 @@ export default function CustomerAnalytics() {
             consumer_id,
             total_amount,
             created_at,
-            profiles!inner(zip_code),
+            profiles!inner(
+              zip_code,
+              full_name
+            ),
             order_items!inner(
               product_id,
               products!inner(
-                farm_profile_id
+                farm_profile_id,
+                name
               )
             )
           `)
           .eq('order_items.products.farm_profile_id', farmProfile.id)
-          .eq('status', 'delivered');
+          .eq('status', 'delivered')
+          .returns<OrderWithZip[]>();
 
-        if (!orders?.length) return [];
-
-        // Aggregate by zip code
-        const zipMap = new Map();
-        orders.forEach(order => {
-          const zip = order.profiles?.zip_code;
-          if (!zip) return;
-
-          if (!zipMap.has(zip)) {
-            zipMap.set(zip, {
-              zip_code: zip,
-              order_count: 0,
-              total_revenue: 0,
-              unique_customers: new Set(),
-            });
-          }
-
-          const zipData = zipMap.get(zip);
-          zipData.order_count++;
-          zipData.total_revenue += Number(order.total_amount);
-          zipData.unique_customers.add(order.consumer_id);
-        });
-
-        return Array.from(zipMap.values()).map(data => ({
-          zip_code: data.zip_code,
-          order_count: data.order_count,
-          total_revenue: data.total_revenue,
-          unique_customers: data.unique_customers.size,
-        }));
+        return summarizeOrdersByZip(orders ?? []);
       }
     },
     enabled: !!user?.id,
   });
 
-  const displayZipData = zipCodeData || [];
+  const displayZipData: ZipDataWithCustomers[] = zipCodeData || [];
 
   const { data: summary, isLoading: summaryLoading } = useQuery({
     queryKey: farmerQueries.customerSummary(user?.id || '', displayZipData),
@@ -185,9 +295,15 @@ export default function CustomerAnalytics() {
         return { totalCustomers: 0, totalOrders: 0, totalRevenue: 0, avgOrderValue: 0 };
       }
 
-      const totalCustomers = displayZipData.reduce((sum: number, z: any) => sum + Number(z.unique_customers), 0);
-      const totalOrders = displayZipData.reduce((sum: number, z: any) => sum + Number(z.order_count), 0);
-      const totalRevenue = displayZipData.reduce((sum: number, z: any) => sum + Number(z.total_revenue), 0);
+      const totalCustomers = displayZipData.reduce(
+        (sum, zip) => sum + Number(zip.unique_customers),
+        0
+      );
+      const totalOrders = displayZipData.reduce((sum, zip) => sum + Number(zip.order_count), 0);
+      const totalRevenue = displayZipData.reduce(
+        (sum, zip) => sum + Number(zip.total_revenue),
+        0
+      );
 
       return {
         totalCustomers,
@@ -286,7 +402,7 @@ export default function CustomerAnalytics() {
         <CardContent>
           {displayZipData && Array.isArray(displayZipData) && displayZipData.length > 0 ? (
             <Accordion type="single" collapsible className="w-full">
-              {displayZipData.map((row: any) => (
+              {displayZipData.map((row: ZipDataWithCustomers) => (
                 <AccordionItem key={row.zip_code} value={row.zip_code} className="border rounded-lg mb-2 px-4">
                   <AccordionTrigger className="hover:no-underline">
                     <div className="flex items-center justify-between w-full pr-4">
@@ -301,7 +417,7 @@ export default function CustomerAnalytics() {
                   <AccordionContent>
                     <div className="pt-4 space-y-3">
                       {row.customers && row.customers.length > 0 ? (
-                        row.customers.map((customer: any, idx: number) => (
+                        row.customers.map((customer: CustomerDetails, idx: number) => (
                           <div key={idx} className="bg-muted/30 rounded-lg p-4 space-y-2">
                             <div className="font-semibold text-base">{customer.name}</div>
                             <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">

@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Stripe from "https://esm.sh/stripe@18.5.0";
 import { loadConfig } from '../_shared/config.ts';
 import { RATE_LIMITS } from '../_shared/constants.ts';
@@ -15,6 +14,52 @@ import {
   type AuthContext
 } from '../_shared/middleware/index.ts';
 
+<<<<<<< HEAD
+import { requireStripe } from "../_shared/config.ts";
+import {
+  createMiddlewareStack,
+  withAuth,
+  withCORS,
+  withErrorHandling,
+  withRequestId,
+  withSupabaseServiceRole,
+} from "../_shared/middleware/index.ts";
+import type { AuthContext } from "../_shared/middleware/withAuth.ts";
+import type { CORSContext } from "../_shared/middleware/withCORS.ts";
+import type { RequestIdContext } from "../_shared/middleware/withRequestId.ts";
+import type { SupabaseServiceRoleContext } from "../_shared/middleware/withSupabaseServiceRole.ts";
+
+interface CheckStripeContext
+  extends RequestIdContext,
+    CORSContext,
+    AuthContext,
+    SupabaseServiceRoleContext {}
+
+const stack = createMiddlewareStack<CheckStripeContext>([
+  withErrorHandling,
+  withRequestId,
+  withCORS,
+  withSupabaseServiceRole,
+  withAuth,
+]);
+
+const handler = stack(async (_req, ctx) => {
+  const { supabase, user, corsHeaders, requestId, config } = ctx;
+  requireStripe(config);
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('stripe_connect_account_id')
+    .eq('id', user.id)
+    .single();
+
+  if (profileError) {
+    console.error(`[${requestId}] [CHECK-STRIPE-CONNECT] Failed to load profile`, profileError);
+    throw profileError;
+  }
+
+  if (!profile?.stripe_connect_account_id) {
+=======
 /**
  * CHECK STRIPE CONNECT STATUS
  * 
@@ -41,6 +86,7 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
 
   if (!profile?.stripe_connect_account_id) {
     console.log(`[${ctx.requestId}] ℹ️ No Stripe account for user ${user.id}`);
+>>>>>>> main
     return new Response(JSON.stringify({
       connected: false,
       onboarding_complete: false,
@@ -48,6 +94,20 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
       payouts_enabled: false
     }), {
       status: 200,
+<<<<<<< HEAD
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+
+  const stripe = new Stripe(config.stripe.secretKey, {});
+  const account = await stripe.accounts.retrieve(profile.stripe_connect_account_id);
+
+  const onboardingComplete = account.details_submitted ?? false;
+  const chargesEnabled = account.charges_enabled ?? false;
+  const payoutsEnabled = account.payouts_enabled ?? false;
+
+  const { error: updateError } = await supabase
+=======
       headers: { ...ctx.corsHeaders, 'Content-Type': 'application/json' },
     });
   }
@@ -66,6 +126,7 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
 
   // Update profile with latest status
   await supabase
+>>>>>>> main
     .from('profiles')
     .update({
       stripe_onboarding_complete: onboardingComplete,
@@ -74,10 +135,22 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
     })
     .eq('id', user.id);
 
+<<<<<<< HEAD
+  if (updateError) {
+    console.error(`[${requestId}] [CHECK-STRIPE-CONNECT] Failed to update profile`, updateError);
+    throw updateError;
+  }
+
+  console.log(`[${requestId}] [CHECK-STRIPE-CONNECT] Updated status for user ${user.id}`, {
+    onboardingComplete,
+    chargesEnabled,
+    payoutsEnabled,
+=======
   console.log(`[${ctx.requestId}] ✅ Stripe Connect status synced for user ${user.id}`, {
     onboardingComplete,
     chargesEnabled,
     payoutsEnabled
+>>>>>>> main
   });
 
   return new Response(JSON.stringify({
@@ -88,6 +161,17 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
     account_id: profile.stripe_connect_account_id
   }), {
     status: 200,
+<<<<<<< HEAD
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+});
+
+serve((req) => {
+  const initialContext: Partial<CheckStripeContext> = {};
+
+  return handler(req, initialContext);
+});
+=======
     headers: { ...ctx.corsHeaders, 'Content-Type': 'application/json' },
   });
 };
@@ -102,3 +186,4 @@ const middlewareStack = createMiddlewareStack<Context>([
 ]);
 
 serve((req) => middlewareStack(handler)(req, {} as any));
+>>>>>>> main

@@ -1,0 +1,38 @@
+[33mcommit 889c0c4255b57edbe19bca41104837c320706842[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mcodex/find-and-fix-important-bug-in-codebase[m[33m)[m
+Author: benrobk1 <benrobk1@gmail.com>
+Date:   Sun Nov 16 16:51:09 2025 +0000
+
+    Fix critical race conditions in batch claiming and inventory
+    
+    🐛 Bug Fixes:
+    - Fixed batch claiming race condition using atomic UPDATE with WHERE conditions
+    - Fixed inventory overselling race condition using database-side atomic decrement
+    - Added CHECK constraint to prevent negative inventory at database level
+    
+    📁 Files Modified:
+    - supabase/functions/claim-route/index.ts
+    - supabase/functions/_shared/services/CheckoutService.ts
+    
+    📁 Files Created:
+    - supabase/migrations/20251116000000_fix_inventory_race_condition.sql
+    - supabase/functions/__tests__/claim-route-race-condition.test.ts
+    - BUGFIX-RACE-CONDITIONS.md (comprehensive documentation)
+    - test-race-condition-fixes.md (testing guide)
+    
+    🎯 Impact:
+    - Prevents multiple drivers from claiming same batch
+    - Prevents overselling of products during concurrent checkouts
+    - Ensures data integrity with database-level constraints
+    
+    🔍 Testing:
+    See test-race-condition-fixes.md for manual testing instructions
+    
+    Closes issue: Race conditions in concurrent operations
+
+ BUGFIX-RACE-CONDITIONS.md                                         | 237 [32m+++++++++++++++++++++++++++++[m
+ supabase/functions/__tests__/claim-route-race-condition.test.ts   |  98 [32m++++++++++++[m
+ supabase/functions/_shared/services/CheckoutService.ts            |  38 [32m++++[m[31m-[m
+ supabase/functions/claim-route/index.ts                           |  51 [32m++++[m[31m---[m
+ .../migrations/20251116000000_fix_inventory_race_condition.sql    |  61 [32m++++++++[m
+ test-race-condition-fixes.md                                      | 148 [32m++++++++++++++++++[m
+ 6 files changed, 600 insertions(+), 33 deletions(-)

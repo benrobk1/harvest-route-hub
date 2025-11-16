@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/playwright';
 
 test.describe('Role-Based Access Control', () => {
   test('farmer cannot access consumer routes', async ({ page }) => {

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/playwright';
 
 test.describe('Driver Workflow', () => {
   test('driver can navigate to dashboard', async ({ page }) => {

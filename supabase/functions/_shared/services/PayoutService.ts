@@ -10,6 +10,7 @@ export interface PayoutResult {
   successful: number;
   failed: number;
   skipped: number;
+  totalAmount: number;
   errors: Array<{
     payoutId: string;
     error: string;
@@ -77,7 +78,7 @@ export class PayoutService {
     // Early return if no payouts to process
     if (!pendingPayouts || pendingPayouts.length === 0) {
       console.log(`[${requestId}] [PAYOUTS] No pending payouts to process`);
-      return { successful: 0, failed: 0, skipped: 0, errors: [] };
+      return { successful: 0, failed: 0, skipped: 0, totalAmount: 0, errors: [] };
     }
 
     console.log(`[${requestId}] [PAYOUTS] Found ${pendingPayouts.length} pending payouts`);
@@ -86,6 +87,7 @@ export class PayoutService {
       successful: 0,
       failed: 0,
       skipped: 0,
+      totalAmount: 0,
       errors: []
     };
 
@@ -176,8 +178,50 @@ export class PayoutService {
               })
               .eq('id', payout.id);
           }
+<<<<<<< HEAD
+        });
+
+        console.log(`[${requestId}] [PAYOUTS] Transfer created: ${transfer.id}`);
+
+        // Update payout record
+        await this.supabase
+          .from('payouts')
+          .update({
+            status: 'completed',
+            stripe_transfer_id: transfer.id,
+            completed_at: new Date().toISOString()
+          })
+          .eq('id', payout.id);
+
+        result.successful++;
+        result.totalAmount += payout.amount;
+        console.log(`[${requestId}] [PAYOUTS] ✅ Payout ${payout.id} completed successfully`);
+
+      } catch (error: any) {
+        console.error(`[${requestId}] [PAYOUTS] ❌ Failed to process payout ${payout.id}:`, error.message);
+
+        result.failed++;
+        result.errors.push({
+          payoutId: payout.id,
+          error: error.message,
+          code: error.code
+        });
+
+        // STEP 6: Mark payout as failed for manual review
+        // Failed payouts can be retried after resolving the issue
+        // Common failures: insufficient balance, account restricted, invalid account
+        await this.supabase
+          .from('payouts')
+          .update({
+            status: 'failed',
+            description: `${payout.description} - Failed: ${error.message}`
+          })
+          .eq('id', payout.id);
+      }
+=======
         })
       );
+>>>>>>> main
     }
 
     console.log(`[${requestId}] [PAYOUTS] Processing complete: ${result.successful} successful, ${result.failed} failed, ${result.skipped} skipped`);

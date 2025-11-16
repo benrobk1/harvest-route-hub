@@ -10,16 +10,25 @@ import { toast } from '@/hooks/use-toast';
 import { useErrorHandler } from '@/lib/errors/useErrorHandler';
 import { createInvalidFileError, createCSVImportError } from '@/features/farmers/errors';
 import { supabase } from '@/integrations/supabase/client';
-import { parseProductFile, generateCSVTemplate, generateExcelTemplate, generateCSVFromProducts, CSVProductRow } from '@/lib/csvParser';
+import {
+  parseProductFile,
+  generateCSVTemplate,
+  generateExcelTemplate,
+  generateCSVFromProducts,
+  CSVProductRow,
+  ExportableProductRow,
+} from '@/lib/csvParser';
 import { uploadImageFromUrl } from '@/lib/imageUploader';
 import { ValidationPreviewTable } from './ValidationPreviewTable';
 import { Download, Upload, FileSpreadsheet, Loader2, AlertCircle } from 'lucide-react';
+import { getErrorMessage } from '@/lib/errors/getErrorMessage';
+import type { Database } from '@/integrations/supabase/types';
 
 interface BulkEditDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   farmProfileId: string;
-  products: any[];
+  products: Database['public']['Tables']['products']['Row'][];
   onComplete: () => void;
 }
 
@@ -61,7 +70,17 @@ export function BulkEditDialog({ open, onOpenChange, farmProfileId, products, on
   };
 
   const handleExportCurrent = () => {
-    const csv = generateCSVFromProducts(products);
+    const csv = generateCSVFromProducts(
+      products.map((product): ExportableProductRow => ({
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        price: Number(product.price),
+        unit: product.unit,
+        available_quantity: Number(product.available_quantity ?? 0),
+        image_url: product.image_url,
+      }))
+    );
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -86,8 +105,8 @@ export function BulkEditDialog({ open, onOpenChange, farmProfileId, products, on
       const result = await parseProductFile(selectedFile, mode);
       setPreview(result.valid);
       setErrors(result.errors);
-    } catch (error: any) {
-      handleError(createCSVImportError(error.message || 'Failed to parse file'));
+    } catch (error) {
+      handleError(createCSVImportError(getErrorMessage(error) || 'Failed to parse file'));
     }
   };
 

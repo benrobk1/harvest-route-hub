@@ -5,6 +5,7 @@
 
 export * from './queries';
 export * from './errors';
+export * from './types';
 export * from './components/BatchConsolidation';
 export * from './components/BoxCodeDisplay';
 export * from './components/BulkEditDialog';

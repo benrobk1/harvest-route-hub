@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/playwright';
 
 test.describe('Consumer Checkout Flow', () => {
   test('complete signup and shop flow', async ({ page }) => {

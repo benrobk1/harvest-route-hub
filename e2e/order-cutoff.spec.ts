@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/playwright';
 
 test.describe('Order Cutoff Enforcement', () => {
   test('allows checkout before 3pm cutoff', async ({ page }) => {

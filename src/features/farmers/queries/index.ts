@@ -1,3 +1,5 @@
+import type { CustomerZipSummary } from '@/features/farmers/types';
+
 /**
  * FARMER QUERIES
  * Query factory pattern for farmer-related queries
@@ -146,6 +148,6 @@ export const farmerQueries = {
    * @param displayZipData - ZIP data to display
    * @returns Query key for customer summary
    */
-  customerSummary: (userId: string, displayZipData: any) => 
+  customerSummary: (userId: string, displayZipData: readonly CustomerZipSummary[]) =>
     [...farmerQueries.all(), 'customer-summary', userId, displayZipData] as const,
 };

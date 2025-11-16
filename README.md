@@ -1,264 +1,59 @@
-# 🌾 Blue Harvests - Local Farm-to-Table Marketplace
-
-> **Documentation Version**: November 2025  
-> **Project Status**: Production-ready, active development  
-> **If anything seems outdated**: Check Git history or ask maintainers
-
-A modern, full-stack platform connecting local farmers with consumers through efficient delivery coordination. Built with React, TypeScript, and Supabase, featuring real-time tracking, automated batch optimization, and comprehensive payment processing.
-
-**Project URL**: https://lovable.dev/projects/eeae09ce-f16e-41fa-a46e-2dadc2102e6c
-
-[![CI Status](https://github.com/YOUR_USERNAME/YOUR_REPO/workflows/CI/badge.svg)](https://github.com/YOUR_USERNAME/YOUR_REPO/actions)
-
-## 📚 Documentation Guide
-
-**New to the project?** Start here:
-1. [QUICKSTART.md](./QUICKSTART.md) - Get running in 5 minutes
-2. [DATABASE.md](./DATABASE.md) - Understand the data model
-3. [ARCHITECTURE.md](./ARCHITECTURE.md) - System design deep-dive
-
-**For developers:**
-- [CONTRIBUTING.md](./CONTRIBUTING.md) - Development workflow
-- [API.md](./API.md) - Edge function reference
-- [SECURITY.md](./SECURITY.md) - Security architecture
-- [src/features/README.md](./src/features/README.md) - Code organization
-
-**Technical Guides (docs/):**
-- [Middleware Pattern](./docs/MIDDLEWARE.md) - Edge function middleware
-- [Monitoring & Observability](./docs/MONITORING.md) - Error tracking & logging
-- [Testing Strategy](./docs/TESTING.md) - Unit, integration, E2E tests
-- [Mobile Apps](./docs/MOBILE.md) - PWA and native setup
-- [Deployment](./docs/DEPLOYMENT-CHECKLIST.md) - Production checklist
-- [Performance](./docs/PERFORMANCE-OPTIMIZATION.md) - Optimization guide
-- [Security Hardening](./docs/SECURITY-HARDENING.md) - Advanced security
-
-**Reference:**
-- Feature READMEs in `src/features/*/README.md`
-- [Error Handling Guide](./src/lib/errors/README.md)
-
-
----
-
-## 🚀 Demo Prep (First-Time Setup)
-
-### Required Environment Variables
-
-All secrets are pre-configured in Lovable Cloud. For local development, you'll need:
-
-```bash
-# Automatically provided by Lovable Cloud:
-VITE_SUPABASE_URL=<your-project-url>
-VITE_SUPABASE_PUBLISHABLE_KEY=<your-anon-key>
-
-# Backend secrets (configured in Lovable Cloud Secrets UI):
-STRIPE_SECRET_KEY=<your-stripe-secret>        # Required for payments
-MAPBOX_PUBLIC_TOKEN=<your-mapbox-token>       # Optional (geocoding fallback enabled)
-LOVABLE_API_KEY=<your-lovable-key>           # Optional (geographic batching fallback enabled)
-OSRM_SERVER_URL=<osrm-server>                # Optional (route optimization)
-RESEND_API_KEY=<your-resend-key>             # Optional (email notifications)
-```
-
-### Demo Data Seeding
-
-**Option 1: Full Demo Reset** (Recommended for demos)
-```bash
-npm run seed              # Creates 50+ orders, 10+ farmers, realistic data
-```
-
-This script (`scripts/seed-demo.ts`) creates:
-- 3 test users (consumer, farmer, driver)
-- 20+ products across multiple farms
-- 50+ orders with varied statuses
-- Delivery batches with optimized routes
-- Credits ledger transactions
-- Subscription data
-
-**Option 2: Reset to Clean State** (via Admin Dashboard)
-- Navigate to `/admin/dashboard`
-- Click "Reset Demo Data" button
-- Calls `reset-demo-data` edge function
-
-### Test Accounts
-
-See [QUICKSTART.md](./QUICKSTART.md#-test-accounts) for test credentials and demo card details.
-
-### Security Notes
-
-**Sensitive endpoints require admin authentication:**
-- All admin functions validate JWT + `admin` role
-- Non-admin requests return `403 Forbidden`
-- Rate limiting enforced on all sensitive operations
-
-**Address privacy:**
-- Driver queries use secure views that mask addresses
-- Progressive disclosure: addresses reveal as deliveries progress
-- Database-level protection against premature exposure
-
-See [`SECURITY.md`](./SECURITY.md) for complete security architecture.
-
-### Webhook Configuration
-
-**Stripe webhooks** are pre-configured in Lovable Cloud deployment:
-- Production: Automatically configured when you deploy
-- Local dev: **Skip webhook setup** - not required for core functionality
-- See `supabase/functions/stripe-webhook/index.ts` for implementation details
-
-**What webhooks handle** (post-demo):
-- `payment_intent.succeeded` → Update order status to 'paid'
-- `customer.subscription.updated` → Sync subscription credits
-- `charge.dispute.created` → Alert admin for review
-- `payout.failed` → Retry payout logic
-
-**Security**: All webhooks verify Stripe signature using `STRIPE_WEBHOOK_SECRET` before processing events.
-
----
-
-## 🎯 Key Features
-
-✅ **Dual-Path Batch Optimization** - AI-powered (Gemini 2.5) with deterministic geographic fallback  
-✅ **Automated Revenue Distribution** - 88% farmer / 2% lead farmer / 10% platform, calculated automatically  
-✅ **Credits System** - Earn $10 credit per $100 spent (subscription members only)  
-✅ **Stripe Connect** - Automated farmer payouts with 1099 generation  
-✅ **Mobile-First PWA** - Offline cart support, installable on iOS/Android  
-✅ **Real-Time Tracking** - Order status updates via Supabase Realtime  
-✅ **Role-Based Access Control** - Secure multi-tenant architecture with RLS policies
-
-## 🎯 Quick Demo
-
-For a detailed 5-minute walkthrough of all user flows, see [QUICKSTART.md](./QUICKSTART.md#-first-feature-to-explore).
-
----
-
-## 🏗️ Architecture Overview
-
-### System Design (30-Second Map)
-
-```
-Consumers → Shop → Cart → Checkout → Stripe Payment
-                                    ↓
-                              Order Created
-                                    ↓
-                    AI Batch Optimization (daily cron)
-                     ↓                    ↓
-              Gemini 2.5 Flash      Geographic Fallback
-              (optimal routes)      (ZIP-based grouping)
-                     ↓                    ↓
-                    Driver Dashboard (pick route)
-                                    ↓
-                          Box Code Scanning
-                                    ↓
-                         Delivery Completion
-                                    ↓
-                    Automated Payouts (Stripe Connect)
-                     ↓              ↓              ↓
-                  Farmer 88%   Lead Farmer 2%  Platform 10%
-```
-
-### Critical Demo Route
-
-**Consumer Journey** (2 min):
-1. `/shop` - Browse products, add to cart
-2. `/consumer/checkout` - Select delivery date, apply credits
-3. Complete Stripe payment (test card: 4242...)
-4. `/consumer/orders` - Track order status in real-time
-
-**Admin Batch Creation** (30 sec):
-1. Navigate to `/admin/dashboard`
-2. Click "Generate Batches" (calls `generate-batches` edge function)
-3. View optimized routes grouped by ZIP + AI optimization
-
-**Driver Delivery** (1 min):
-1. `/driver/routes` - Accept batch assignment
-2. `/driver/load-boxes` - Scan QR codes to confirm pickup
-3. `/driver/route/:id` - Follow optimized route with map
-4. Mark stops as delivered (triggers address reveal for next 3 stops)
-
-### Key Technical Decisions
-
-**Why addresses are hidden from drivers initially:**
-- **Privacy-first design** - Consumer addresses only revealed when driver starts route
-- **Progressive disclosure** - Next 3 addresses unlock as each stop completes
-- **RLS enforcement** - Database-level access control via `get_consumer_address()` function
-
-**Why batch sizes have caps (30-45 orders):**
-- **Driver workload** - 7.5 hour route maximum prevents burnout
-- **Subsidization threshold** - Batches <30 orders may need platform subsidy
-- **Quality control** - Larger batches risk delivery delays and quality issues
-
-**Why geographic fallback exists:**
-- **Reliability** - If Lovable AI API is down, system continues operating
-- **Cost optimization** - AI only used when needed (complex multi-ZIP batches)
-- **Performance** - Simple ZIP grouping is instant for small batches
-
----
-
-
----
-
-## How can I edit this code?
-
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/eeae09ce-f16e-41fa-a46e-2dadc2102e6c) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/eeae09ce-f16e-41fa-a46e-2dadc2102e6c) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+# 🌾 Blue Harvests Enterprise Handbook
+
+Blue Harvests is a production-grade, farm-to-table marketplace that connects local farmers, drivers, and consumers with real-time logistics, automated payouts, and transparent governance. The platform runs on React, TypeScript, Supabase, and Stripe Connect, with observability, security, and compliance controls suitable for enterprise deployments.
+
+## 📑 Documentation Map
+- **Enterprise posture:** [docs/ENTERPRISE-HANDBOOK.md](./docs/ENTERPRISE-HANDBOOK.md) (governance, security, operations, SLAs)
+- **Architecture deep dives:** [ARCHITECTURE.md](./ARCHITECTURE.md) and [ARCHITECTURE-FEATURES.md](./ARCHITECTURE-FEATURES.md)
+- **Data model & migrations:** [DATABASE.md](./DATABASE.md)
+- **API contracts:** [API.md](./API.md) and feature READMEs under `src/features/*/README.md`
+- **Edge/security guides:** [SECURITY.md](./SECURITY.md), [docs/SECURITY-HARDENING.md](./docs/SECURITY-HARDENING.md)
+- **Testing & quality:** [docs/TESTING.md](./docs/TESTING.md), [CONTRIBUTING.md](./CONTRIBUTING.md)
+- **Operational playbooks:** [docs/MONITORING.md](./docs/MONITORING.md), [docs/DEPLOYMENT-CHECKLIST.md](./docs/DEPLOYMENT-CHECKLIST.md)
+
+## 🚀 Environments & Access
+| Environment | Purpose | Entry point | Notes |
+| --- | --- | --- | --- |
+| Local | Developer workstation | `npm run dev` | Uses `.env.local` with Supabase anon key; Stripe webhook emulation optional. |
+| Preview | Per-PR validation | Vercel/Lovable preview URLs | Mirrors production configs minus live payouts. |
+| Production | Customer-facing | https://lovable.dev/projects/eeae09ce-f16e-41fa-a46e-2dadc2102e6c | Enforces admin role-based access, Stripe Connect, and monitoring alerts. |
+
+Secrets are managed via Lovable Cloud / Supabase. Stripe and Resend credentials are required for payment and notification flows; Mapbox and OSRM tokens optimize routing but are optional.
+
+## 🏁 Quickstart (Local Development)
+1. Install dependencies: `npm install`
+2. Copy `.env.example` to `.env.local` and populate Supabase URL + anon key, plus Stripe/Mapbox tokens if testing those paths.
+3. Run database migrations/seed (optional but recommended): `npm run seed`
+4. Start the app: `npm run dev`
+5. Visit `/shop` (consumer), `/admin/dashboard` (admin), `/driver/routes` (driver) to validate core personas.
+
+## 🔐 Security & Compliance Snapshot
+- Role-based Supabase policies gate all privileged data; admin-only endpoints return `403` when misused.
+- Stripe Connect handles PII/PCI scope; webhook signatures are enforced in `supabase/functions/stripe-webhook/index.ts`.
+- Addresses reveal progressively to drivers to minimize exposure (documented in `SECURITY.md`).
+- Auditability: event logging and monitoring are outlined in [docs/MONITORING.md](./docs/MONITORING.md).
+
+## 🛠️ Architecture Overview
+- **Frontend:** Vite + React + Tailwind + shadcn-ui. Feature modules live under `src/features/*`.
+- **Backend:** Supabase (Postgres, Auth, Edge Functions). Business logic in `supabase/functions/*` and `src/lib/*`.
+- **Integrations:** Stripe payments/payouts, Mapbox/OSRM for routing, Resend for notifications.
+- **Batch & logistics:** Dual-path optimization (AI + geographic fallback) with QR-based box scanning and credits ledger automation.
+
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for sequence diagrams, failure modes, and data flow details.
+
+## 🧪 Quality Gates
+- Unit/integration tests via `npm test` and Vitest; E2E via Playwright.
+- CI enforces lint (`npm run lint`), type-check (`npm run typecheck`), and build (`npm run build`).
+- Release readiness follows [docs/DEPLOYMENT-CHECKLIST.md](./docs/DEPLOYMENT-CHECKLIST.md) and [CONTRIBUTING.md](./CONTRIBUTING.md).
+
+## 🩺 Operations & Runbooks
+- Monitoring/alerts: see [docs/MONITORING.md](./docs/MONITORING.md) for SLIs, dashboards, and PagerDuty routing.
+- Incident response: production rollback and data-restore paths are documented in [docs/ENTERPRISE-HANDBOOK.md](./docs/ENTERPRISE-HANDBOOK.md#incident-response--disaster-recovery).
+- Oncall escalation: create incidents in the chosen IM channel; all critical logs are centralized via Supabase.
+
+## 🤝 Support & Contact
+- **Product owners:** Marketplace operations (farmer/driver/consumer workflows)
+- **Engineering leads:** Supabase backend, logistics optimization, frontend UX
+- **Security/Compliance:** Data retention, least-privilege reviews, vendor risk
+
+For access requests or escalation paths, refer to [docs/ENTERPRISE-HANDBOOK.md](./docs/ENTERPRISE-HANDBOOK.md#roles-ownership--access).

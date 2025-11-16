@@ -135,6 +135,20 @@ const FarmerAuth = () => {
       // Wait for auth trigger to complete before updating profile
       await new Promise(resolve => setTimeout(resolve, 500));
 
+      // Assign farmer role immediately (prevents role assignment issues)
+      const roleToAssign = farmerType === "lead" ? 'lead_farmer' : 'farmer';
+      const { error: roleError } = await supabase
+        .from('user_roles')
+        .insert({ 
+          user_id: authData.user.id, 
+          role: roleToAssign 
+        });
+
+      if (roleError) {
+        // Role already exists or other error - log but don't fail
+        console.error('Role assignment warning:', roleError);
+      }
+
       // For lead farmers, use their farm address as the collection point
       const collectionPointAddress = farmerType === "lead" 
         ? `${formData.streetAddress}${formData.streetAddressLine2 ? `, ${formData.streetAddressLine2}` : ''}, ${formData.city}, ${formData.state} ${formData.zipCode}`
@@ -339,7 +353,7 @@ const FarmerAuth = () => {
                     <Input 
                       id="password" 
                       type="password" 
-                      placeholder="At least 6 characters" 
+                      placeholder="Enter your password" 
                       required 
                       value={formData.password}
                       onChange={(e) => {
@@ -349,7 +363,11 @@ const FarmerAuth = () => {
                       }}
                       className={passwordError ? 'border-destructive' : ''}
                     />
-                    {passwordError && <p className="text-xs text-destructive">{passwordError}</p>}
+                    {passwordError ? (
+                      <p className="text-xs text-destructive">{passwordError}</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Must be at least 6 characters long</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="confirmPassword">Confirm Password *</Label>

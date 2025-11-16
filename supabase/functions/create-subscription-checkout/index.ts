@@ -1,107 +1,118 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import Stripe from "https://esm.sh/stripe@18.5.0";
-import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
-
-import { requireStripe } from "../_shared/config.ts";
-import {
-  createMiddlewareStack,
+import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
+import Stripe from 'https://esm.sh/stripe@18.5.0';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
+import { loadConfig } from '../_shared/config.ts';
+import { RATE_LIMITS } from '../_shared/constants.ts';
+import { 
+  withRequestId, 
+  withCORS, 
   withAuth,
-  withCORS,
-  withErrorHandling,
-  withRequestId,
-  withSupabaseServiceRole,
   withValidation,
-} from "../_shared/middleware/index.ts";
-import type { AuthContext } from "../_shared/middleware/withAuth.ts";
-import type { CORSContext } from "../_shared/middleware/withCORS.ts";
-import type { RequestIdContext } from "../_shared/middleware/withRequestId.ts";
-import type { ValidationContext } from "../_shared/middleware/withValidation.ts";
-import type { SupabaseServiceRoleContext } from "../_shared/middleware/withSupabaseServiceRole.ts";
+  withRateLimit,
+  withErrorHandling, 
+  withMetrics,
+  createMiddlewareStack,
+  type RequestIdContext,
+  type CORSContext,
+  type AuthContext,
+  type MetricsContext,
+  type ValidationContext
+} from '../_shared/middleware/index.ts';
 
+/**
+ * CREATE SUBSCRIPTION CHECKOUT EDGE FUNCTION
+ * 
+ * Creates Stripe checkout session for subscription with optional trial.
+ * Uses middleware pattern with full authentication and validation.
+ */
+
+// Validation schema
 const CreateSubscriptionCheckoutSchema = z.object({
   enable_trial: z.boolean().optional().default(false),
 });
 
-type CreateSubscriptionCheckoutInput = z.infer<typeof CreateSubscriptionCheckoutSchema>;
+type CreateSubscriptionCheckoutRequest = z.infer<typeof CreateSubscriptionCheckoutSchema>;
 
-interface CreateSubscriptionCheckoutContext
-  extends RequestIdContext,
-    CORSContext,
-    AuthContext,
-    ValidationContext<CreateSubscriptionCheckoutInput>,
-    SupabaseServiceRoleContext {}
+type Context = RequestIdContext & CORSContext & AuthContext & MetricsContext & ValidationContext<CreateSubscriptionCheckoutRequest>;
 
-const stack = createMiddlewareStack<CreateSubscriptionCheckoutContext>([
-  withErrorHandling,
-  withRequestId,
-  withCORS,
-  withSupabaseServiceRole,
-  withAuth,
-  withValidation(CreateSubscriptionCheckoutSchema),
-]);
-
-const handler = stack(async (req, ctx) => {
-  const { corsHeaders, requestId, user, config, input } = ctx;
-  requireStripe(config);
-
+/**
+ * Main handler with middleware composition
+ */
+const handler = async (req: Request, ctx: Context): Promise<Response> => {
+  ctx.metrics.mark('checkout_creation_started');
+  
+  const config = loadConfig();
+  const user = ctx.user;
+  
   if (!user.email) {
-    throw new Error("Authenticated user must include an email address");
+    throw new Error('User email not available');
   }
 
-  console.log(
-    `[${requestId}] [CREATE-SUBSCRIPTION-CHECKOUT] Starting session creation`,
-    { userId: user.id, enableTrial: input.enable_trial },
-  );
+  console.log(`[${ctx.requestId}] Creating subscription checkout for user ${user.id}`);
 
-  const stripe = new Stripe(config.stripe.secretKey, {});
-  const customers = await stripe.customers.list({ email: user.email, limit: 1 });
-  const customerId = customers.data[0]?.id;
+  const stripe = new Stripe(config.stripe.secretKey, {
+    apiVersion: '2023-10-16',
+  });
 
-  const origin =
-    req.headers.get("origin") ??
-    corsHeaders["Access-Control-Allow-Origin"] ??
-    "https://lovable.app";
+  // Check for existing customer
+  const customers = await stripe.customers.list({
+    email: user.email,
+    limit: 1,
+  });
 
+  const customerId = customers.data.length > 0 ? customers.data[0].id : undefined;
+  console.log(`[${ctx.requestId}] Stripe customer: ${customerId || 'new'}`);
+  
+  ctx.metrics.mark(customerId ? 'existing_customer' : 'new_customer');
+
+  // Create checkout session config
   const sessionConfig: Stripe.Checkout.SessionCreateParams = {
     customer: customerId,
     customer_email: customerId ? undefined : user.email,
     line_items: [
       {
-        price: "price_1SMh7wDipsIpa8WwwtVag1ej",
+        price: 'price_1SMh7wDipsIpa8WwwtVag1ej',
         quantity: 1,
       },
     ],
-    mode: "subscription",
-    success_url: `${origin}/consumer/shop?subscription=success`,
-    cancel_url: `${origin}/consumer/shop?subscription=cancelled`,
+    mode: 'subscription',
+    success_url: `${req.headers.get('origin')}/consumer/shop?subscription=success`,
+    cancel_url: `${req.headers.get('origin')}/consumer/shop?subscription=cancelled`,
   };
 
-  if (input.enable_trial) {
+  // Add trial if requested
+  if (ctx.input.enable_trial) {
     sessionConfig.subscription_data = {
-      trial_period_days: 60,
+      trial_period_days: 60, // 2 months
     };
-
-    console.log(
-      `[${requestId}] [CREATE-SUBSCRIPTION-CHECKOUT] Trial enabled`,
-      { trialDays: 60 },
-    );
+    console.log(`[${ctx.requestId}] Trial enabled: 60 days`);
+    ctx.metrics.mark('trial_enabled');
   }
 
   const session = await stripe.checkout.sessions.create(sessionConfig);
 
-  console.log(
-    `[${requestId}] [CREATE-SUBSCRIPTION-CHECKOUT] Session created`,
-    { sessionId: session.id },
+  console.log(`[${ctx.requestId}] ✅ Checkout session created: ${session.id}`);
+  ctx.metrics.mark('session_created');
+
+  return new Response(
+    JSON.stringify({ url: session.url }),
+    {
+      status: 200,
+      headers: { ...ctx.corsHeaders, 'Content-Type': 'application/json' },
+    }
   );
+};
 
-  return new Response(JSON.stringify({ url: session.url }), {
-    status: 200,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
-});
+// Compose middleware stack
+const middlewareStack = createMiddlewareStack<Context>([
+  withRequestId,
+  withCORS,
+  withAuth,
+  withValidation(CreateSubscriptionCheckoutSchema),
+  withRateLimit(RATE_LIMITS.CREATE_SUBSCRIPTION),
+  withMetrics('create-subscription-checkout'),
+  withErrorHandling
+]);
 
-serve((req) => {
-  const initialContext: Partial<CreateSubscriptionCheckoutContext> = {};
-
-  return handler(req, initialContext);
-});
+serve((req) => middlewareStack(handler)(req, {} as any));

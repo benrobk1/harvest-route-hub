@@ -13,8 +13,7 @@ dist-ssr
 *.local
 
 # Test coverage
-coverage
-*.lcov
+coverage/
 
 # Editor directories and files
 .vscode/*

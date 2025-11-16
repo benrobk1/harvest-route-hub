@@ -32,6 +32,7 @@ interface Product {
     profiles: {
       full_name: string;
       collection_point_lead_farmer_id: string | null;
+      collection_point_address: string | null;
     };
   };
 }
@@ -71,7 +72,8 @@ export default function ProductApproval() {
             farmer_id,
             profiles!farm_profiles_farmer_id_fkey(
               full_name,
-              collection_point_lead_farmer_id
+              collection_point_lead_farmer_id,
+              collection_point_address
             )
           )
         `
@@ -79,7 +81,16 @@ export default function ProductApproval() {
         .order("created_at", { ascending: false });
 
       if (error) throw error;
-      return data as Product[];
+      
+      // Fetch user roles to identify lead farmers
+      const farmerIds = [...new Set(data?.map(p => p.farm_profiles.farmer_id))];
+      const { data: userRoles } = await supabase
+        .from("user_roles")
+        .select("user_id, role")
+        .in("user_id", farmerIds)
+        .eq("role", "lead_farmer");
+      
+      return { products: data as Product[], leadFarmerIds: new Set(userRoles?.map(ur => ur.user_id) || []) };
     },
   });
 
@@ -108,15 +119,28 @@ export default function ProductApproval() {
   });
 
   // Group products by collection point → farmer → products
-  const groupedProducts: GroupedProducts = products?.reduce((acc, product) => {
-    const leadFarmerId = product.farm_profiles?.profiles?.collection_point_lead_farmer_id || "independent";
+  const leadFarmerIds = products?.leadFarmerIds || new Set();
+  const groupedProducts: GroupedProducts = products?.products?.reduce((acc, product) => {
     const farmerId = product.farm_profiles.farmer_id;
+    const isLeadFarmer = leadFarmerIds.has(farmerId);
+    
+    // Determine the collection point ID:
+    // 1. If farmer IS a lead farmer → use their own ID
+    // 2. If farmer has a lead farmer assigned → use that ID
+    // 3. Otherwise → they're independent
+    const leadFarmerId = isLeadFarmer 
+      ? farmerId 
+      : (product.farm_profiles?.profiles?.collection_point_lead_farmer_id || "independent");
 
     if (!acc[leadFarmerId]) {
       acc[leadFarmerId] = {
         leadFarmer: leadFarmerId === "independent" ? null : {
-          full_name: "Collection Point",
-          collection_point_address: null,
+          full_name: isLeadFarmer 
+            ? product.farm_profiles?.profiles?.full_name || "Collection Point"
+            : "Collection Point",
+          collection_point_address: isLeadFarmer
+            ? product.farm_profiles?.profiles?.collection_point_address
+            : null,
         },
         farmers: {},
       };
@@ -238,7 +262,14 @@ export default function ProductApproval() {
                                       <div className="flex items-center gap-3">
                                         <User className="h-4 w-4 text-muted-foreground" />
                                         <div>
-                                          <div className="font-medium">{farmerData.farmName}</div>
+                                          <div className="font-medium flex items-center gap-2">
+                                            {farmerData.farmName}
+                                            {leadFarmerIds.has(farmerId) && leadFarmerId === farmerId && (
+                                              <Badge variant="outline" className="text-xs">
+                                                Lead Farmer
+                                              </Badge>
+                                            )}
+                                          </div>
                                           <div className="text-sm text-muted-foreground">
                                             {farmerData.farmerName}
                                           </div>

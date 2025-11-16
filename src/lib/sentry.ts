@@ -2,11 +2,22 @@ import * as Sentry from '@sentry/react';
 
 export const initSentry = () => {
   const dsn = import.meta.env.VITE_SENTRY_DSN;
+  const isProduction = import.meta.env.PROD;
   
   if (!dsn) {
-    console.warn('Sentry DSN not configured. Error tracking disabled.');
+    if (isProduction) {
+      console.error(
+        '❌ CRITICAL: Sentry DSN not configured in production!\n' +
+        'Error tracking is DISABLED. Set VITE_SENTRY_DSN environment variable.\n' +
+        'Get your DSN from: https://sentry.io/'
+      );
+    } else {
+      console.warn('⚠️  Sentry DSN not configured. Error tracking disabled in development.');
+    }
     return;
   }
+  
+  console.log('✅ Initializing Sentry error tracking...');
 
   Sentry.init({
     dsn,
@@ -24,11 +35,18 @@ export const initSentry = () => {
         sentry: true,
       }),
     ],
-    tracesSampleRate: 1.0,
-    tracePropagationTargets: ['localhost', /^https:\/\/.*\.lovableproject\.com/],
-    replaysSessionSampleRate: 0.1,
-    replaysOnErrorSampleRate: 1.0,
+    // Performance monitoring
+    tracesSampleRate: isProduction ? 0.1 : 1.0, // 10% in production, 100% in dev
+    tracePropagationTargets: ['localhost', /^https:\/\/.*\.lovableproject\.com/, /^https:\/\/.*\.lovable\.app/],
+    
+    // Session replay
+    replaysSessionSampleRate: isProduction ? 0.05 : 0.1, // 5% in production, 10% in dev
+    replaysOnErrorSampleRate: 1.0, // Always capture on errors
+    
     environment: import.meta.env.MODE,
+    
+    // Release tracking
+    release: import.meta.env.VITE_APP_VERSION || 'development',
     
     // Enhanced error filtering and tagging
     beforeSend(event, hint) {

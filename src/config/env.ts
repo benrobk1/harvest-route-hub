@@ -26,6 +26,17 @@ function validateEnv() {
     );
   }
   
+  // Production warnings for optional but recommended variables
+  if (import.meta.env.PROD) {
+    if (!import.meta.env.VITE_SENTRY_DSN) {
+      console.error(
+        '⚠️  PRODUCTION WARNING: VITE_SENTRY_DSN not set!\n' +
+        '   Error tracking is disabled. Incidents will not be captured.\n' +
+        '   Set up Sentry at: https://sentry.io/'
+      );
+    }
+  }
+  
   return result.data;
 }
 

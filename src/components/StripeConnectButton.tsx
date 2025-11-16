@@ -51,8 +51,12 @@ export const StripeConnectButton = () => {
 
   const handleConnect = async () => {
     setIsLoading(true);
+    console.log('Starting Stripe Connect onboarding...');
+    
     try {
       const { data: { session } } = await supabase.auth.getSession();
+      console.log('Session retrieved:', !!session);
+      
       if (!session) {
         toast({
           title: 'Authentication Required',
@@ -62,22 +66,39 @@ export const StripeConnectButton = () => {
         return;
       }
 
+      console.log('Invoking stripe-connect-onboard function...');
       const { data, error } = await supabase.functions.invoke('stripe-connect-onboard', {
         headers: {
           Authorization: `Bearer ${session.access_token}`,
         },
+        body: {
+          origin: window.location.origin,
+          returnPath: '/driver/profile',
+        },
       });
 
-      if (error) throw error;
+      console.log('Function response:', { data, error });
 
-      if (data.url) {
+      if (error) {
+        console.error('Function error:', error);
+        throw error;
+      }
+
+      if (data?.url) {
+        console.log('Opening Stripe URL:', data.url);
         window.open(data.url, '_blank');
         toast({
           title: 'Redirecting to Stripe',
           description: 'Complete the onboarding process to receive payouts',
         });
+        // Refresh status after a short delay
+        setTimeout(() => checkStatus(), 2000);
+      } else {
+        console.error('No URL in response:', data);
+        throw new Error('No onboarding URL received');
       }
     } catch (error: any) {
+      console.error('Connect error:', error);
       toast({
         title: 'Error',
         description: error.message || 'Failed to initiate Stripe Connect onboarding',

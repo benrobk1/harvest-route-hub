@@ -96,30 +96,26 @@ export class CheckoutService {
       };
     }
 
-    // NORMAL PATH: Sequential validation for production
-    // 1. Validate delivery address
-    await this.validateDeliveryAddress(userId, requestId);
+    // OPTIMIZED PATH: Parallelize independent queries
+    console.log(`[${requestId}] [CHECKOUT] Fetching initial data in parallel...`);
+    const [cart, cartItems, profile] = await Promise.all([
+      this.validateCart(cartId, userId, requestId),
+      this.getCartItems(cartId, requestId),
+      this.getUserProfile(userId, requestId)
+    ]);
 
-    // 2. Validate cart ownership
-    const cart = await this.validateCart(cartId, userId, requestId);
-
-    // 3. Fetch cart items with products
-    const cartItems = await this.getCartItems(cartId, requestId);
     if (cartItems.length === 0) {
       throw new CheckoutError('EMPTY_CART', 'Cart is empty');
     }
 
-    // 4. Get user profile
-    const profile = await this.getUserProfile(userId, requestId);
+    // Get market config and validate delivery date in parallel with price validation
+    const [marketConfig, { subtotal, insufficientProducts }] = await Promise.all([
+      this.getMarketConfig(profile.zip_code, requestId),
+      this.validatePricesAndInventory(cartItems, requestId)
+    ]);
 
-    // 5. Get market config
-    const marketConfig = await this.getMarketConfig(profile.zip_code, requestId);
-
-    // 6. Validate delivery date
+    // Validate delivery date (requires market config)
     await this.validateDeliveryDate(deliveryDate, marketConfig, requestId);
-
-    // 7. Server-side price validation and inventory check
-    const { subtotal, insufficientProducts } = await this.validatePricesAndInventory(cartItems, requestId);
     
     if (insufficientProducts.length > 0) {
       throw new CheckoutError('INSUFFICIENT_INVENTORY', 'Some products are out of stock', { products: insufficientProducts });

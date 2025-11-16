@@ -1,148 +1,127 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
-
-import { checkRateLimit } from "../_shared/rateLimiter.ts";
-import {
-  createMiddlewareStack,
-  withCORS,
-  withErrorHandling,
-  withRequestId,
-  withSupabaseServiceRole,
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { loadConfig } from '../_shared/config.ts';
+import { RATE_LIMITS } from '../_shared/constants.ts';
+import { SendPushNotificationRequestSchema } from '../_shared/contracts/notifications.ts';
+import { 
+  withRequestId, 
+  withCORS, 
+  withAuth,
   withValidation,
-} from "../_shared/middleware/index.ts";
-import type { CORSContext } from "../_shared/middleware/withCORS.ts";
-import type { RequestIdContext } from "../_shared/middleware/withRequestId.ts";
-import type { ValidationContext } from "../_shared/middleware/withValidation.ts";
-import type { SupabaseServiceRoleContext } from "../_shared/middleware/withSupabaseServiceRole.ts";
-import { maskEmail, truncateMessage } from "../_shared/utils.ts";
+  withRateLimit,
+  withErrorHandling, 
+  withMetrics,
+  createMiddlewareStack,
+  type RequestIdContext,
+  type CORSContext,
+  type AuthContext,
+  type MetricsContext,
+  type ValidationContext
+} from '../_shared/middleware/index.ts';
 
-const SendPushNotificationSchema = z.object({
-  consumerId: z.string().min(1, { message: "consumerId is required" }),
-  message: z.string().min(1, { message: "message is required" }),
-  eta: z.string().optional(),
-  stopsRemaining: z.number().int().nonnegative().optional(),
-});
+/**
+ * SEND PUSH NOTIFICATION EDGE FUNCTION
+ * 
+ * Sends push notifications to users (drivers/consumers).
+ * Uses middleware pattern with aggressive rate limiting.
+ * Note: Requires VAPID setup for production Web Push API.
+ */
 
-type SendPushNotificationInput = z.infer<typeof SendPushNotificationSchema>;
+type SendPushRequest = {
+  user_id: string;
+  title: string;
+  body: string;
+  data?: Record<string, any>;
+};
 
-interface SendPushNotificationContext
-  extends RequestIdContext,
-    CORSContext,
-    ValidationContext<SendPushNotificationInput>,
-    SupabaseServiceRoleContext {}
+type Context = RequestIdContext & CORSContext & AuthContext & MetricsContext & ValidationContext<SendPushRequest>;
 
-const stack = createMiddlewareStack<SendPushNotificationContext>([
-  withErrorHandling,
-  withRequestId,
-  withCORS,
-  withSupabaseServiceRole,
-  withValidation(SendPushNotificationSchema),
-]);
+/**
+ * Main handler with middleware composition
+ */
+const handler = async (req: Request, ctx: Context): Promise<Response> => {
+  ctx.metrics.mark('notification_requested');
+  
+  const config = loadConfig();
+  const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey);
 
-const handler = stack(async (_req, ctx) => {
-  const { supabase, corsHeaders, requestId, input } = ctx;
-  const { consumerId, message, eta, stopsRemaining } = input;
+  const { user_id, title, body: messageBody, data } = ctx.input;
 
-  const rateCheck = await checkRateLimit(supabase, consumerId, {
-    maxRequests: 20,
-    windowMs: 60 * 60 * 1000,
-    keyPrefix: "push-notification",
-  });
+  console.log(`[${ctx.requestId}] Push notification request:`, { user_id, title });
 
-  if (!rateCheck.allowed) {
-    console.warn(
-      `[${requestId}] [SEND-PUSH-NOTIFICATION] Rate limit exceeded`,
-      { consumerId },
-    );
-
-    return new Response(
-      JSON.stringify({
-        error: "TOO_MANY_REQUESTS",
-        message: "Notification rate limit exceeded.",
-        retryAfter: rateCheck.retryAfter,
-      }),
-      {
-        status: 429,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
-    );
-  }
-
+  // Get user's push subscription
   const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("push_subscription, email, full_name")
-    .eq("id", consumerId)
+    .from('profiles')
+    .select('push_subscription, email, full_name')
+    .eq('id', user_id)
     .single();
 
   if (profileError || !profile) {
-    console.error(
-      `[${requestId}] [SEND-PUSH-NOTIFICATION] Consumer not found`,
-      profileError,
-    );
-
-    return new Response(
-      JSON.stringify({ error: "Consumer not found" }),
-      {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
-    );
+    console.error(`[${ctx.requestId}] ❌ User not found: ${user_id}`);
+    ctx.metrics.mark('user_not_found');
+    return new Response(JSON.stringify({ 
+      error: 'User not found',
+      code: 'USER_NOT_FOUND'
+    }), {
+      status: 404,
+      headers: { ...ctx.corsHeaders, 'Content-Type': 'application/json' }
+    });
   }
 
+  // Check if notifications are enabled
   if (!profile.push_subscription?.enabled) {
-    return new Response(
-      JSON.stringify({ error: "Notifications not enabled for this user" }),
-      {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    console.log(`[${ctx.requestId}] ℹ️ Notifications not enabled for user ${user_id}`);
+    ctx.metrics.mark('notifications_disabled');
+    return new Response(JSON.stringify({ 
+      error: 'Notifications not enabled for this user',
+      code: 'NOTIFICATIONS_DISABLED'
+    }), {
+      status: 400,
+      headers: { ...ctx.corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+
+  // TODO: Implement Web Push API with VAPID keys
+  // For now, just log the notification
+  console.log(`[${ctx.requestId}] 📱 Push notification (logged):`, {
+    to: profile.email,
+    title,
+    body: messageBody,
+    data,
+  });
+
+  // Update last notification timestamp
+  await supabase
+    .from('profiles')
+    .update({
+      push_subscription: {
+        ...profile.push_subscription,
+        last_notification: new Date().toISOString(),
       },
-    );
-  }
+    })
+    .eq('id', user_id);
 
-  console.log(
-    `[${requestId}] [SEND-PUSH-NOTIFICATION] Notification placeholder`,
-    {
-      consumerId,
-      emailMasked: profile.email ? maskEmail(profile.email) : undefined,
-      messagePreview: truncateMessage(message, 20),
-      eta,
-      stopsRemaining,
-    },
-  );
+  console.log(`[${ctx.requestId}] ✅ Notification logged successfully`);
+  ctx.metrics.mark('notification_sent');
 
-  const updatedSubscription = {
-    ...profile.push_subscription,
-    last_notification: new Date().toISOString(),
-  };
+  return new Response(JSON.stringify({ 
+    success: true,
+    message: 'Notification logged (push implementation requires VAPID setup)' 
+  }), {
+    status: 200,
+    headers: { ...ctx.corsHeaders, 'Content-Type': 'application/json' }
+  });
+};
 
-  const { error: updateError } = await supabase
-    .from("profiles")
-    .update({ push_subscription: updatedSubscription })
-    .eq("id", consumerId);
+// Compose middleware stack
+const middlewareStack = createMiddlewareStack<Context>([
+  withRequestId,
+  withCORS,
+  withAuth,
+  withValidation(SendPushNotificationRequestSchema),
+  withRateLimit(RATE_LIMITS.SEND_PUSH_NOTIFICATION),
+  withMetrics('send-push-notification'),
+  withErrorHandling
+]);
 
-  if (updateError) {
-    console.error(
-      `[${requestId}] [SEND-PUSH-NOTIFICATION] Failed to log notification`,
-      updateError,
-    );
-    throw updateError;
-  }
-
-  return new Response(
-    JSON.stringify({
-      success: true,
-      message:
-        "Notification logged (push implementation requires VAPID setup)",
-    }),
-    {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    },
-  );
-});
-
-serve((req) => {
-  const initialContext: Partial<SendPushNotificationContext> = {};
-
-  return handler(req, initialContext);
-});
+serve((req) => middlewareStack(handler)(req, {} as any));

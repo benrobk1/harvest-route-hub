@@ -138,12 +138,13 @@ const AcceptInvitation = () => {
               <Input
                 id="password"
                 type="password"
-                placeholder="Choose a password (min 6 characters)"
+                placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 minLength={6}
               />
+              <p className="text-xs text-muted-foreground">Must be at least 6 characters long</p>
             </div>
 
             <div className="space-y-2">

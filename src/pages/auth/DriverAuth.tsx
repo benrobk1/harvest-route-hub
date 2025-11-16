@@ -6,6 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Link } from "react-router-dom";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Truck, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -36,8 +37,12 @@ const DriverAuth = () => {
     vehicleType: "",
     vehicleMake: "",
     vehicleYear: "",
+    streetAddress: "",
+    addressLine2: "",
+    city: "",
+    state: "",
     zipCode: "",
-    availability: "",
+    availability: [] as string[],
     additionalInfo: "",
   });
 
@@ -50,7 +55,8 @@ const DriverAuth = () => {
     try {
       // Validate required fields
       if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword || 
-          !formData.phone || !formData.licenseNumber || !formData.vehicleType || !formData.zipCode) {
+          !formData.phone || !formData.licenseNumber || !formData.vehicleType || 
+          !formData.streetAddress || !formData.city || !formData.state || !formData.zipCode) {
         throw new Error("Please fill in all required fields");
       }
 
@@ -77,6 +83,9 @@ const DriverAuth = () => {
       if (signUpError) throw signUpError;
       if (!authData.user) throw new Error("Failed to create user account");
 
+      // Wait for auth trigger to complete
+      await new Promise(resolve => setTimeout(resolve, 300));
+
       // Assign driver role
       const { error: roleError } = await supabase
         .from('user_roles')
@@ -85,7 +94,12 @@ const DriverAuth = () => {
           role: 'driver'
         });
 
-      if (roleError) throw roleError;
+      if (roleError) {
+        // Check if it's a duplicate key error (role already exists)
+        if (!roleError.message?.includes('duplicate key')) {
+          throw roleError;
+        }
+      }
 
       // Update profile with driver information
       const { error: profileError } = await supabase
@@ -93,14 +107,19 @@ const DriverAuth = () => {
         .update({
           full_name: formData.name,
           phone: formData.phone,
+          street_address: formData.streetAddress,
+          address_line_2: formData.addressLine2,
+          city: formData.city,
+          state: formData.state,
+          zip_code: formData.zipCode,
           vehicle_type: formData.vehicleType,
           vehicle_make: formData.vehicleMake,
           vehicle_year: formData.vehicleYear,
           license_number: formData.licenseNumber,
-          zip_code: formData.zipCode,
           approval_status: 'pending',
+          applied_role: 'driver',
           acquisition_channel: acquisitionChannel,
-          delivery_days: formData.availability ? [formData.availability] : null,
+          delivery_days: formData.availability.length > 0 ? formData.availability : null,
           additional_info: formData.additionalInfo || null,
         })
         .eq('id', authData.user.id);
@@ -123,8 +142,12 @@ const DriverAuth = () => {
         vehicleType: "",
         vehicleMake: "",
         vehicleYear: "",
+        streetAddress: "",
+        addressLine2: "",
+        city: "",
+        state: "",
         zipCode: "",
-        availability: "",
+        availability: [],
         additionalInfo: "",
       });
     } catch (error: any) {
@@ -234,7 +257,7 @@ const DriverAuth = () => {
                     <Input 
                       id="password" 
                       type="password" 
-                      placeholder="At least 6 characters" 
+                      placeholder="Enter your password" 
                       required 
                       value={formData.password}
                       onChange={(e) => {
@@ -244,7 +267,11 @@ const DriverAuth = () => {
                       }}
                       className={passwordError ? 'border-destructive' : ''}
                     />
-                    {passwordError && <p className="text-xs text-destructive">{passwordError}</p>}
+                    {passwordError ? (
+                      <p className="text-xs text-destructive">{passwordError}</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Must be at least 6 characters long</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="confirmPassword">Confirm Password *</Label>
@@ -312,7 +339,49 @@ const DriverAuth = () => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="zipCode">Your ZIP Code *</Label>
+                    <Label htmlFor="streetAddress">Street Address *</Label>
+                    <Input 
+                      id="streetAddress" 
+                      placeholder="123 Main St" 
+                      required 
+                      value={formData.streetAddress}
+                      onChange={(e) => setFormData({...formData, streetAddress: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="addressLine2">Apartment, Suite, etc. (Optional)</Label>
+                    <Input 
+                      id="addressLine2" 
+                      placeholder="Apt 4B" 
+                      value={formData.addressLine2}
+                      onChange={(e) => setFormData({...formData, addressLine2: e.target.value})}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="city">City *</Label>
+                      <Input 
+                        id="city" 
+                        placeholder="Springfield" 
+                        required 
+                        value={formData.city}
+                        onChange={(e) => setFormData({...formData, city: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="state">State *</Label>
+                      <Input 
+                        id="state" 
+                        placeholder="IL" 
+                        required 
+                        maxLength={2}
+                        value={formData.state}
+                        onChange={(e) => setFormData({...formData, state: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="zipCode">ZIP Code *</Label>
                     <Input 
                       id="zipCode" 
                       placeholder="10001" 
@@ -322,14 +391,30 @@ const DriverAuth = () => {
                       onChange={(e) => setFormData({...formData, zipCode: e.target.value})}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="availability">Availability</Label>
-                    <Input 
-                      id="availability" 
-                      placeholder="Weekdays, weekends, specific days..." 
-                      value={formData.availability}
-                      onChange={(e) => setFormData({...formData, availability: e.target.value})}
-                    />
+                  <div className="space-y-3">
+                    <Label>Preferred Delivery Days</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Select days you're available to deliver
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day) => (
+                        <div key={day} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`signup-day-${day}`}
+                            checked={formData.availability.includes(day)}
+                            onCheckedChange={(checked) => {
+                              const newDays = checked
+                                ? [...formData.availability, day]
+                                : formData.availability.filter(d => d !== day);
+                              setFormData({ ...formData, availability: newDays });
+                            }}
+                          />
+                          <Label htmlFor={`signup-day-${day}`} className="font-normal cursor-pointer">
+                            {day}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
                   </div>
 
                   <div className="space-y-2">

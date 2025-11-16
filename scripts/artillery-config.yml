@@ -1,0 +1,99 @@
+# ARTILLERY LOAD TEST CONFIGURATION
+# 
+# Run with: artillery run scripts/artillery-config.yml
+# Or: artillery run -e spike scripts/artillery-config.yml
+
+config:
+  target: "{{ $processEnvironment.VITE_SUPABASE_URL }}"
+  phases:
+    - duration: 60
+      arrivalRate: 5
+      name: "Warm up"
+    - duration: 120
+      arrivalRate: 10
+      name: "Sustained load"
+    - duration: 60
+      arrivalRate: 5
+      name: "Cool down"
+  processor: "./artillery-functions.js"
+  plugins:
+    expect: {}
+  variables:
+    anon_key: "{{ $processEnvironment.VITE_SUPABASE_PUBLISHABLE_KEY }}"
+
+# Environment-specific overrides
+environments:
+  spike:
+    phases:
+      - duration: 30
+        arrivalRate: 5
+        name: "Baseline"
+      - duration: 10
+        arrivalRate: 50
+        name: "Spike"
+      - duration: 30
+        arrivalRate: 5
+        name: "Recovery"
+  
+  stress:
+    phases:
+      - duration: 60
+        arrivalRate: 5
+        rampTo: 50
+        name: "Ramp up"
+      - duration: 120
+        arrivalRate: 50
+        name: "Peak load"
+  
+  soak:
+    phases:
+      - duration: 1800 # 30 minutes
+        arrivalRate: 10
+        name: "Extended soak"
+
+scenarios:
+  - name: "Check Subscription"
+    weight: 30
+    flow:
+      - post:
+          url: "/functions/v1/check-subscription"
+          headers:
+            Authorization: "Bearer {{ token }}"
+            apikey: "{{ anon_key }}"
+            Content-Type: "application/json"
+          json: {}
+          expect:
+            - statusCode: 200
+            - contentType: json
+            - hasProperty: subscribed
+
+  - name: "Get Metrics"
+    weight: 20
+    flow:
+      - get:
+          url: "/functions/v1/get-metrics?range=1h"
+          headers:
+            Authorization: "Bearer {{ token }}"
+            apikey: "{{ anon_key }}"
+          expect:
+            - statusCode: 200
+            - contentType: json
+
+  - name: "Checkout (Demo Mode)"
+    weight: 50
+    flow:
+      - post:
+          url: "/functions/v1/checkout"
+          headers:
+            Authorization: "Bearer {{ token }}"
+            apikey: "{{ anon_key }}"
+            Content-Type: "application/json"
+          json:
+            cartId: "00000000-0000-0000-0000-000000000001"
+            deliveryDate: "{{ $randomString(10) }}"
+            useCredits: false
+            tipAmount: 5.00
+            isDemoMode: true
+          expect:
+            - statusCode: [200, 400]
+            - contentType: json

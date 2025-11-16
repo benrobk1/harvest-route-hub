@@ -30,7 +30,6 @@ interface AuditLogEntry {
 
 const AuditLog = () => {
   const navigate = useNavigate();
-  
   const { data: logs, isLoading } = useQuery({
     queryKey: adminQueries.auditLogs(),
     queryFn: async () => {

@@ -1,149 +1,142 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-
-import {
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { loadConfig } from '../_shared/config.ts';
+import { 
+  withRequestId, 
+  withCORS, 
+  withErrorHandling, 
+  withMetrics,
   createMiddlewareStack,
-  withCORS,
-  withErrorHandling,
-  withRequestId,
-  withSupabaseServiceRole,
-} from "../_shared/middleware/index.ts";
-import type { CORSContext } from "../_shared/middleware/withCORS.ts";
-import type { RequestIdContext } from "../_shared/middleware/withRequestId.ts";
-import type { SupabaseServiceRoleContext } from "../_shared/middleware/withSupabaseServiceRole.ts";
+  type RequestIdContext,
+  type CORSContext,
+  type MetricsContext
+} from '../_shared/middleware/index.ts';
 
-interface SendCutoffRemindersContext
-  extends RequestIdContext,
-    CORSContext,
-    SupabaseServiceRoleContext {}
+/**
+ * SEND CUTOFF REMINDERS EDGE FUNCTION
+ * 
+ * Scheduled job that sends reminders to consumers about order cutoff times.
+ * Runs daily via pg_cron to notify users with pending orders or cart items.
+ */
 
-const stack = createMiddlewareStack<SendCutoffRemindersContext>([
-  withErrorHandling,
-  withRequestId,
-  withCORS,
-  withSupabaseServiceRole,
-]);
+type Context = RequestIdContext & CORSContext & MetricsContext;
 
-const handler = stack(async (_req, ctx) => {
-  const { supabase, corsHeaders, requestId } = ctx;
+/**
+ * Main handler with middleware composition
+ */
+const handler = async (req: Request, ctx: Context): Promise<Response> => {
+  ctx.metrics.mark('reminder_job_started');
+  
+  const config = loadConfig();
+  const supabaseClient = createClient(
+    config.supabase.url,
+    config.supabase.serviceRoleKey
+  );
 
-  console.log(`[${requestId}] [SEND-CUTOFF-REMINDERS] Starting reminder job`);
+  console.log(`[${ctx.requestId}] Starting cutoff reminder job...`);
 
+  // Calculate tomorrow's date
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowDate = tomorrow.toISOString().split("T")[0];
+  const tomorrowDate = tomorrow.toISOString().split('T')[0];
 
-  const { data: pendingOrders, error: pendingOrdersError } = await supabase
-    .from("orders")
-    .select("consumer_id, profiles(email)")
-    .eq("delivery_date", tomorrowDate)
-    .eq("status", "pending");
+  ctx.metrics.mark('date_calculated');
 
-  if (pendingOrdersError) {
-    console.error(
-      `[${requestId}] [SEND-CUTOFF-REMINDERS] Failed to load pending orders`,
-      pendingOrdersError,
-    );
-    throw pendingOrdersError;
-  }
+  // Find all consumers with pending orders for tomorrow
+  const { data: pendingOrders } = await supabaseClient
+    .from('orders')
+    .select('consumer_id, profiles (email)')
+    .eq('delivery_date', tomorrowDate)
+    .eq('status', 'pending');
 
-  // Filter carts to only those updated in the last 7 days to avoid unbounded table scan
-  const recentDate = new Date();
-  recentDate.setDate(recentDate.getDate() - 7);
-  const recentDateISO = recentDate.toISOString();
+  // Find consumers with items in cart (who haven't checked out yet)
+  const { data: cartsWithItems } = await supabaseClient
+    .from('cart_items')
+    .select(`
+      cart_id,
+      shopping_carts (
+        consumer_id,
+        profiles (email)
+      )
+    `);
 
-  const { data: cartsWithItems, error: cartsError } = await supabase
-    .from("cart_items")
-    .select(
-      `cart_id, shopping_carts ( consumer_id, profiles (email) )`,
-    )
-    .gte("shopping_carts.updated_at", recentDateISO);
+  ctx.metrics.mark('consumers_fetched');
 
-  if (cartsError) {
-    console.error(
-      `[${requestId}] [SEND-CUTOFF-REMINDERS] Failed to load carts`,
-      cartsError,
-    );
-    throw cartsError;
-  }
-
+  // Combine and deduplicate consumers
   const consumersToNotify = new Set<string>();
   const consumerEmails = new Map<string, string>();
 
-  for (const order of pendingOrders ?? []) {
-    const profile = order.profiles as { email?: string } | null;
-    if (profile?.email) {
-      consumersToNotify.add(order.consumer_id);
-      consumerEmails.set(order.consumer_id, profile.email);
+  if (pendingOrders) {
+    for (const order of pendingOrders) {
+      const profile = order.profiles as any;
+      if (profile?.email) {
+        consumersToNotify.add(order.consumer_id);
+        consumerEmails.set(order.consumer_id, profile.email);
+      }
     }
   }
 
-  for (const item of cartsWithItems ?? []) {
-    const cart = item.shopping_carts as { consumer_id?: string; profiles?: { email?: string } | null } | null;
-    const consumerId = cart?.consumer_id;
-    const email = cart?.profiles?.email;
-
-    if (consumerId && email) {
-      consumersToNotify.add(consumerId);
-      consumerEmails.set(consumerId, email);
+  if (cartsWithItems) {
+    for (const item of cartsWithItems) {
+      const cart = item.shopping_carts as any;
+      const profile = cart?.profiles as any;
+      if (cart?.consumer_id && profile?.email) {
+        consumersToNotify.add(cart.consumer_id);
+        consumerEmails.set(cart.consumer_id, profile.email);
+      }
     }
   }
 
-  console.log(
-    `[${requestId}] [SEND-CUTOFF-REMINDERS] Notifying consumers`,
-    { count: consumersToNotify.size },
-  );
+  console.log(`[${ctx.requestId}] Found ${consumersToNotify.size} consumers to notify`);
+  ctx.metrics.mark('consumers_identified');
 
   const results = {
     success: true,
     reminders_sent: 0,
-    errors: [] as { consumer_id: string; error: string }[],
+    errors: [] as any[]
   };
 
+  // Send reminder to each consumer
   for (const consumerId of consumersToNotify) {
     try {
-      const { error: notifyError } = await supabase.functions.invoke(
-        "send-notification",
-        {
-          body: {
-            event_type: "cutoff_reminder",
-            recipient_id: consumerId,
-            recipient_email: consumerEmails.get(consumerId),
-            data: {
-              delivery_date: tomorrowDate,
-            },
-          },
-        },
-      );
+      await supabaseClient.functions.invoke('send-notification', {
+        body: {
+          event_type: 'cutoff_reminder',
+          recipient_id: consumerId,
+          recipient_email: consumerEmails.get(consumerId),
+          data: {
+            delivery_date: tomorrowDate
+          }
+        }
+      });
 
-      if (notifyError) {
-        throw notifyError;
-      }
-
-      results.reminders_sent += 1;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.error(
-        `[${requestId}] [SEND-CUTOFF-REMINDERS] Failed to notify consumer`,
-        { consumerId, message },
-      );
-
-      results.errors.push({ consumer_id: consumerId, error: message });
+      results.reminders_sent++;
+      ctx.metrics.mark('reminder_sent');
+    } catch (error: any) {
+      console.error(`[${ctx.requestId}] Failed to send reminder to ${consumerId}:`, error);
+      results.errors.push({
+        consumer_id: consumerId,
+        error: error.message
+      });
+      ctx.metrics.mark('reminder_failed');
     }
   }
 
-  console.log(
-    `[${requestId}] [SEND-CUTOFF-REMINDERS] Completed reminder job`,
-    { remindersSent: results.reminders_sent, errors: results.errors.length },
-  );
+  console.log(`[${ctx.requestId}] ✅ Cutoff reminder job complete:`, results);
+  ctx.metrics.mark('job_complete');
 
   return new Response(JSON.stringify(results), {
     status: 200,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    headers: { ...ctx.corsHeaders, 'Content-Type': 'application/json' },
   });
-});
+};
 
-serve((req) => {
-  const initialContext: Partial<SendCutoffRemindersContext> = {};
+// Compose middleware stack (public endpoint for cron)
+const middlewareStack = createMiddlewareStack<Context>([
+  withRequestId,
+  withCORS,
+  withMetrics('send-cutoff-reminders'),
+  withErrorHandling
+]);
 
-  return handler(req, initialContext);
-});
+serve((req) => middlewareStack(handler)(req, {} as any));

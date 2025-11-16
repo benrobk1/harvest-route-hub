@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
 import { adminQueries } from '@/features/admin';
 import {
   Dialog,
@@ -38,6 +39,7 @@ interface UserProfile {
   // Farmer fields
   farm_name: string | null;
   street_address: string | null;
+  address_line_2: string | null;
   city: string | null;
   state: string | null;
   zip_code: string | null;
@@ -66,6 +68,9 @@ const UserApprovals = () => {
   const navigate = useNavigate();
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
+  const [selectedUserIds, setSelectedUserIds] = useState<Set<string>>(new Set());
+  const [bulkRejectionReason, setBulkRejectionReason] = useState('');
+  const [showBulkRejectDialog, setShowBulkRejectDialog] = useState(false);
 
   // Helper to extract storage path from URL or path string
   const toStoragePath = (val: string | null): string | null => {
@@ -184,31 +189,53 @@ const UserApprovals = () => {
         .single();
       if (profileFetchError) throw profileFetchError;
 
-      // Assign role based on applied_role (default to 'farmer')
-      const appliedRole = (profileData?.applied_role as 'farmer' | 'lead_farmer') ?? 'farmer';
-      const { error: roleAssignError } = await supabase
+      // Validate and assign role based on applied_role
+      const appliedRole = profileData?.applied_role as 'farmer' | 'lead_farmer' | 'driver' | null;
+      if (!appliedRole) {
+        throw new Error('User has no applied role specified. Cannot approve.');
+      }
+
+      // Validate it's a valid role
+      const validRoles: Array<'farmer' | 'lead_farmer' | 'driver'> = ['farmer', 'lead_farmer', 'driver'];
+      if (!validRoles.includes(appliedRole)) {
+        throw new Error(`Invalid applied role: ${appliedRole}`);
+      }
+
+      // Check if role already exists to prevent duplicates
+      const { data: existingRole } = await supabase
         .from('user_roles')
-        .upsert({ user_id: userId, role: appliedRole }, { onConflict: 'user_id,role' });
-      if (roleAssignError) throw roleAssignError;
-
-      // Ensure a farm profile exists for dropdowns
-      const { data: existingFarm, error: farmCheckError } = await supabase
-        .from('farm_profiles')
-        .select('id')
-        .eq('farmer_id', userId)
+        .select('role')
+        .eq('user_id', userId)
+        .eq('role', appliedRole)
         .maybeSingle();
-      if (farmCheckError) throw farmCheckError;
 
-      if (!existingFarm) {
-        const { error: farmInsertError } = await supabase
+      if (!existingRole) {
+        const { error: roleAssignError } = await supabase
+          .from('user_roles')
+          .insert([{ user_id: userId, role: appliedRole }]);
+        if (roleAssignError) throw roleAssignError;
+      }
+
+      // Ensure a farm profile exists for farmers/lead_farmers only
+      if (appliedRole === 'farmer' || appliedRole === 'lead_farmer') {
+        const { data: existingFarm, error: farmCheckError } = await supabase
           .from('farm_profiles')
-          .insert({
-            farmer_id: userId,
-            farm_name: profileData?.farm_name || 'Untitled Farm',
-            description: profileData?.additional_info || null,
-            location: [profileData?.city, profileData?.state].filter(Boolean).join(', ') || null,
-          });
-        if (farmInsertError) throw farmInsertError;
+          .select('id')
+          .eq('farmer_id', userId)
+          .maybeSingle();
+        if (farmCheckError) throw farmCheckError;
+
+        if (!existingFarm) {
+          const { error: farmInsertError } = await supabase
+            .from('farm_profiles')
+            .insert({
+              farmer_id: userId,
+              farm_name: profileData?.farm_name || 'Untitled Farm',
+              description: profileData?.additional_info || null,
+              location: [profileData?.city, profileData?.state].filter(Boolean).join(', ') || null,
+            });
+          if (farmInsertError) throw farmInsertError;
+        }
       }
     },
     onSuccess: () => {
@@ -217,6 +244,7 @@ const UserApprovals = () => {
         description: 'The user has been approved successfully',
       });
       queryClient.invalidateQueries({ queryKey: adminQueries.pendingUsers() });
+      queryClient.invalidateQueries({ queryKey: adminQueries.metrics() });
       setSelectedUser(null);
     },
     onError: (error: any) => {
@@ -271,6 +299,7 @@ const UserApprovals = () => {
         description: 'The user has been rejected',
       });
       queryClient.invalidateQueries({ queryKey: adminQueries.pendingUsers() });
+      queryClient.invalidateQueries({ queryKey: adminQueries.metrics() });
       setSelectedUser(null);
       setRejectionReason('');
     },
@@ -282,6 +311,195 @@ const UserApprovals = () => {
       });
     },
   });
+
+  const bulkApproveMutation = useMutation({
+    mutationFn: async (userIds: string[]) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Approve all selected users
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          approval_status: 'approved',
+          approved_at: new Date().toISOString(),
+          approved_by: user.id,
+          rejected_reason: null,
+        })
+        .in('id', userIds);
+
+      if (updateError) throw updateError;
+
+      // Process each user for role assignment and farm profile
+      for (const userId of userIds) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('applied_role, farm_name, additional_info, city, state')
+          .eq('id', userId)
+          .single();
+
+        if (profileData) {
+          const appliedRole = profileData?.applied_role as 'farmer' | 'lead_farmer' | 'driver' | null;
+          
+          // Validate role exists
+          if (!appliedRole) {
+            console.error(`User ${userId} has no applied role, skipping role assignment`);
+            continue;
+          }
+
+          // Validate it's a valid role
+          const validRoles: Array<'farmer' | 'lead_farmer' | 'driver'> = ['farmer', 'lead_farmer', 'driver'];
+          if (!validRoles.includes(appliedRole)) {
+            console.error(`User ${userId} has invalid applied role: ${appliedRole}, skipping`);
+            continue;
+          }
+
+          // Check if role already exists to prevent duplicates
+          const { data: existingRole } = await supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', userId)
+            .eq('role', appliedRole)
+            .maybeSingle();
+
+          if (!existingRole) {
+            await supabase
+              .from('user_roles')
+              .insert([{ user_id: userId, role: appliedRole }]);
+          }
+
+          // Create farm profile if it's a farmer/lead_farmer
+          if (appliedRole === 'farmer' || appliedRole === 'lead_farmer') {
+            const { data: existingFarm } = await supabase
+              .from('farm_profiles')
+              .select('id')
+              .eq('farmer_id', userId)
+              .maybeSingle();
+
+            if (!existingFarm) {
+              await supabase
+                .from('farm_profiles')
+                .insert({
+                  farmer_id: userId,
+                  farm_name: profileData?.farm_name || 'Untitled Farm',
+                  description: profileData?.additional_info || null,
+                  location: [profileData?.city, profileData?.state].filter(Boolean).join(', ') || null,
+                });
+            }
+          }
+        }
+
+        // Log approval history
+        await supabase
+          .from('approval_history')
+          .insert({
+            user_id: userId,
+            previous_status: 'pending',
+            new_status: 'approved',
+            approved_by: user.id,
+          });
+
+        // Log admin action
+        await supabase.rpc('log_admin_action', {
+          _action_type: 'bulk_user_approved',
+          _target_user_id: userId,
+          _old_value: { status: 'pending' },
+          _new_value: { status: 'approved' },
+        });
+      }
+    },
+    onSuccess: (_, userIds) => {
+      toast({
+        title: 'Users approved',
+        description: `${userIds.length} user(s) have been approved successfully`,
+      });
+      queryClient.invalidateQueries({ queryKey: adminQueries.pendingUsers() });
+      queryClient.invalidateQueries({ queryKey: adminQueries.metrics() });
+      setSelectedUserIds(new Set());
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Bulk approval failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const bulkRejectMutation = useMutation({
+    mutationFn: async ({ userIds, reason }: { userIds: string[]; reason: string }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not authenticated');
+
+      // Reject all selected users
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          approval_status: 'rejected',
+          rejected_reason: reason,
+          approved_by: user.id,
+        })
+        .in('id', userIds);
+
+      if (updateError) throw updateError;
+
+      // Log for each user
+      for (const userId of userIds) {
+        await supabase
+          .from('approval_history')
+          .insert({
+            user_id: userId,
+            previous_status: 'pending',
+            new_status: 'rejected',
+            reason,
+            approved_by: user.id,
+          });
+
+        await supabase.rpc('log_admin_action', {
+          _action_type: 'bulk_user_rejected',
+          _target_user_id: userId,
+          _old_value: { status: 'pending' },
+          _new_value: { status: 'rejected', reason },
+        });
+      }
+    },
+    onSuccess: (_, { userIds }) => {
+      toast({
+        title: 'Users rejected',
+        description: `${userIds.length} user(s) have been rejected`,
+      });
+      queryClient.invalidateQueries({ queryKey: adminQueries.pendingUsers() });
+      queryClient.invalidateQueries({ queryKey: adminQueries.metrics() });
+      setSelectedUserIds(new Set());
+      setBulkRejectionReason('');
+      setShowBulkRejectDialog(false);
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Bulk rejection failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const toggleUserSelection = (userId: string) => {
+    const newSet = new Set(selectedUserIds);
+    if (newSet.has(userId)) {
+      newSet.delete(userId);
+    } else {
+      newSet.add(userId);
+    }
+    setSelectedUserIds(newSet);
+  };
+
+  const toggleSelectAll = (users: UserProfile[]) => {
+    if (selectedUserIds.size === users.length) {
+      setSelectedUserIds(new Set());
+    } else {
+      setSelectedUserIds(new Set(users.map(u => u.id)));
+    }
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -336,13 +554,107 @@ const UserApprovals = () => {
               </CardContent>
             </Card>
           ) : (
-            pendingList.map((user) => (
+            <>
+              {/* Bulk Actions Bar */}
+              <Card className="bg-muted/50">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          checked={selectedUserIds.size === pendingList.length && pendingList.length > 0}
+                          onCheckedChange={() => toggleSelectAll(pendingList)}
+                        />
+                        <span className="text-sm font-medium">
+                          {selectedUserIds.size > 0 
+                            ? `${selectedUserIds.size} selected` 
+                            : 'Select all'}
+                        </span>
+                      </div>
+                    </div>
+                    {selectedUserIds.size > 0 && (
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={() => bulkApproveMutation.mutate(Array.from(selectedUserIds))}
+                          disabled={bulkApproveMutation.isPending}
+                          size="sm"
+                        >
+                          <CheckCircle2 className="mr-2 h-4 w-4" />
+                          Approve Selected ({selectedUserIds.size})
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          onClick={() => setShowBulkRejectDialog(true)}
+                          disabled={bulkRejectMutation.isPending}
+                          size="sm"
+                        >
+                          <XCircle className="mr-2 h-4 w-4" />
+                          Reject Selected ({selectedUserIds.size})
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Bulk Reject Dialog */}
+              <Dialog open={showBulkRejectDialog} onOpenChange={setShowBulkRejectDialog}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Reject Multiple Applications</DialogTitle>
+                    <DialogDescription>
+                      Please provide a reason for rejecting {selectedUserIds.size} application(s)
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="bulkReason">Reason</Label>
+                      <Textarea
+                        id="bulkReason"
+                        value={bulkRejectionReason}
+                        onChange={(e) => setBulkRejectionReason(e.target.value)}
+                        placeholder="Explain why these applications are being rejected..."
+                        rows={4}
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => {
+                          bulkRejectMutation.mutate({
+                            userIds: Array.from(selectedUserIds),
+                            reason: bulkRejectionReason,
+                          });
+                        }}
+                        disabled={!bulkRejectionReason || bulkRejectMutation.isPending}
+                        variant="destructive"
+                      >
+                        Confirm Rejection
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowBulkRejectDialog(false)}
+                      >
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              {pendingList.map((user) => (
               <Card key={user.id}>
                 <CardHeader>
                   <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle>{user.full_name}</CardTitle>
-                      <CardDescription>{user.email}</CardDescription>
+                    <div className="flex items-start gap-3">
+                      <Checkbox
+                        checked={selectedUserIds.has(user.id)}
+                        onCheckedChange={() => toggleUserSelection(user.id)}
+                        className="mt-1"
+                      />
+                      <div>
+                        <CardTitle>{user.full_name}</CardTitle>
+                        <CardDescription>{user.email}</CardDescription>
+                      </div>
                     </div>
                     {getStatusBadge(user.approval_status)}
                   </div>
@@ -491,18 +803,35 @@ const UserApprovals = () => {
                         <h3 className="font-semibold mb-3 text-sm text-muted-foreground uppercase tracking-wide">Driver Details</h3>
                         <div className="grid grid-cols-2 gap-4 text-sm">
                           <div>
-                            <span className="text-muted-foreground">Vehicle:</span>{' '}
-                            {[user.vehicle_type, user.vehicle_make, user.vehicle_year].filter(Boolean).join(' ') || 'N/A'}
-                          </div>
-                          <div>
                             <span className="text-muted-foreground">License #:</span> {user.license_number || 'N/A'}
                           </div>
                           <div>
-                            <span className="text-muted-foreground">ZIP Code:</span> {user.zip_code || 'N/A'}
+                            <span className="text-muted-foreground">Vehicle Type:</span> {user.vehicle_type || 'N/A'}
                           </div>
-                          {user.delivery_days && user.delivery_days.length > 0 && (
+                          {user.vehicle_make && (
                             <div>
+                              <span className="text-muted-foreground">Vehicle Make/Model:</span> {user.vehicle_make}
+                            </div>
+                          )}
+                          {user.vehicle_year && (
+                            <div>
+                              <span className="text-muted-foreground">Vehicle Year:</span> {user.vehicle_year}
+                            </div>
+                          )}
+                          {user.delivery_days && user.delivery_days.length > 0 && (
+                            <div className="col-span-2">
                               <span className="text-muted-foreground">Availability:</span> {user.delivery_days.join(', ')}
+                            </div>
+                          )}
+                          {user.street_address && (
+                            <div className="col-span-2">
+                              <span className="text-muted-foreground">Full Address:</span>
+                              <div className="text-sm mt-1">
+                                {user.street_address}
+                                {user.address_line_2 && <><br />{user.address_line_2}</>}
+                                <br />
+                                {user.city}, {user.state} {user.zip_code}
+                              </div>
                             </div>
                           )}
                           {user.additional_info && (
@@ -636,8 +965,9 @@ const UserApprovals = () => {
                   </div>
                 </CardContent>
               </Card>
-            ))
-          )}
+            ))}
+          </>
+        )}
         </TabsContent>
 
         <TabsContent value="rejected" className="space-y-4">
@@ -735,17 +1065,48 @@ const UserApprovals = () => {
                   )}
 
                   {/* Driver-specific fields */}
-                  {user.roles.includes('driver') && (
+                  {(user.applied_role === 'driver' || user.roles.includes('driver')) && (
                     <div>
                       <h3 className="font-semibold mb-3 text-sm text-muted-foreground uppercase tracking-wide">Driver Details</h3>
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
-                          <span className="text-muted-foreground">Vehicle:</span>{' '}
-                          {[user.vehicle_type, user.vehicle_make, user.vehicle_year].filter(Boolean).join(' ') || 'N/A'}
-                        </div>
-                        <div>
                           <span className="text-muted-foreground">License #:</span> {user.license_number || 'N/A'}
                         </div>
+                        <div>
+                          <span className="text-muted-foreground">Vehicle Type:</span> {user.vehicle_type || 'N/A'}
+                        </div>
+                        {user.vehicle_make && (
+                          <div>
+                            <span className="text-muted-foreground">Vehicle Make/Model:</span> {user.vehicle_make}
+                          </div>
+                        )}
+                        {user.vehicle_year && (
+                          <div>
+                            <span className="text-muted-foreground">Vehicle Year:</span> {user.vehicle_year}
+                          </div>
+                        )}
+                        {user.delivery_days && user.delivery_days.length > 0 && (
+                          <div className="col-span-2">
+                            <span className="text-muted-foreground">Availability:</span> {user.delivery_days.join(', ')}
+                          </div>
+                        )}
+                        {user.street_address && (
+                          <div className="col-span-2">
+                            <span className="text-muted-foreground">Full Address:</span>
+                            <div className="text-sm mt-1">
+                              {user.street_address}
+                              {user.address_line_2 && <><br />{user.address_line_2}</>}
+                              <br />
+                              {user.city}, {user.state} {user.zip_code}
+                            </div>
+                          </div>
+                        )}
+                        {user.additional_info && (
+                          <div className="col-span-2">
+                            <span className="text-muted-foreground">Additional Information:</span>
+                            <div className="text-sm mt-1 whitespace-pre-wrap">{user.additional_info}</div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}

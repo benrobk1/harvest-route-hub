@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -20,7 +20,7 @@ export const StripeConnectStatusBanner = () => {
   const [loading, setLoading] = useState(true);
   const [checking, setChecking] = useState(false);
 
-  const checkStatus = async () => {
+  const checkStatus = useCallback(async () => {
     if (!user) return;
     
     setChecking(true);
@@ -34,11 +34,11 @@ export const StripeConnectStatusBanner = () => {
       setLoading(false);
       setChecking(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     checkStatus();
-  }, [user?.id]);
+  }, [checkStatus]);
 
   const getStatusDisplay = () => {
     if (!status?.connected) {

@@ -1,69 +1,51 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { Resend } from "https://esm.sh/resend@4.0.0";
-
-import {
-  createMiddlewareStack,
+import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
+import { loadConfig } from '../_shared/config.ts';
+import { 
+  withRequestId, 
+  withCORS, 
   withAdminAuth,
-  withCORS,
-  withErrorHandling,
-  withRequestId,
-  withSupabaseServiceRole,
-} from "../_shared/middleware/index.ts";
-import type { AdminAuthContext } from "../_shared/middleware/withAdminAuth.ts";
-import type { CORSContext } from "../_shared/middleware/withCORS.ts";
-import type { RequestIdContext } from "../_shared/middleware/withRequestId.ts";
-import type { SupabaseServiceRoleContext } from "../_shared/middleware/withSupabaseServiceRole.ts";
+  withValidation,
+  withErrorHandling, 
+  createMiddlewareStack,
+  type RequestIdContext,
+  type CORSContext,
+  type AuthContext,
+  type ValidationContext
+} from '../_shared/middleware/index.ts';
+
+/**
+ * INVITE ADMIN EDGE FUNCTION
+ * 
+ * Admin-only endpoint for inviting new administrators.
+ * Sends invitation email with secure token.
+ */
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
-interface InviteRequest {
-  email: string;
-}
+// Validation schema
+const InviteRequestSchema = z.object({
+  email: z.string().email("Invalid email address").max(255, "Email too long"),
+});
 
-interface InviteAdminContext
-  extends RequestIdContext,
-    CORSContext,
-    AdminAuthContext,
-    SupabaseServiceRoleContext {}
+type InviteRequest = z.infer<typeof InviteRequestSchema>;
 
-const stack = createMiddlewareStack<InviteAdminContext>([
-  withErrorHandling,
-  withRequestId,
-  withCORS,
-  withSupabaseServiceRole,
-  withAdminAuth,
-]);
+type Context = RequestIdContext & CORSContext & AuthContext & ValidationContext<InviteRequest>;
 
-const handler = stack(async (req, ctx) => {
-  const { supabase, user, corsHeaders, requestId, config } = ctx;
+/**
+ * Main handler with middleware composition
+ */
+const handler = async (req: Request, ctx: Context): Promise<Response> => {
+  const config = loadConfig();
+  const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey);
+  const user = ctx.user;
+  const { email } = ctx.input;
 
-  let body: InviteRequest;
-  try {
-    body = await req.json();
-  } catch {
-    return new Response(
-      JSON.stringify({ error: "Invalid JSON payload" }),
-      {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
-  }
+  console.log(`[${ctx.requestId}] [INVITE-ADMIN] Processing invitation for ${email}`);
 
-  const { email } = body;
-
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return new Response(
-      JSON.stringify({ error: "Invalid email address" }),
-      {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
-  }
-
-  console.log(`[${requestId}] [INVITE-ADMIN] Processing invitation for ${email}`);
-
+  // Check if user already exists
   const { data: existingProfile } = await supabase
     .from("profiles")
     .select("id")
@@ -75,20 +57,23 @@ const handler = stack(async (req, ctx) => {
       JSON.stringify({ error: "User already exists. Please assign the role directly." }),
       {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...ctx.corsHeaders, "Content-Type": "application/json" },
       }
     );
   }
 
+  // Generate secure invitation token (32 bytes = 64 hex chars)
   const tokenBytes = new Uint8Array(32);
   crypto.getRandomValues(tokenBytes);
   const invitationToken = Array.from(tokenBytes)
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
 
+  // Set expiration to 7 days from now
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 7);
 
+  // Store invitation in database
   const { error: insertError } = await supabase
     .from("admin_invitations")
     .insert({
@@ -99,20 +84,18 @@ const handler = stack(async (req, ctx) => {
     });
 
   if (insertError) {
-    console.error(`[${requestId}] [INVITE-ADMIN] Error storing invitation:`, insertError);
-    return new Response(
-      JSON.stringify({ error: "Failed to create invitation" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    console.error(`[${ctx.requestId}] [INVITE-ADMIN] Error storing invitation:`, insertError);
+    throw new Error("Failed to create invitation");
   }
 
-  const origin = req.headers.get("origin") || "http://localhost:5173";
-  const appUrl = config.supabase.url.replace(/^https:\/\/[^.]+\.supabase\.co/, origin);
+  // Create magic link
+  const appUrl = config.supabase.url.replace(
+    /^https:\/\/[^.]+\.supabase\.co/,
+    req.headers.get("origin") || "http://localhost:5173"
+  );
   const magicLink = `${appUrl}/admin/accept-invitation?token=${invitationToken}`;
 
+  // Send invitation email
   const emailResponse = await resend.emails.send({
     from: "Blue Harvests <onboarding@resend.dev>",
     to: [email],
@@ -129,27 +112,35 @@ const handler = stack(async (req, ctx) => {
     `,
   });
 
-  console.log(`[${requestId}] [INVITE-ADMIN] Email sent successfully`, emailResponse);
+  console.log(`[${ctx.requestId}] [INVITE-ADMIN] Email sent successfully:`, emailResponse);
 
+  // Log admin action
   await supabase.rpc("log_admin_action", {
     _action_type: "admin_invited",
     _new_value: { email, expires_at: expiresAt.toISOString() },
   });
 
+  console.log(`[${ctx.requestId}] [INVITE-ADMIN] ✅ Success`);
+
   return new Response(
-    JSON.stringify({
-      success: true,
-      message: `Invitation sent to ${email}. They have 7 days to accept.`
+    JSON.stringify({ 
+      success: true, 
+      message: `Invitation sent to ${email}. They have 7 days to accept.` 
     }),
     {
       status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...ctx.corsHeaders, "Content-Type": "application/json" },
     }
   );
-});
+};
 
-serve((req) => {
-  const initialContext: Partial<InviteAdminContext> = {};
+// Compose middleware stack
+const middlewareStack = createMiddlewareStack<Context>([
+  withRequestId,
+  withCORS,
+  withAdminAuth,
+  withValidation(InviteRequestSchema),
+  withErrorHandling
+]);
 
-  return handler(req, initialContext);
-});
+serve((req) => middlewareStack(handler)(req, {} as any));

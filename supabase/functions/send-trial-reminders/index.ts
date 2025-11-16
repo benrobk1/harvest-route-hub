@@ -1,40 +1,48 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-
-import {
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { loadConfig } from '../_shared/config.ts';
+import { 
+  withRequestId, 
+  withCORS, 
+  withErrorHandling, 
+  withMetrics,
   createMiddlewareStack,
-  withCORS,
-  withErrorHandling,
-  withRequestId,
-  withSupabaseServiceRole,
-} from "../_shared/middleware/index.ts";
-import type { CORSContext } from "../_shared/middleware/withCORS.ts";
-import type { RequestIdContext } from "../_shared/middleware/withRequestId.ts";
-import type { SupabaseServiceRoleContext } from "../_shared/middleware/withSupabaseServiceRole.ts";
+  type RequestIdContext,
+  type CORSContext,
+  type MetricsContext
+} from '../_shared/middleware/index.ts';
 
-interface SendTrialRemindersContext
-  extends RequestIdContext,
-    CORSContext,
-    SupabaseServiceRoleContext {}
+/**
+ * SEND TRIAL REMINDERS EDGE FUNCTION
+ * 
+ * Scheduled job that sends reminders to users with expiring trials.
+ * Runs daily via pg_cron to notify users 7 days before trial ends.
+ */
 
-const stack = createMiddlewareStack<SendTrialRemindersContext>([
-  withErrorHandling,
-  withRequestId,
-  withCORS,
-  withSupabaseServiceRole,
-]);
+type Context = RequestIdContext & CORSContext & MetricsContext;
 
-const handler = stack(async (_req, ctx) => {
-  const { supabase, corsHeaders, requestId } = ctx;
+/**
+ * Main handler with middleware composition
+ */
+const handler = async (req: Request, ctx: Context): Promise<Response> => {
+  ctx.metrics.mark('trial_check_started');
+  
+  const config = loadConfig();
+  const supabaseClient = createClient(
+    config.supabase.url,
+    config.supabase.serviceRoleKey
+  );
 
-  console.log(`[${requestId}] [SEND-TRIAL-REMINDERS] Checking for expiring trials...`);
+  console.log(`[${ctx.requestId}] Checking for expiring trials...`);
 
+  // Find subscriptions with trials ending in 7 days
   const sevenDaysFromNow = new Date();
   sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
-
+  
   const eightDaysFromNow = new Date();
   eightDaysFromNow.setDate(eightDaysFromNow.getDate() + 8);
 
-  const { data: expiringTrials, error } = await supabase
+  const { data: expiringTrials, error } = await supabaseClient
     .from('subscriptions')
     .select(`
       id,
@@ -47,47 +55,63 @@ const handler = stack(async (_req, ctx) => {
     .lt('trial_end', eightDaysFromNow.toISOString());
 
   if (error) {
-    console.error(`[${requestId}] [SEND-TRIAL-REMINDERS] Error fetching expiring trials:`, error);
+    console.error(`[${ctx.requestId}] Error fetching expiring trials:`, error);
     throw error;
   }
 
-  console.log(`[${requestId}] [SEND-TRIAL-REMINDERS] Found ${expiringTrials?.length ?? 0} expiring trials`);
+  console.log(`[${ctx.requestId}] Found ${expiringTrials?.length || 0} expiring trials`);
+  ctx.metrics.mark('trials_fetched');
 
-  for (const trial of expiringTrials ?? []) {
+  const results = {
+    success: true,
+    reminders_sent: 0,
+    errors: [] as any[]
+  };
+
+  // Send reminder emails
+  for (const trial of expiringTrials || []) {
     try {
       const trialEndDate = new Date(trial.trial_end);
-
-      await supabase.functions.invoke('send-notification', {
+      
+      await supabaseClient.functions.invoke('send-notification', {
         body: {
           event_type: 'trial_ending',
           recipient_id: trial.consumer_id,
           data: {
             trial_end_date: trialEndDate.toLocaleDateString(),
-            days_remaining: 7,
-          },
-        },
+            days_remaining: 7
+          }
+        }
       });
 
-      console.log(`[${requestId}] [SEND-TRIAL-REMINDERS] Sent reminder to user ${trial.consumer_id}`);
-    } catch (notifError) {
-      console.error(`[${requestId}] [SEND-TRIAL-REMINDERS] Failed to send reminder for user ${trial.consumer_id}:`, notifError);
+      console.log(`[${ctx.requestId}] Sent trial reminder to user ${trial.consumer_id}`);
+      results.reminders_sent++;
+      ctx.metrics.mark('reminder_sent');
+    } catch (notifError: any) {
+      console.error(`[${ctx.requestId}] Failed to send reminder for ${trial.consumer_id}:`, notifError);
+      results.errors.push({
+        consumer_id: trial.consumer_id,
+        error: notifError.message
+      });
+      ctx.metrics.mark('reminder_failed');
     }
   }
 
-  return new Response(
-    JSON.stringify({
-      success: true,
-      reminders_sent: expiringTrials?.length ?? 0,
-    }),
-    {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    },
-  );
-});
+  console.log(`[${ctx.requestId}] ✅ Trial reminder job complete:`, results);
+  ctx.metrics.mark('job_complete');
 
-serve((req) => {
-  const initialContext: Partial<SendTrialRemindersContext> = {};
+  return new Response(JSON.stringify(results), {
+    status: 200,
+    headers: { ...ctx.corsHeaders, 'Content-Type': 'application/json' },
+  });
+};
 
-  return handler(req, initialContext);
-});
+// Compose middleware stack (public endpoint for cron)
+const middlewareStack = createMiddlewareStack<Context>([
+  withRequestId,
+  withCORS,
+  withMetrics('send-trial-reminders'),
+  withErrorHandling
+]);
+
+serve((req) => middlewareStack(handler)(req, {} as any));

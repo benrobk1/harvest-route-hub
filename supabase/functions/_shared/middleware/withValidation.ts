@@ -27,6 +27,11 @@ export const withValidation = <TInput>(
     handler: (req: Request, ctx: TContext & ValidationContext<TInput>) => Promise<Response>
   ): ((req: Request, ctx: TContext) => Promise<Response>) => {
     return async (req: Request, ctx: TContext): Promise<Response> => {
+      // Skip validation for OPTIONS preflight requests
+      if (req.method === 'OPTIONS') {
+        return handler(req, ctx as TContext & ValidationContext<TInput>);
+      }
+      
       try {
         const body = await req.json();
         const result = schema.safeParse(body);

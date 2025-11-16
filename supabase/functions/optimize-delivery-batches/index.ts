@@ -1,85 +1,70 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { loadConfig } from '../_shared/config.ts';
+import { RATE_LIMITS } from '../_shared/constants.ts';
+import { OptimizeBatchesRequestSchema } from '../_shared/contracts/optimization.ts';
+import { BatchOptimizationService } from '../_shared/services/BatchOptimizationService.ts';
+import { 
+  withRequestId, 
+  withCORS, 
+  withAdminAuth,
+  withValidation,
+  withRateLimit,
+  withErrorHandling, 
+  createMiddlewareStack,
+  type RequestIdContext,
+  type CORSContext,
+  type AuthContext,
+  type ValidationContext
+} from '../_shared/middleware/index.ts';
+
 /**
- * BATCH OPTIMIZATION EDGE FUNCTION (REFACTORED)
+ * OPTIMIZE DELIVERY BATCHES EDGE FUNCTION
  * 
- * Thin handler that delegates to BatchOptimizationService.
- * Uses dual-path optimization: AI-powered (primary) + geographic (fallback).
- * 
- * WHY THIS MATTERS FOR YC DEMO:
- * - Handler is now ~50 lines (was 433) - easy to scan and review
- * - Business logic extracted to service layer for testability
- * - Still maintains all functionality with improved architecture
+ * AI-powered batch optimization with geographic fallback.
+ * Uses BatchOptimizationService for dual-path optimization.
+ * Full middleware: RequestId + CORS + AdminAuth + RateLimit + Validation + ErrorHandling
  */
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
-import { BatchOptimizationService } from '../_shared/services/BatchOptimizationService.ts';
-import {
-  createMiddlewareStack,
-  withAdminAuth,
-  withCORS,
-  withErrorHandling,
-  withRequestId,
-  withSupabaseServiceRole,
-  withValidation,
-} from '../_shared/middleware/index.ts';
-import type { AdminAuthContext } from '../_shared/middleware/withAdminAuth.ts';
-import type { CORSContext } from '../_shared/middleware/withCORS.ts';
-import type { RequestIdContext } from '../_shared/middleware/withRequestId.ts';
-import type { SupabaseServiceRoleContext } from '../_shared/middleware/withSupabaseServiceRole.ts';
+type OptimizeBatchesInput = { delivery_date: string };
+type Context = RequestIdContext & CORSContext & AuthContext & ValidationContext<OptimizeBatchesInput>;
 
-// Input validation schema
-const OptimizeBatchesSchema = z.object({
-  delivery_date: z.string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, { message: "Date must be in YYYY-MM-DD format" })
-    .refine(date => !isNaN(Date.parse(date)), { message: "Invalid date value" })
-});
-
-type OptimizeInput = z.infer<typeof OptimizeBatchesSchema>;
-
-interface OptimizeContext
-  extends RequestIdContext,
-    CORSContext,
-    AdminAuthContext,
-    SupabaseServiceRoleContext {
-  input: OptimizeInput;
-}
-
-const stack = createMiddlewareStack<OptimizeContext>([
-  withErrorHandling,
-  withRequestId,
-  withCORS,
-  withSupabaseServiceRole,
-  withAdminAuth,
-  withValidation(OptimizeBatchesSchema),
-]);
-
-const handler = stack(async (_req, ctx) => {
-  const { supabase, user, corsHeaders, requestId, config, input } = ctx;
-
-  const lovableApiKey = config.lovable?.apiKey;
+/**
+ * Main handler with middleware composition
+ */
+const handler = async (req: Request, ctx: Context): Promise<Response> => {
+  const config = loadConfig();
+  const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey);
+  const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+  const { delivery_date } = ctx.input;
 
   if (!lovableApiKey) {
-    console.warn(`[${requestId}] [BATCH_OPT] ⚠️  LOVABLE_API_KEY not configured - using geographic fallback`);
+    console.warn(`[${ctx.requestId}] ⚠️  LOVABLE_API_KEY not configured - will use fallback batching`);
   }
 
-  console.log(`[${requestId}] [BATCH_OPT] Admin user ${user.id} authorized for ${input.delivery_date}`);
+  console.log(`[${ctx.requestId}] Optimizing batches for delivery date: ${delivery_date}`);
 
+  // Initialize optimization service
   const service = new BatchOptimizationService(supabase, lovableApiKey);
-  const result = await service.optimizeBatches(input.delivery_date);
+  const result = await service.optimizeBatches(delivery_date);
 
-  console.log(`[${requestId}] [BATCH_OPT] ✅ Created ${result.batches_created} batches for ${result.total_orders} orders`);
+  console.log(`[${ctx.requestId}] ✅ Created ${result.batches_created} batches for ${result.total_orders} orders`);
+  console.log(`[${ctx.requestId}] Optimization method: ${result.optimization_method}`);
 
-  return new Response(
-    JSON.stringify(result),
-    {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    }
-  );
-});
+  return new Response(JSON.stringify(result), {
+    status: 200,
+    headers: { ...ctx.corsHeaders, 'Content-Type': 'application/json' }
+  });
+};
 
-serve((req) => {
-  const initialContext: Partial<OptimizeContext> = {};
+// Compose middleware stack
+const middlewareStack = createMiddlewareStack<Context>([
+  withRequestId,
+  withCORS,
+  withAdminAuth,
+  withRateLimit(RATE_LIMITS.OPTIMIZE_BATCHES),
+  withValidation(OptimizeBatchesRequestSchema),
+  withErrorHandling
+]);
 
-  return handler(req, initialContext);
-});
+serve((req) => middlewareStack(handler)(req, {} as any));

@@ -58,6 +58,9 @@ const AdminAuth = () => {
         title: "Access granted",
         description: "Redirecting to management portal...",
       });
+
+      // Wait for AuthContext to load roles before navigating
+      await new Promise(resolve => setTimeout(resolve, 500));
       navigate("/admin/dashboard");
     } catch (error: any) {
       toast({
@@ -150,6 +153,7 @@ const AdminAuth = () => {
                   placeholder="••••••••"
                   required 
                 />
+                {isSignUp && <p className="text-xs text-muted-foreground">Must be at least 6 characters long</p>}
               </div>
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? (isSignUp ? "Creating Account..." : "Verifying...") : (isSignUp ? "Create Admin Account" : "Access Portal")}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,6 +14,7 @@ import { DocumentUpload } from "@/components/DocumentUpload";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const DriverProfile = () => {
   const navigate = useNavigate();
@@ -24,6 +25,11 @@ const DriverProfile = () => {
     full_name: "",
     email: "",
     phone: "",
+    street_address: "",
+    address_line_2: "",
+    city: "",
+    state: "",
+    zip_code: "",
     vehicle_type: "",
     vehicle_make: "",
     vehicle_year: "",
@@ -32,13 +38,10 @@ const DriverProfile = () => {
     driver_license_url: null,
     insurance_url: null,
     rejected_reason: null,
+    delivery_days: [] as string[],
   });
 
-  useEffect(() => {
-    loadProfile();
-  }, []);
-
-  const loadProfile = async () => {
+  const loadProfile = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       navigate("/auth/driver");
@@ -63,6 +66,11 @@ const DriverProfile = () => {
         full_name: data.full_name || "",
         email: data.email || "",
         phone: data.phone || "",
+        street_address: data.street_address || "",
+        address_line_2: data.address_line_2 || "",
+        city: data.city || "",
+        state: data.state || "",
+        zip_code: data.zip_code || "",
         vehicle_type: data.vehicle_type || "",
         vehicle_make: data.vehicle_make || "",
         vehicle_year: data.vehicle_year || "",
@@ -71,9 +79,14 @@ const DriverProfile = () => {
         driver_license_url: data.driver_license_url,
         insurance_url: data.insurance_url,
         rejected_reason: data.rejected_reason,
+        delivery_days: data.delivery_days || [],
       });
     }
-  };
+  }, [navigate]);
+
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,10 +100,16 @@ const DriverProfile = () => {
       .update({
         full_name: profile.full_name,
         phone: profile.phone,
+        street_address: profile.street_address,
+        address_line_2: profile.address_line_2,
+        city: profile.city,
+        state: profile.state,
+        zip_code: profile.zip_code,
         vehicle_type: profile.vehicle_type,
         vehicle_make: profile.vehicle_make,
         vehicle_year: profile.vehicle_year,
         license_number: profile.license_number,
+        delivery_days: profile.delivery_days,
       })
       .eq("id", user.id);
 
@@ -201,6 +220,59 @@ const DriverProfile = () => {
               </div>
 
               <div className="space-y-2">
+                <Label htmlFor="street_address">Street Address</Label>
+                <Input
+                  id="street_address"
+                  value={profile.street_address}
+                  onChange={(e) => setProfile({ ...profile, street_address: e.target.value })}
+                  placeholder="123 Main St"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="address_line_2">Apartment, Suite, etc. (Optional)</Label>
+                <Input
+                  id="address_line_2"
+                  value={profile.address_line_2}
+                  onChange={(e) => setProfile({ ...profile, address_line_2: e.target.value })}
+                  placeholder="Apt 4B"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="city">City</Label>
+                  <Input
+                    id="city"
+                    value={profile.city}
+                    onChange={(e) => setProfile({ ...profile, city: e.target.value })}
+                    placeholder="Springfield"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="state">State</Label>
+                  <Input
+                    id="state"
+                    value={profile.state}
+                    onChange={(e) => setProfile({ ...profile, state: e.target.value })}
+                    placeholder="IL"
+                    maxLength={2}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="zip_code">ZIP Code</Label>
+                <Input
+                  id="zip_code"
+                  value={profile.zip_code}
+                  onChange={(e) => setProfile({ ...profile, zip_code: e.target.value })}
+                  placeholder="10001"
+                  maxLength={5}
+                />
+              </div>
+
+              <div className="space-y-2">
                 <Label htmlFor="license_number">Driver's License Number</Label>
                 <Input
                   id="license_number"
@@ -237,6 +309,41 @@ const DriverProfile = () => {
                   onChange={(e) => setProfile({ ...profile, vehicle_year: e.target.value })}
                   placeholder="2020"
                 />
+              </div>
+
+              <div className="space-y-3">
+                <Label>Preferred Delivery Days</Label>
+                <p className="text-sm text-muted-foreground">
+                  Select days you're available to deliver. Routes on these days will appear first in Available Routes.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day) => (
+                    <div key={day} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`day-${day}`}
+                        checked={profile.delivery_days.includes(day)}
+                        onCheckedChange={(checked) => {
+                          const newDays = checked
+                            ? [...profile.delivery_days, day]
+                            : profile.delivery_days.filter(d => d !== day);
+                          setProfile({ ...profile, delivery_days: newDays });
+                        }}
+                      />
+                      <Label htmlFor={`day-${day}`} className="font-normal cursor-pointer">
+                        {day}
+                      </Label>
+                    </div>
+                  ))}
+                </div>
+                {profile.delivery_days.length > 0 && (
+                  <div className="flex flex-wrap gap-2 pt-2">
+                    {profile.delivery_days.map((day) => (
+                      <Badge key={day} variant="secondary">
+                        {day}
+                      </Badge>
+                    ))}
+                  </div>
+                )}
               </div>
 
                   <Button type="submit" className="w-full" disabled={isLoading}>

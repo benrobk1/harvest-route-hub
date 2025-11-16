@@ -6,7 +6,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import OrderTracking from "@/components/OrderTracking";
 import PreApprovedMessaging from "@/components/PreApprovedMessaging";
-import { DriverRating } from "@/features/consumers";
+import { CompleteFeedbackDrawer, DisputeDialog } from "@/features/consumers";
+import type { OrderWithDetails } from "@/features/orders/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -31,6 +32,8 @@ const ConsumerOrderTracking = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [cancelOrderId, setCancelOrderId] = useState<string | null>(null);
+  const [feedbackOrderId, setFeedbackOrderId] = useState<string | null>(null);
+  const [disputeOrderId, setDisputeOrderId] = useState<string | null>(null);
 
   const { data: orders, isLoading, refetch } = useQuery({
     queryKey: consumerQueries.orders(user?.id || ''),
@@ -39,17 +42,21 @@ const ConsumerOrderTracking = () => {
         .from('orders')
         .select(`
           id,
+          consumer_id,
           status,
           total_amount,
           tip_amount,
           delivery_date,
           box_code,
           created_at,
+          updated_at,
           delivery_batch_id,
           order_items(
+            id,
             quantity,
             unit_price,
             products(
+              id,
               name, 
               unit,
               farm_profiles(id, farm_name)
@@ -57,7 +64,14 @@ const ConsumerOrderTracking = () => {
           ),
           delivery_batches(
             driver_id,
+            estimated_duration_minutes,
             profiles!delivery_batches_driver_id_fkey(full_name, phone)
+          ),
+          profiles(
+            street_address,
+            city,
+            state,
+            zip_code
           )
         `)
         .eq('consumer_id', user?.id)
@@ -272,21 +286,37 @@ const ConsumerOrderTracking = () => {
                     )}
 
                     {/* Rating Section for Delivered Orders */}
-                    {order.status === 'delivered' && !order.hasRating && order.delivery_batches?.driver_id && (
-                      <div className="pt-4 border-t">
-                        <DriverRating
-                          orderId={order.id}
-                          driverId={order.delivery_batches.driver_id}
-                          driverName={driver?.full_name}
-                          onRatingSubmitted={() => refetch()}
-                        />
+                    {order.status === 'delivered' && !order.hasRating && (
+                      <div className="pt-4 border-t space-y-2">
+                        <Button
+                          onClick={() => setFeedbackOrderId(order.id)}
+                          className="w-full"
+                        >
+                          Rate Your Experience
+                        </Button>
+                        <Button
+                          onClick={() => setDisputeOrderId(order.id)}
+                          variant="outline"
+                          className="w-full"
+                        >
+                          File a Dispute
+                        </Button>
                       </div>
                     )}
 
                     {order.hasRating && (
-                      <p className="text-sm text-green-600 text-center py-2">
-                        ✓ You've rated this delivery
-                      </p>
+                      <div className="pt-4 border-t space-y-2">
+                        <p className="text-sm text-green-600 text-center py-2">
+                          ✓ You've submitted feedback for this order
+                        </p>
+                        <Button
+                          onClick={() => setDisputeOrderId(order.id)}
+                          variant="outline"
+                          className="w-full"
+                        >
+                          File a Dispute
+                        </Button>
+                      </div>
                     )}
 
                     {/* Cancel Order Button */}
@@ -342,6 +372,31 @@ const ConsumerOrderTracking = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Complete Feedback Drawer */}
+      {feedbackOrderId && orders && (
+        <CompleteFeedbackDrawer
+          open={!!feedbackOrderId}
+          onOpenChange={(open) => {
+            if (!open) setFeedbackOrderId(null);
+          }}
+          order={orders.find(o => o.id === feedbackOrderId) as OrderWithDetails}
+          hasDriverRating={orders.find(o => o.id === feedbackOrderId)?.hasRating || false}
+        />
+      )}
+
+      {/* Dispute Dialog */}
+      {disputeOrderId && orders && (
+        <DisputeDialog
+          open={!!disputeOrderId}
+          onOpenChange={(open) => {
+            if (!open) setDisputeOrderId(null);
+          }}
+          orderId={disputeOrderId}
+          consumerId={user?.id || ""}
+          totalAmount={Number(orders.find(o => o.id === disputeOrderId)?.total_amount || 0)}
+        />
+      )}
     </div>
   );
 };

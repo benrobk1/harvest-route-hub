@@ -8,6 +8,7 @@ export interface EdgeFunctionConfig {
   supabase: {
     url: string;
     serviceRoleKey: string;
+    anonKey: string;
   };
   stripe?: {
     secretKey: string;
@@ -22,6 +23,7 @@ export interface EdgeFunctionConfig {
   sentry?: {
     dsn: string;
   };
+  taxEncryptionKey?: string;
 }
 
 /**
@@ -54,6 +56,7 @@ export function initSentry(config: EdgeFunctionConfig): void {
 export function loadConfig(): EdgeFunctionConfig {
   const supabaseUrl = Deno.env.get('SUPABASE_URL');
   const supabaseServiceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY');
   const stripeSecretKey = Deno.env.get('STRIPE_SECRET_KEY');
 
   // Critical env vars - fail fast with descriptive errors
@@ -63,11 +66,21 @@ export function loadConfig(): EdgeFunctionConfig {
   if (!supabaseServiceRoleKey) {
     throw new Error('❌ SUPABASE_SERVICE_ROLE_KEY is required. Check your Lovable Cloud configuration.');
   }
+<<<<<<< HEAD
+=======
+  if (!supabaseAnonKey) {
+    throw new Error('❌ SUPABASE_ANON_KEY is required. Check your Lovable Cloud configuration.');
+  }
+  if (!stripeSecretKey) {
+    throw new Error('❌ STRIPE_SECRET_KEY is required. Add it in Lovable Cloud Secrets UI.');
+  }
+>>>>>>> main
 
   // Optional env vars - log warnings but continue
   const mapboxToken = Deno.env.get('MAPBOX_PUBLIC_TOKEN');
   const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
   const sentryDsn = Deno.env.get('SENTRY_DSN');
+  const taxEncryptionKey = Deno.env.get('TAX_ENCRYPTION_KEY');
   
   if (!stripeSecretKey) {
     console.warn('⚠️  STRIPE_SECRET_KEY not configured - payment processing endpoints will fail');
@@ -85,10 +98,15 @@ export function loadConfig(): EdgeFunctionConfig {
     console.warn('⚠️  SENTRY_DSN not configured - error tracking disabled (console logs only)');
   }
 
+  if (!taxEncryptionKey) {
+    console.warn('⚠️  TAX_ENCRYPTION_KEY not configured - tax info storage will fail');
+  }
+
   return {
     supabase: {
       url: supabaseUrl,
       serviceRoleKey: supabaseServiceRoleKey,
+      anonKey: supabaseAnonKey,
     },
     stripe: stripeSecretKey ? {
       secretKey: stripeSecretKey,
@@ -97,6 +115,7 @@ export function loadConfig(): EdgeFunctionConfig {
     mapbox: mapboxToken ? { publicToken: mapboxToken } : undefined,
     lovable: lovableApiKey ? { apiKey: lovableApiKey } : undefined,
     sentry: sentryDsn ? { dsn: sentryDsn } : undefined,
+    taxEncryptionKey,
   };
 }
 

@@ -27,6 +27,11 @@ export const withAuth = <T extends AuthContext>(
   handler: (req: Request, ctx: T) => Promise<Response>
 ): ((req: Request, ctx: Partial<T>) => Promise<Response>) => {
   return async (req: Request, ctx: Partial<T>): Promise<Response> => {
+    // Skip authentication for OPTIONS preflight requests
+    if (req.method === 'OPTIONS') {
+      return handler(req, ctx as T);
+    }
+    
     const authHeader = req.headers.get('Authorization');
     
     if (!authHeader) {

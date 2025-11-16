@@ -54,12 +54,30 @@ const Login = () => {
       emailSchema.parse(email);
       passwordSchema.parse(password);
 
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      // Retry logic for network failures
+      let lastError;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const { error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          });
 
-      if (error) throw error;
+          if (error) throw error;
+          lastError = null;
+          break; // Success, exit retry loop
+        } catch (err: any) {
+          lastError = err;
+          // If it's a network error and not the last attempt, retry
+          if (attempt < 1 && (err.message?.includes('fetch') || err.message?.includes('network'))) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            continue;
+          }
+          throw err;
+        }
+      }
+
+      if (lastError) throw lastError;
 
       // Wait for roles to load
       await new Promise(resolve => setTimeout(resolve, 200));

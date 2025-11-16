@@ -28,6 +28,11 @@ export const withRateLimit = <T extends RateLimitContext>(
     handler: (req: Request, ctx: T) => Promise<Response>
   ): ((req: Request, ctx: T) => Promise<Response>) => {
     return async (req: Request, ctx: T): Promise<Response> => {
+      // Skip rate limiting for OPTIONS preflight requests
+      if (req.method === 'OPTIONS') {
+        return handler(req, ctx);
+      }
+      
       const { user, supabase } = ctx;
 
       // Check rate limit

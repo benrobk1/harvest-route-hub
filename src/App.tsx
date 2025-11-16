@@ -30,6 +30,7 @@ import Financials from '@/pages/farmer/Financials';
 import MyLeadFarmer from '@/pages/farmer/MyLeadFarmer';
 import AffiliatedFarmers from '@/pages/farmer/AffiliatedFarmers';
 import CustomerAnalytics from '@/pages/farmer/CustomerAnalytics';
+import Monitoring from "./pages/admin/Monitoring";
 import AdminDashboard from "./pages/admin/Dashboard";
 import AnalyticsAndFinancials from "./pages/admin/AnalyticsAndFinancials";
 import AdminRoles from "./pages/admin/AdminRoles";
@@ -52,6 +53,7 @@ import UserApprovals from "./pages/admin/UserApprovals";
 import UserSearch from "./pages/admin/UserSearch";
 import Disputes from "./pages/admin/Disputes";
 import BatchAdjustments from "./pages/admin/BatchAdjustments";
+import DeliveryIssues from "./pages/admin/DeliveryIssues";
 import Install from "./pages/Install";
 import { CookieConsent } from "./components/CookieConsent";
 import { BottomNav } from "./components/mobile/BottomNav";
@@ -266,6 +268,16 @@ const AppContent = () => {
           <Route path="/admin/tax-documents" element={
             <RoleGate roles={['admin']}>
               <TaxDocuments />
+            </RoleGate>
+          } />
+          <Route path="/admin/monitoring" element={
+            <RoleGate roles={['admin']}>
+              <Monitoring />
+            </RoleGate>
+          } />
+          <Route path="/admin/delivery-issues" element={
+            <RoleGate roles={['admin']}>
+              <DeliveryIssues />
             </RoleGate>
           } />
           

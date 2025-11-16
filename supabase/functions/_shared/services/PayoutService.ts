@@ -91,46 +91,94 @@ export class PayoutService {
       errors: []
     };
 
-    // STEP 2: Process each payout individually
-    for (const payout of pendingPayouts) {
-      try {
-        const order = payout.orders as any;
+    // STEP 2: Process payouts in batches with concurrency limit
+    const BATCH_SIZE = 10;
+    const batches = this.chunkArray(pendingPayouts, BATCH_SIZE);
+    
+    console.log(`[${requestId}] [PAYOUTS] Processing ${batches.length} batches of ${BATCH_SIZE} payouts each`);
 
-        // Only process payouts for delivered orders
-        if (order.status !== 'delivered') {
-          console.log(`[${requestId}] [PAYOUTS] Skipping payout ${payout.id} - order ${order.id} not delivered (status: ${order.status})`);
-          result.skipped++;
-          continue;
-        }
+    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+      const batch = batches[batchIndex];
+      console.log(`[${requestId}] [PAYOUTS] Processing batch ${batchIndex + 1}/${batches.length}`);
 
-        console.log(`[${requestId}] [PAYOUTS] Processing payout ${payout.id}: $${payout.amount} to ${payout.recipient_type} (${payout.stripe_connect_account_id})`);
+      // Process batch in parallel
+      await Promise.all(
+        batch.map(async (payout) => {
+          try {
+            const order = payout.orders as any;
 
-        // Verify Connect account
-        const account = await this.stripe.accounts.retrieve(payout.stripe_connect_account_id);
+            // Only process payouts for delivered orders
+            if (order.status !== 'delivered') {
+              console.log(`[${requestId}] [PAYOUTS] Skipping payout ${payout.id} - order ${order.id} not delivered (status: ${order.status})`);
+              result.skipped++;
+              return;
+            }
 
-        if (!account.payouts_enabled) {
-          console.warn(`[${requestId}] [PAYOUTS] ⚠️  Account ${payout.stripe_connect_account_id} not enabled for payouts`);
-          result.failed++;
-          result.errors.push({
-            payoutId: payout.id,
-            error: 'PAYOUTS_NOT_ENABLED',
-            code: account.id
-          });
-          continue;
-        }
+            console.log(`[${requestId}] [PAYOUTS] Processing payout ${payout.id}: $${payout.amount} to ${payout.recipient_type} (${payout.stripe_connect_account_id})`);
 
-        // Create Stripe transfer
-        const transfer = await this.stripe.transfers.create({
-          amount: Math.round(payout.amount * 100), // Convert to cents
-          currency: 'usd',
-          destination: payout.stripe_connect_account_id,
-          description: payout.description,
-          metadata: {
-            payout_id: payout.id,
-            order_id: payout.order_id,
-            recipient_id: payout.recipient_id,
-            recipient_type: payout.recipient_type
+            // Verify Connect account
+            const account = await this.stripe.accounts.retrieve(payout.stripe_connect_account_id);
+
+            if (!account.payouts_enabled) {
+              console.warn(`[${requestId}] [PAYOUTS] ⚠️  Account ${payout.stripe_connect_account_id} not enabled for payouts`);
+              result.failed++;
+              result.errors.push({
+                payoutId: payout.id,
+                error: 'PAYOUTS_NOT_ENABLED',
+                code: account.id
+              });
+              return;
+            }
+
+            // Create Stripe transfer
+            const transfer = await this.stripe.transfers.create({
+              amount: Math.round(payout.amount * 100), // Convert to cents
+              currency: 'usd',
+              destination: payout.stripe_connect_account_id,
+              description: payout.description,
+              metadata: {
+                payout_id: payout.id,
+                order_id: payout.order_id,
+                recipient_id: payout.recipient_id,
+                recipient_type: payout.recipient_type
+              }
+            });
+
+            console.log(`[${requestId}] [PAYOUTS] Transfer created: ${transfer.id}`);
+
+            // Update payout record
+            await this.supabase
+              .from('payouts')
+              .update({
+                status: 'completed',
+                stripe_transfer_id: transfer.id,
+                completed_at: new Date().toISOString()
+              })
+              .eq('id', payout.id);
+
+            result.successful++;
+            console.log(`[${requestId}] [PAYOUTS] ✅ Payout ${payout.id} completed successfully`);
+
+          } catch (error: any) {
+            console.error(`[${requestId}] [PAYOUTS] ❌ Failed to process payout ${payout.id}:`, error.message);
+
+            result.failed++;
+            result.errors.push({
+              payoutId: payout.id,
+              error: error.message,
+              code: error.code
+            });
+
+            // Mark payout as failed for manual review
+            await this.supabase
+              .from('payouts')
+              .update({
+                status: 'failed',
+                description: `${payout.description} - Failed: ${error.message}`
+              })
+              .eq('id', payout.id);
           }
+<<<<<<< HEAD
         });
 
         console.log(`[${requestId}] [PAYOUTS] Transfer created: ${transfer.id}`);
@@ -170,9 +218,24 @@ export class PayoutService {
           })
           .eq('id', payout.id);
       }
+=======
+        })
+      );
+>>>>>>> main
     }
 
     console.log(`[${requestId}] [PAYOUTS] Processing complete: ${result.successful} successful, ${result.failed} failed, ${result.skipped} skipped`);
     return result;
+  }
+
+  /**
+   * Helper: Chunk array into batches
+   */
+  private chunkArray<T>(array: T[], chunkSize: number): T[][] {
+    const chunks: T[][] = [];
+    for (let i = 0; i < array.length; i += chunkSize) {
+      chunks.push(array.slice(i, i + chunkSize));
+    }
+    return chunks;
   }
 }

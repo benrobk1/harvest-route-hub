@@ -1,93 +1,81 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Stripe from "https://esm.sh/stripe@18.5.0";
-
-import { requireStripe } from "../_shared/config.ts";
-import {
+import { loadConfig } from '../_shared/config.ts';
+import { RATE_LIMITS } from '../_shared/constants.ts';
+import { StripeConnectOnboardRequestSchema } from '../_shared/contracts/stripe.ts';
+import { 
+  withRequestId, 
+  withCORS, 
+  withAuth,
+  withValidation,
+  withRateLimit,
+  withErrorHandling, 
   createMiddlewareStack,
-  withAuth,
-  withCORS,
-  withErrorHandling,
-  withRequestId,
-  withSupabaseServiceRole,
-} from "../_shared/middleware/index.ts";
-import type { AuthContext } from "../_shared/middleware/withAuth.ts";
-import type { CORSContext } from "../_shared/middleware/withCORS.ts";
-import type { RequestIdContext } from "../_shared/middleware/withRequestId.ts";
-import type { SupabaseServiceRoleContext } from "../_shared/middleware/withSupabaseServiceRole.ts";
+  type RequestIdContext,
+  type CORSContext,
+  type AuthContext,
+  type ValidationContext
+} from '../_shared/middleware/index.ts';
 
-interface StripeOnboardContext
-  extends RequestIdContext,
-    CORSContext,
-    AuthContext,
-    SupabaseServiceRoleContext {}
+/**
+ * STRIPE CONNECT ONBOARDING
+ * 
+ * Creates Stripe Connect accounts and generates onboarding links.
+ * Only farmers and drivers can initiate onboarding.
+ */
 
-const stack = createMiddlewareStack<StripeOnboardContext>([
-  withErrorHandling,
-  withRequestId,
-  withCORS,
-  withSupabaseServiceRole,
-  withAuth,
-]);
+type StripeConnectOnboardInput = { origin?: string; returnPath?: string };
+type Context = RequestIdContext & CORSContext & AuthContext & ValidationContext<StripeConnectOnboardInput>;
 
-const handler = stack(async (req, ctx) => {
-  const { supabase, user, corsHeaders, requestId, config } = ctx;
-  requireStripe(config);
+/**
+ * Main handler with middleware composition
+ */
+const handler = async (req: Request, ctx: Context): Promise<Response> => {
+  const config = loadConfig();
+  const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey);
+  const user = ctx.user;
+  const body = ctx.input;
 
-  console.log(`[${requestId}] [STRIPE-CONNECT-ONBOARD] Request from user ${user.id}`);
-
+  // Verify user is farmer or driver
   const { data: userRoles, error: rolesError } = await supabase
     .from('user_roles')
     .select('role')
     .eq('user_id', user.id);
 
-  if (rolesError) {
-    console.error(`[${requestId}] [STRIPE-CONNECT-ONBOARD] Failed to load roles:`, rolesError);
-    return new Response(JSON.stringify({ error: 'Failed to verify user roles' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
-
-  const roles = userRoles?.map((r) => r.role) ?? [];
-  const isFarmerOrDriver = roles.some((role) => ['farmer', 'lead_farmer', 'driver'].includes(role));
+  const roles = userRoles?.map(r => r.role) || [];
+  const isFarmerOrDriver = roles.includes('farmer') || roles.includes('lead_farmer') || roles.includes('driver');
 
   if (!isFarmerOrDriver) {
-    return new Response(JSON.stringify({
+    console.warn(`[${ctx.requestId}] ⚠️ Invalid role for user ${user.id}: ${roles.join(', ')}`);
+    return new Response(JSON.stringify({ 
       error: 'INVALID_ROLE',
       message: 'Only farmers and drivers can connect Stripe accounts',
-      debug: { roles, userId: user.id },
+      code: 'INVALID_ROLE'
     }), {
       status: 403,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...ctx.corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 
-  const profilePath = roles.includes('driver')
-    ? '/driver/profile'
-    : roles.some((role) => role === 'farmer' || role === 'lead_farmer')
-      ? '/farmer/profile'
-      : '/profile';
-
-  const { data: profile, error: profileError } = await supabase
+  // Get user profile
+  const { data: profile } = await supabase
     .from('profiles')
     .select('stripe_connect_account_id, email, full_name')
     .eq('id', user.id)
     .single();
 
-  if (profileError) {
-    console.error(`[${requestId}] [STRIPE-CONNECT-ONBOARD] Failed to load profile:`, profileError);
-    return new Response(JSON.stringify({ error: 'Failed to load profile' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  }
+  // Initialize Stripe
+  const stripe = new Stripe(config.stripe.secretKey, {
+    // Using account default API version
+  });
 
-  const stripe = new Stripe(config.stripe.secretKey, {});
+  let accountId = profile?.stripe_connect_account_id;
 
-  let accountId = profile?.stripe_connect_account_id ?? undefined;
-
+  // Create Connect account if doesn't exist
   if (!accountId) {
-    console.log(`[${requestId}] [STRIPE-CONNECT-ONBOARD] Creating new Stripe Connect account`);
+    console.log(`[${ctx.requestId}] Creating new Stripe Connect account...`);
+    
     const account = await stripe.accounts.create({
       type: 'express',
       email: profile?.email || user.email,
@@ -97,48 +85,53 @@ const handler = stack(async (req, ctx) => {
       business_type: 'individual',
       metadata: {
         supabase_user_id: user.id,
-        roles: roles.join(','),
-      },
+        roles: roles.join(',')
+      }
     });
 
     accountId = account.id;
+    console.log(`[${ctx.requestId}] Created Stripe Connect account: ${accountId}`);
 
-    const { error: updateError } = await supabase
+    // Update profile with account ID
+    await supabase
       .from('profiles')
       .update({ stripe_connect_account_id: accountId })
       .eq('id', user.id);
-
-    if (updateError) {
-      console.error(`[${requestId}] [STRIPE-CONNECT-ONBOARD] Failed to persist accountId`, updateError);
-      return new Response(JSON.stringify({ error: 'Failed to persist Stripe account' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
   }
 
-  const origin = req.headers.get('origin') || 'http://localhost:3000';
+  // Create account link for onboarding
+  const headerOrigin = req.headers.get('origin') || '';
+  const baseOrigin = body.origin || headerOrigin || 'http://localhost:3000';
+  const defaultPath = roles.includes('driver') ? '/driver/profile' : '/farmer/profile';
+  const returnPath = body.returnPath || defaultPath;
+
   const accountLink = await stripe.accountLinks.create({
     account: accountId,
-    refresh_url: `${origin}${profilePath}`,
-    return_url: `${origin}${profilePath}?stripe_onboarding=success`,
+    refresh_url: `${baseOrigin}${returnPath}`,
+    return_url: `${baseOrigin}${returnPath}?stripe_onboarding=success`,
     type: 'account_onboarding',
   });
 
-  console.log(`[${requestId}] [STRIPE-CONNECT-ONBOARD] Created account link ${accountLink.url}`);
+  console.log(`[${ctx.requestId}] ✅ Account link created for ${accountId}`);
 
   return new Response(JSON.stringify({
     success: true,
     url: accountLink.url,
-    account_id: accountId,
+    account_id: accountId
   }), {
     status: 200,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    headers: { ...ctx.corsHeaders, 'Content-Type': 'application/json' },
   });
-});
+};
 
-serve((req) => {
-  const initialContext: Partial<StripeOnboardContext> = {};
+// Compose middleware stack
+const middlewareStack = createMiddlewareStack<Context>([
+  withRequestId,
+  withCORS,
+  withAuth,
+  withRateLimit(RATE_LIMITS.STRIPE_CONNECT_ONBOARD),
+  withValidation(StripeConnectOnboardRequestSchema),
+  withErrorHandling
+]);
 
-  return handler(req, initialContext);
-});
+serve((req) => middlewareStack(handler)(req, {} as any));

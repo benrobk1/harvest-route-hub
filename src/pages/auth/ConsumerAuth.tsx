@@ -48,6 +48,7 @@ const ConsumerAuth = () => {
     const fullName = formData.get("fullName") as string;
     const phone = formData.get("phone") as string;
     const street = formData.get("street") as string;
+    const addressLine2 = formData.get("addressLine2") as string;
     const city = formData.get("city") as string;
     const state = formData.get("state") as string;
     const zipCode = formData.get("zipCode") as string;
@@ -73,6 +74,7 @@ const ConsumerAuth = () => {
             full_name: fullName,
             phone,
             street_address: street,
+            address_line_2: addressLine2,
             city,
             state,
             zip_code: zipCode,
@@ -85,12 +87,20 @@ const ConsumerAuth = () => {
       if (error) throw error;
 
       if (data.user) {
+        // Wait for auth trigger to complete
+        await new Promise(resolve => setTimeout(resolve, 300));
+
         // Assign consumer role
         const { error: roleError } = await supabase
           .from('user_roles')
           .insert({ user_id: data.user.id, role: 'consumer' });
 
-        if (roleError) throw roleError;
+        if (roleError) {
+          // Check if it's a duplicate key error (role already exists)
+          if (!roleError.message?.includes('duplicate key')) {
+            throw roleError;
+          }
+        }
 
         // Process referral code if provided
         if (referralCodeInput) {
@@ -220,7 +230,11 @@ const ConsumerAuth = () => {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="street">Street Address *</Label>
-                    <Input id="street" name="street" placeholder="123 Main St, Apt 4B" required />
+                    <Input id="street" name="street" placeholder="123 Main St" required />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="addressLine2">Apartment, Suite, etc. (Optional)</Label>
+                    <Input id="addressLine2" name="addressLine2" placeholder="Apt 4B" />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -266,7 +280,7 @@ const ConsumerAuth = () => {
                       id="signupPassword" 
                       name="password" 
                       type="password" 
-                      placeholder="At least 6 characters" 
+                      placeholder="Enter your password" 
                       required 
                       onChange={(e) => {
                         validatePassword(e.target.value);
@@ -275,7 +289,11 @@ const ConsumerAuth = () => {
                       }}
                       className={passwordError ? 'border-destructive' : ''}
                     />
-                    {passwordError && <p className="text-xs text-destructive">{passwordError}</p>}
+                    {passwordError ? (
+                      <p className="text-xs text-destructive">{passwordError}</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">Must be at least 6 characters long</p>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="confirmPassword">Confirm Password *</Label>

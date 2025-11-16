@@ -141,7 +141,7 @@ const AdminDashboard = () => {
               <Button variant="outline" size="sm" onClick={() => navigate('/admin/audit-log')}>Audit Log</Button>
               <Button variant="outline" size="sm" onClick={() => navigate('/admin/farm-affiliations')}>Affiliations</Button>
               <Button variant="outline" size="sm" onClick={() => navigate('/admin/tax-documents')}>Tax Docs</Button>
-              <Button variant="outline" size="sm" onClick={() => navigate('/admin/roles')}>Roles</Button>
+              <Button variant="outline" size="sm" onClick={() => navigate('/admin/roles')}>Admins</Button>
               <Button variant="outline" size="sm" onClick={() => navigate('/admin/credits')}>Credits</Button>
             </div>
         </div>

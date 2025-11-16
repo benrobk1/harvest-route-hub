@@ -1,86 +1,71 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+/**
+ * PROCESS PAYOUTS EDGE FUNCTION
+ * Admin-only function to process pending farmer payouts via Stripe
+ * 
+ * Full Middleware Pattern:
+ * RequestId + CORS + Auth + AdminAuth + RateLimit + ErrorHandling
+ */
+
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Stripe from "https://esm.sh/stripe@18.5.0";
-
-import { requireStripe } from "../_shared/config.ts";
+import { loadConfig } from '../_shared/config.ts';
+import { RATE_LIMITS } from '../_shared/constants.ts';
+import { PayoutService } from '../_shared/services/PayoutService.ts';
 import {
-  createMiddlewareStack,
-  withAdminAuth,
+  withRequestId,
   withCORS,
-  withErrorHandling,
+  withAuth,
+  withAdminAuth,
   withRateLimit,
-  withRequestId,
-  withSupabaseServiceRole,
-} from "../_shared/middleware/index.ts";
-import type { AdminAuthContext } from "../_shared/middleware/withAdminAuth.ts";
-import type { CORSContext } from "../_shared/middleware/withCORS.ts";
-import type { RequestIdContext } from "../_shared/middleware/withRequestId.ts";
-import type { SupabaseServiceRoleContext } from "../_shared/middleware/withSupabaseServiceRole.ts";
-
-import { PayoutService } from "../_shared/services/PayoutService.ts";
-
-interface ProcessPayoutsContext
-  extends RequestIdContext,
-    CORSContext,
-    AdminAuthContext,
-    SupabaseServiceRoleContext {}
-
-const stack = createMiddlewareStack<ProcessPayoutsContext>([
   withErrorHandling,
-  withRequestId,
-  withCORS,
-  withSupabaseServiceRole,
-  withAdminAuth,
-  withRateLimit({
-    maxRequests: 1,
-    windowMs: 5 * 60 * 1000,
-    keyPrefix: "process-payouts",
-  }),
-]);
+  createMiddlewareStack,
+  type RequestIdContext,
+  type CORSContext,
+  type AuthContext,
+} from '../_shared/middleware/index.ts';
 
-const handler = stack(async (_req, ctx) => {
-  const { supabase, corsHeaders, requestId, user, config } = ctx;
-  requireStripe(config);
+type Context = RequestIdContext & CORSContext & AuthContext;
 
-  console.log(
-    `[${requestId}] [PROCESS-PAYOUTS] Starting payout run`,
-    { adminId: user.id },
-  );
+const handler = async (req: Request, ctx: Context): Promise<Response> => {
+  const { requestId, corsHeaders } = ctx;
+  
+  const config = loadConfig();
+  const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey);
 
-  const stripe = new Stripe(config.stripe.secretKey, {});
+  console.log(`[${requestId}] Processing pending payouts`);
+
+  const stripe = new Stripe(config.stripe.secretKey);
   const payoutService = new PayoutService(supabase, stripe);
   const result = await payoutService.processPendingPayouts();
 
-  console.log(
-    `[${requestId}] [PROCESS-PAYOUTS] Completed payout run`,
-    {
-      successful: result.successful,
-      failed: result.failed,
-      skipped: result.skipped,
-    },
-  );
+  console.log(`[${requestId}] ✅ Payouts complete: ${result.successful} successful, ${result.failed} failed`);
 
   return new Response(
     JSON.stringify({
       success: true,
       payouts_processed: result.successful + result.failed,
-      total_amount: result.totalAmount,
-      failures:
-        result.errors.length > 0
-          ? result.errors.map((error) => ({
-              payout_id: error.payoutId,
-              error: error.error,
-            }))
-          : undefined,
+      total_amount: 0,
+      failures: result.errors.length > 0 ? result.errors.map(e => ({
+        payout_id: e.payoutId,
+        error: e.error
+      })) : undefined
     }),
     {
       status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    }
   );
-});
+};
 
-serve((req) => {
-  const initialContext: Partial<ProcessPayoutsContext> = {};
+// Compose middleware stack
+const middlewareStack = createMiddlewareStack<Context>([
+  withRequestId,
+  withCORS,
+  withAuth,
+  withAdminAuth,
+  withRateLimit(RATE_LIMITS.PROCESS_PAYOUTS),
+  withErrorHandling,
+]);
 
-  return handler(req, initialContext);
-});
+serve((req) => middlewareStack(handler)(req, {} as any));

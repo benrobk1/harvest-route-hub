@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,11 +34,7 @@ const FarmProfileView = () => {
   const [metrics, setMetrics] = useState<ImpactMetrics>({ totalSales: 0, totalOrders: 0, familiesFed: 0 });
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    loadFarmProfile();
-  }, [farmId]);
-
-  const loadFarmProfile = async () => {
+  const loadFarmProfile = useCallback(async () => {
     if (!farmId) return;
 
     // Load farm profile
@@ -106,7 +102,11 @@ const FarmProfileView = () => {
     }
 
     setIsLoading(false);
-  };
+  }, [farmId]);
+
+  useEffect(() => {
+    loadFarmProfile();
+  }, [loadFarmProfile]);
 
   if (isLoading) {
     return (

@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ShoppingCart, Users, TrendingUp, Truck, Leaf, Search } from "lucide-react";
 import logo from "@/assets/blue-harvests-logo.jpeg";
+import { SentryErrorTest } from "@/components/SentryErrorTest";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -49,6 +50,13 @@ const Index = () => {
               </div>
             </div>
           </div>
+
+        {/* Sentry Testing (Development Only - Remove in Production) */}
+        {import.meta.env.DEV && (
+          <div className="max-w-2xl mx-auto mb-12">
+            <SentryErrorTest />
+          </div>
+        )}
 
         {/* How It Works Section */}
         <div className="col-span-1 md:col-span-3 mt-12">
@@ -174,16 +182,6 @@ const Index = () => {
             <p className="text-white/70 text-sm">
               Family Farm Fresh • Locally Traceable • Climate Friendly
             </p>
-          </div>
-          <div className="flex justify-center">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate("/auth/admin")}
-              className="text-white/50 hover:text-white/70 text-xs"
-            >
-              Staff Portal
-            </Button>
           </div>
         </div>
       </footer>

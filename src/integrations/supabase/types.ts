@@ -394,6 +394,108 @@ export type Database = {
           },
         ]
       }
+      delivery_issues: {
+        Row: {
+          admin_notes: string | null
+          category: Database["public"]["Enums"]["issue_category"]
+          created_at: string
+          delivery_batch_id: string | null
+          description: string
+          id: string
+          latitude: number | null
+          longitude: number | null
+          order_id: string | null
+          photo_urls: string[] | null
+          reporter_id: string
+          reporter_type: string
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: Database["public"]["Enums"]["issue_severity"]
+          status: Database["public"]["Enums"]["issue_status"]
+          stop_id: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          admin_notes?: string | null
+          category: Database["public"]["Enums"]["issue_category"]
+          created_at?: string
+          delivery_batch_id?: string | null
+          description: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          order_id?: string | null
+          photo_urls?: string[] | null
+          reporter_id: string
+          reporter_type: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: Database["public"]["Enums"]["issue_severity"]
+          status?: Database["public"]["Enums"]["issue_status"]
+          stop_id?: string | null
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          admin_notes?: string | null
+          category?: Database["public"]["Enums"]["issue_category"]
+          created_at?: string
+          delivery_batch_id?: string | null
+          description?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          order_id?: string | null
+          photo_urls?: string[] | null
+          reporter_id?: string
+          reporter_type?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: Database["public"]["Enums"]["issue_severity"]
+          status?: Database["public"]["Enums"]["issue_status"]
+          stop_id?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_issues_delivery_batch_id_fkey"
+            columns: ["delivery_batch_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_issues_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_issues_stop_id_fkey"
+            columns: ["stop_id"]
+            isOneToOne: false
+            referencedRelation: "batch_stops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_issues_stop_id_fkey"
+            columns: ["stop_id"]
+            isOneToOne: false
+            referencedRelation: "driver_batch_stops"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_issues_stop_id_fkey"
+            columns: ["stop_id"]
+            isOneToOne: false
+            referencedRelation: "driver_batch_stops_secure"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delivery_proofs: {
         Row: {
           batch_stop_id: string
@@ -457,25 +559,31 @@ export type Database = {
           created_at: string
           driver_id: string
           feedback: string | null
+          feedback_tags: Json | null
           id: string
           order_id: string
           rating: number
+          reviewer_type: string | null
         }
         Insert: {
           created_at?: string
           driver_id: string
           feedback?: string | null
+          feedback_tags?: Json | null
           id?: string
           order_id: string
           rating: number
+          reviewer_type?: string | null
         }
         Update: {
           created_at?: string
           driver_id?: string
           feedback?: string | null
+          feedback_tags?: Json | null
           id?: string
           order_id?: string
           rating?: number
+          reviewer_type?: string | null
         }
         Relationships: [
           {
@@ -740,6 +848,61 @@ export type Database = {
           },
         ]
       }
+      farm_ratings: {
+        Row: {
+          consumer_id: string
+          created_at: string | null
+          farm_profile_id: string
+          feedback: string | null
+          feedback_tags: Json | null
+          id: string
+          order_id: string
+          rating: number
+        }
+        Insert: {
+          consumer_id: string
+          created_at?: string | null
+          farm_profile_id: string
+          feedback?: string | null
+          feedback_tags?: Json | null
+          id?: string
+          order_id: string
+          rating: number
+        }
+        Update: {
+          consumer_id?: string
+          created_at?: string | null
+          farm_profile_id?: string
+          feedback?: string | null
+          feedback_tags?: Json | null
+          id?: string
+          order_id?: string
+          rating?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "farm_ratings_consumer_id_fkey"
+            columns: ["consumer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "farm_ratings_farm_profile_id_fkey"
+            columns: ["farm_profile_id"]
+            isOneToOne: false
+            referencedRelation: "farm_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "farm_ratings_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       inventory_reservations: {
         Row: {
           consumer_id: string
@@ -843,6 +1006,71 @@ export type Database = {
             columns: ["collection_point_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      order_item_ratings: {
+        Row: {
+          consumer_id: string
+          created_at: string | null
+          farm_profile_id: string
+          feedback: string | null
+          feedback_tags: Json | null
+          id: string
+          order_item_id: string
+          product_id: string
+          rating: number
+        }
+        Insert: {
+          consumer_id: string
+          created_at?: string | null
+          farm_profile_id: string
+          feedback?: string | null
+          feedback_tags?: Json | null
+          id?: string
+          order_item_id: string
+          product_id: string
+          rating: number
+        }
+        Update: {
+          consumer_id?: string
+          created_at?: string | null
+          farm_profile_id?: string
+          feedback?: string | null
+          feedback_tags?: Json | null
+          id?: string
+          order_item_id?: string
+          product_id?: string
+          rating?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_item_ratings_consumer_id_fkey"
+            columns: ["consumer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_item_ratings_farm_profile_id_fkey"
+            columns: ["farm_profile_id"]
+            isOneToOne: false
+            referencedRelation: "farm_profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_item_ratings_order_item_id_fkey"
+            columns: ["order_item_id"]
+            isOneToOne: false
+            referencedRelation: "order_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_item_ratings_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
             referencedColumns: ["id"]
           },
         ]
@@ -1753,6 +1981,8 @@ export type Database = {
         }[]
       }
       get_driver_rating: { Args: { p_driver_id: string }; Returns: number }
+      get_farm_rating: { Args: { p_farm_profile_id: string }; Returns: number }
+      get_product_rating: { Args: { p_product_id: string }; Returns: number }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1774,6 +2004,23 @@ export type Database = {
     }
     Enums: {
       app_role: "consumer" | "farmer" | "lead_farmer" | "driver" | "admin"
+      issue_category:
+        | "delivery_delay"
+        | "vehicle_problem"
+        | "customer_unavailable"
+        | "wrong_address"
+        | "damaged_product"
+        | "missing_items"
+        | "collection_point_issue"
+        | "weather_condition"
+        | "other"
+      issue_severity: "low" | "medium" | "high" | "critical"
+      issue_status:
+        | "open"
+        | "acknowledged"
+        | "in_progress"
+        | "resolved"
+        | "dismissed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1902,6 +2149,25 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["consumer", "farmer", "lead_farmer", "driver", "admin"],
+      issue_category: [
+        "delivery_delay",
+        "vehicle_problem",
+        "customer_unavailable",
+        "wrong_address",
+        "damaged_product",
+        "missing_items",
+        "collection_point_issue",
+        "weather_condition",
+        "other",
+      ],
+      issue_severity: ["low", "medium", "high", "critical"],
+      issue_status: [
+        "open",
+        "acknowledged",
+        "in_progress",
+        "resolved",
+        "dismissed",
+      ],
     },
   },
 } as const

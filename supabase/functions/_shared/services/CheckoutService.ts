@@ -592,17 +592,39 @@ export class CheckoutService {
   }
 
   private async updateInventory(cartItems: any[], requestId: string): Promise<void> {
-    // Batch update inventory using RPC or individual updates in parallel
-    const updatePromises = cartItems.map(item => {
-      const product = item.products as any;
-      return this.supabase
-        .from('products')
-        .update({ available_quantity: product.available_quantity - item.quantity })
-        .eq('id', item.product_id);
+    // CRITICAL FIX: Use atomic decrement to prevent inventory race conditions
+    // Previously: SELECT quantity, then UPDATE quantity - item.quantity (RACE CONDITION!)
+    // Now: UPDATE quantity = quantity - N (ATOMIC OPERATION)
+    //
+    // WHY THIS MATTERS:
+    // - Scenario: Product has 10 units. Two customers buy 5 each simultaneously.
+    // - OLD BUG: Both read 10, both set to 5, final inventory = 5 (should be 0!)
+    // - NEW FIX: Both decrement by 5, final inventory = 0 (correct!)
+    //
+    // The database handles the subtraction atomically, preventing overselling.
+    
+    const updatePromises = cartItems.map(async item => {
+      const { data, error } = await this.supabase.rpc('decrement_product_quantity', {
+        product_id: item.product_id,
+        decrement_by: item.quantity
+      });
+      
+      if (error) {
+        console.error(`[${requestId}] [CHECKOUT] Failed to update inventory for product ${item.product_id}:`, error);
+        throw new CheckoutError('INVENTORY_ERROR', `Failed to update inventory: ${error.message}`);
+      }
+      
+      // Check if the decrement resulted in negative inventory (overselling)
+      if (data && data.new_quantity < 0) {
+        console.error(`[${requestId}] [CHECKOUT] Overselling detected for product ${item.product_id}: new_quantity=${data.new_quantity}`);
+        throw new CheckoutError('INSUFFICIENT_INVENTORY', `Product ${item.product_id} is out of stock`);
+      }
+      
+      return data;
     });
     
     await Promise.all(updatePromises);
-    console.log(`[${requestId}] [CHECKOUT] Updated inventory for ${cartItems.length} products`);
+    console.log(`[${requestId}] [CHECKOUT] ✅ Atomically updated inventory for ${cartItems.length} products`);
   }
 
   private async redeemCredits(userId: string, orderId: string, creditsUsed: number, requestId: string): Promise<void> {

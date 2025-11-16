@@ -40,14 +40,36 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
 
   console.log(`[${requestId}] Driver ${user.id} claiming batch ${input.batch_id}`);
 
-    const { data: batch, error: loadErr } = await supabase
+    // ATOMIC OPERATION: Use UPDATE with WHERE conditions to prevent race condition
+    // This ensures only one driver can successfully claim a batch
+    const { data: updatedBatch, error: updateErr } = await supabase
       .from('delivery_batches')
-      .select('id, status, driver_id')
+      .update({ driver_id: user.id, status: 'assigned' })
       .eq('id', input.batch_id)
+      .eq('status', 'pending')        // Only update if still pending
+      .is('driver_id', null)           // Only update if no driver assigned
+      .select()
       .single();
 
-    if (loadErr || !batch) {
-      console.warn(`[${requestId}] Batch not found: ${input.batch_id}`);
+    if (updateErr) {
+      // Check if it's a "no rows returned" error (batch was already claimed)
+      if (updateErr.code === 'PGRST116') {
+        console.warn(`[${requestId}] Batch ${input.batch_id} already claimed or not available`);
+        return new Response(
+          JSON.stringify({
+            error: 'BATCH_UNAVAILABLE',
+            message: 'Batch is not available for claiming',
+          }),
+          { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      console.error(`[${requestId}] Failed to assign batch:`, updateErr);
+      throw new Error(`Failed to assign batch: ${updateErr.message}`);
+    }
+
+    if (!updatedBatch) {
+      console.warn(`[${requestId}] Batch ${input.batch_id} not found`);
       return new Response(
         JSON.stringify({
           error: 'BATCH_NOT_FOUND',
@@ -55,27 +77,6 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
         }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
-    }
-
-    if (batch.status !== 'pending' || batch.driver_id !== null) {
-      console.warn(`[${requestId}] Batch unavailable: status=${batch.status}, driver=${batch.driver_id}`);
-      return new Response(
-        JSON.stringify({
-          error: 'BATCH_UNAVAILABLE',
-          message: 'Batch is not available for claiming',
-        }),
-        { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const { error: updateErr } = await supabase
-      .from('delivery_batches')
-      .update({ driver_id: user.id, status: 'assigned' })
-      .eq('id', input.batch_id);
-
-    if (updateErr) {
-      console.error(`[${requestId}] Failed to assign batch:`, updateErr);
-      throw new Error(`Failed to assign batch: ${updateErr.message}`);
     }
 
   console.log(`[${requestId}] ✅ Batch ${input.batch_id} assigned to driver ${user.id}`);

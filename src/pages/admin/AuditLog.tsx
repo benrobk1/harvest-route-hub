@@ -29,6 +29,8 @@ interface AuditLogEntry {
 }
 
 const AuditLog = () => {
+  const navigate = useNavigate();
+  
   const { data: logs, isLoading } = useQuery({
     queryKey: adminQueries.auditLogs(),
     queryFn: async () => {
@@ -83,8 +85,6 @@ const AuditLog = () => {
   if (isLoading) {
     return <div className="flex items-center justify-center min-h-screen">Loading audit log...</div>;
   }
-
-  const navigate = useNavigate();
 
   return (
     <div className="container mx-auto p-6">

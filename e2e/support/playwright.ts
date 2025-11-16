@@ -2,8 +2,15 @@
  * Shared Playwright test helpers that gracefully skip in environments
  * where the Playwright dependency is unavailable (such as offline CI).
  */
-let test: any;
-let expect: any;
+import type { TestType, Expect } from '@playwright/test';
+
+// Define types for Playwright's test and expect
+type PlaywrightTest = typeof import('@playwright/test').test;
+type PlaywrightExpect = typeof import('@playwright/test').expect;
+
+// Conditional types: use real Playwright types when available, fallback otherwise
+let test: PlaywrightTest;
+let expect: PlaywrightExpect;
 let hasPlaywright = true;
 
 try {
@@ -13,11 +20,15 @@ try {
 } catch (error) {
   hasPlaywright = false;
   const bun = await import('bun:test');
-  const skipTest = (title: string, fn?: (...args: any[]) => unknown) => bun.test.skip(title, fn as any);
+  
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const skipTest = (title: string, fn?: (...args: unknown[]) => unknown) => bun.test.skip(title, fn as any);
   const noop = () => {};
 
+  // Use Proxy for cleaner stub implementation while maintaining type safety
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const stubTest: any = new Proxy(
-    (title: string, fn?: (...args: any[]) => unknown) => skipTest(title, fn),
+    (title: string, fn?: (...args: unknown[]) => unknown) => skipTest(title, fn),
     {
       get(target, prop) {
         if (prop === 'describe') {
@@ -51,10 +62,12 @@ try {
     }
   );
 
-  test = stubTest;
-  expect = () => {
+  test = stubTest as PlaywrightTest;
+  
+  // Type the expect stub to match Playwright's expect interface
+  expect = (() => {
     throw new Error('Playwright expect is unavailable in this environment.');
-  };
+  }) as PlaywrightExpect;
 }
 
 export { test, expect, hasPlaywright };

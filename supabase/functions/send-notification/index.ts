@@ -17,6 +17,20 @@ import type { SupabaseServiceRoleContext } from "../_shared/middleware/withSupab
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
+/**
+ * Escapes HTML special characters to prevent HTML injection
+ * @param text - The text to escape
+ * @returns The escaped text safe for HTML insertion
+ */
+function escapeHtml(text: string): string {
+  const htmlEscapeMap: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+  };
+  return text.replace(/[&<>]/g, (char) => htmlEscapeMap[char] || char);
+}
+
 const NotificationSchema = z.object({
   event_type: z.enum([
     "order_confirmation",
@@ -192,7 +206,7 @@ const handler = stack(async (_req, ctx) => {
           <p>You've just received <strong>$${Number(data.amount ?? 0).toFixed(2)}</strong> in Blue Harvests credits.</p>
           <div style="background: #ecfdf5; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #10b981;">
             <p><strong>New Balance:</strong> $${Number(data.new_balance ?? 0).toFixed(2)}</p>
-            ${data.description ? `<p><strong>Reason:</strong> ${data.description}</p>` : ""}
+            ${data.description ? `<p><strong>Reason:</strong> ${escapeHtml(String(data.description))}</p>` : ""}
             ${data.expires_at ? `<p><strong>Expires:</strong> ${new Date(String(data.expires_at)).toLocaleDateString()}</p>` : ""}
           </div>
           <p>Apply your credits at checkout to save on your next order.</p>

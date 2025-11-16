@@ -46,11 +46,17 @@ const handler = stack(async (_req, ctx) => {
     throw pendingOrdersError;
   }
 
+  // Filter carts to only those updated in the last 7 days to avoid unbounded table scan
+  const recentDate = new Date();
+  recentDate.setDate(recentDate.getDate() - 7);
+  const recentDateISO = recentDate.toISOString();
+
   const { data: cartsWithItems, error: cartsError } = await supabase
     .from("cart_items")
     .select(
       `cart_id, shopping_carts ( consumer_id, profiles (email) )`,
-    );
+    )
+    .gte("shopping_carts.updated_at", recentDateISO);
 
   if (cartsError) {
     console.error(
@@ -95,16 +101,23 @@ const handler = stack(async (_req, ctx) => {
 
   for (const consumerId of consumersToNotify) {
     try {
-      await supabase.functions.invoke("send-notification", {
-        body: {
-          event_type: "cutoff_reminder",
-          recipient_id: consumerId,
-          recipient_email: consumerEmails.get(consumerId),
-          data: {
-            delivery_date: tomorrowDate,
+      const { error: notifyError } = await supabase.functions.invoke(
+        "send-notification",
+        {
+          body: {
+            event_type: "cutoff_reminder",
+            recipient_id: consumerId,
+            recipient_email: consumerEmails.get(consumerId),
+            data: {
+              delivery_date: tomorrowDate,
+            },
           },
         },
-      });
+      );
+
+      if (notifyError) {
+        throw notifyError;
+      }
 
       results.reminders_sent += 1;
     } catch (error) {

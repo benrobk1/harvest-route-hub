@@ -515,8 +515,8 @@ const handler = stack(async (_req, ctx) => {
             return {
               ...order,
               address,
-              latitude: order.latitude ?? fallback.latitude,
-              longitude: order.longitude ?? fallback.longitude
+              latitude: profile?.latitude ?? fallback.latitude,
+              longitude: profile?.longitude ?? fallback.longitude
             };
           }
 
@@ -706,52 +706,9 @@ const handler = stack(async (_req, ctx) => {
           errors.push({ batch_id: batch.id, error: updateError.message });
         }
 
-        if (batch.lead_farmer_id) {
-          console.log(`[${requestId}] [GENERATE-BATCHES] Calculating lead farmer commission for batch ${batch.id}`);
-
-          const { data: leadFarmerProfile } = await supabaseClient
-            .from('profiles')
-            .select('commission_rate')
-            .eq('id', batch.lead_farmer_id)
-            .single();
-
-          const commissionRate = leadFarmerProfile?.commission_rate || 5.0;
-
-          const { data: batchOrderItems } = await supabaseClient
-            .from('order_items')
-            .select(`
-              subtotal,
-              products!inner(
-                farm_profiles!inner(farmer_id)
-              )
-            `)
-            .in('order_id', orderIds);
-
-          let commissionableAmount = 0;
-          batchOrderItems?.forEach((item: any) => {
-            const farmerId = item.products?.farm_profiles?.farmer_id;
-            if (farmerId && farmerId !== batch.lead_farmer_id) {
-              commissionableAmount += Number(item.subtotal);
-            }
-          });
-
-          const commissionAmount = commissionableAmount * (commissionRate / 100);
-
-          if (commissionAmount > 0) {
-            await supabaseClient
-              .from('payouts')
-              .insert({
-                recipient_id: batch.lead_farmer_id,
-                recipient_type: 'lead_farmer_commission',
-                amount: commissionAmount,
-                status: 'pending',
-                description: `Lead farmer commission (${commissionRate}%) for batch ${nextBatchNumber}`,
-                order_id: orderIds[0]
-              });
-
-            console.log(`[${requestId}] [GENERATE-BATCHES] Created lead farmer commission payout: $${commissionAmount.toFixed(2)}`);
-          }
-        }
+        // Note: Lead farmer commission calculation is handled by the lead-farmer 
+        // assignment process, not here. Batches are created with lead_farmer_id: null
+        // and commission is computed only after a lead farmer is actually assigned.
 
         batchesCreated.push({
           batch_id: batch.id,

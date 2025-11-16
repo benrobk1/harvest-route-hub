@@ -5,13 +5,12 @@ const SENSITIVE_KEYS = new Set([
   'token',
   'password',
   'secret',
-  'apiKey',
   'apikey',
   'authorization',
   'access_token',
   'refresh_token',
-  'accessToken',
-  'refreshToken',
+  'accesstoken',
+  'refreshtoken',
 ]);
 
 /**
@@ -43,7 +42,7 @@ function redactSensitiveData(obj: unknown): unknown {
   const redacted: Record<string, unknown> = {};
   for (const [key, value] of entries) {
     const lowerKey = key.toLowerCase();
-    if (SENSITIVE_KEYS.has(lowerKey) || SENSITIVE_KEYS.has(key)) {
+    if (SENSITIVE_KEYS.has(lowerKey)) {
       redacted[key] = '[REDACTED]';
     } else if (typeof value === 'object' && value !== null) {
       redacted[key] = redactSensitiveData(value);

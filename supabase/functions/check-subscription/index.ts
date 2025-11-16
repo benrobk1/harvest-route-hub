@@ -118,17 +118,21 @@ const handler = stack(async (_req, ctx) => {
 
   const subscriptions = await stripe.subscriptions.list({
     customer: customerId,
-    status: 'active',
+    status: 'all',
     limit: 1,
   });
 
-  const hasActiveSub = subscriptions.data.length > 0;
+  // Filter for active or trialing subscriptions only
+  const validSubscription = subscriptions.data.find(
+    sub => sub.status === 'active' || sub.status === 'trialing'
+  );
+  const hasActiveSub = validSubscription !== undefined;
   let subscriptionEnd: string | null = null;
   let trialEnd: string | null = null;
   let isTrialing = false;
 
-  if (hasActiveSub) {
-    const subscription = subscriptions.data[0];
+  if (hasActiveSub && validSubscription) {
+    const subscription = validSubscription;
     subscriptionEnd = new Date(subscription.current_period_end * 1000).toISOString();
     isTrialing = subscription.status === 'trialing';
 

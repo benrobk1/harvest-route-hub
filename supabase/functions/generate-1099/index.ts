@@ -67,6 +67,47 @@ const handler = stack(async (_req, ctx) => {
     throw new Error("Recipient has not submitted tax information");
   }
 
+  // Validate tax_id_type is present to avoid runtime errors
+  if (!profile.tax_id_type) {
+    throw new Error("Recipient tax ID type is missing");
+  }
+
+  // Validate tax_id_last4 is present for recipient verification
+  if (!profile.tax_id_last4) {
+    throw new Error("Recipient tax ID last 4 digits not available");
+  }
+
+  // Load payer information from company_settings
+  const { data: payerInfo, error: payerError } = await supabase
+    .from("company_settings")
+    .select("legal_name, tax_id")
+    .single();
+
+  if (payerError || !payerInfo) {
+    console.error(
+      `[${requestId}] [GENERATE-1099] Failed to load payer information`,
+      payerError,
+    );
+    throw new Error("Failed to load payer information");
+  }
+
+  // Validate that required payer fields are non-empty
+  const missingFields: string[] = [];
+  if (!payerInfo.legal_name || !payerInfo.legal_name.trim()) {
+    missingFields.push("legal_name");
+  }
+  if (!payerInfo.tax_id || !payerInfo.tax_id.trim()) {
+    missingFields.push("tax_id");
+  }
+
+  if (missingFields.length > 0) {
+    console.error(
+      `[${requestId}] [GENERATE-1099] Missing required payer fields: ${missingFields.join(", ")}`,
+      { legal_name: payerInfo.legal_name, tax_id: payerInfo.tax_id },
+    );
+    throw new Error("Failed to load payer information");
+  }
+
   const { data: payouts, error: payoutsError } = await supabase
     .from("payouts")
     .select("amount, description, created_at")
@@ -131,8 +172,8 @@ const handler = stack(async (_req, ctx) => {
   });
 
   page.drawText("PAYER:", { x: 50, y: height - 120, size: fontSize, font: boldFont });
-  page.drawText("Blue Harvests Inc.", { x: 50, y: height - 135, size: fontSize, font });
-  page.drawText("Tax ID: XX-XXXXXXX", { x: 50, y: height - 150, size: fontSize, font });
+  page.drawText(payerInfo.legal_name, { x: 50, y: height - 135, size: fontSize, font });
+  page.drawText(`Tax ID: ${payerInfo.tax_id}`, { x: 50, y: height - 150, size: fontSize, font });
 
   page.drawText("RECIPIENT:", {
     x: 350,
@@ -146,15 +187,17 @@ const handler = stack(async (_req, ctx) => {
     size: fontSize,
     font,
   });
-  page.drawText(
-    `${profile.tax_id_type.toUpperCase()}: XXX-XX-${profile.tax_id_encrypted.slice(-4)}`,
-    {
-      x: 350,
-      y: height - 150,
-      size: fontSize,
-      font,
-    },
-  );
+
+  // Use tax_id_last4 for recipient verification on 1099 forms
+  const taxIdType = profile.tax_id_type.toUpperCase();
+  const taxIdDisplay = `${taxIdType}: XXX-XX-${profile.tax_id_last4}`;
+
+  page.drawText(taxIdDisplay, {
+    x: 350,
+    y: height - 150,
+    size: fontSize,
+    font,
+  });
 
   if (profile.tax_address) {
     const addressLines = String(profile.tax_address).split("\n");

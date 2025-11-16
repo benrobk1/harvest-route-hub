@@ -18,7 +18,7 @@ export const useCart = () => {
     queryFn: async () => {
       if (!user) return null;
 
-      let { data: existingCart, error: fetchError } = await supabase
+      const { data: existingCart, error: fetchError } = await supabase
         .from('shopping_carts')
         .select(`
           *,

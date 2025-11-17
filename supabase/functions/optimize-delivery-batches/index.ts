@@ -1,20 +1,20 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { loadConfig } from '../_shared/config.ts';
 import { RATE_LIMITS } from '../_shared/constants.ts';
 import { OptimizeBatchesRequestSchema } from '../_shared/contracts/optimization.ts';
 import { BatchOptimizationService } from '../_shared/services/BatchOptimizationService.ts';
-import { 
-  withRequestId, 
-  withCORS, 
+import {
+  withRequestId,
+  withCORS,
+  withSupabaseServiceRole,
   withAdminAuth,
   withValidation,
   withRateLimit,
-  withErrorHandling, 
+  withErrorHandling,
   createMiddlewareStack,
   type RequestIdContext,
   type CORSContext,
   type AuthContext,
+  type SupabaseServiceRoleContext,
   type ValidationContext
 } from '../_shared/middleware/index.ts';
 
@@ -27,14 +27,17 @@ import {
  */
 
 type OptimizeBatchesInput = { delivery_date: string };
-type Context = RequestIdContext & CORSContext & AuthContext & ValidationContext<OptimizeBatchesInput>;
+type Context = RequestIdContext &
+  CORSContext &
+  AuthContext &
+  SupabaseServiceRoleContext &
+  ValidationContext<OptimizeBatchesInput>;
 
 /**
  * Main handler with middleware composition
  */
 const handler = async (req: Request, ctx: Context): Promise<Response> => {
-  const config = loadConfig();
-  const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey);
+  const { supabase } = ctx;
   const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
   const { delivery_date } = ctx.input;
 
@@ -61,6 +64,7 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
 const middlewareStack = createMiddlewareStack<Context>([
   withRequestId,
   withCORS,
+  withSupabaseServiceRole,
   withAdminAuth,
   withRateLimit(RATE_LIMITS.OPTIMIZE_BATCHES),
   withValidation(OptimizeBatchesRequestSchema),

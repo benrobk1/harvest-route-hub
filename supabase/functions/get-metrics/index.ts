@@ -1,19 +1,19 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { loadConfig } from '../_shared/config.ts';
 import { RATE_LIMITS } from '../_shared/constants.ts';
-import { 
-  withRequestId, 
-  withCORS, 
+import {
+  withRequestId,
+  withCORS,
   withAdminAuth,
+  withSupabaseServiceRole,
   withRateLimit,
-  withErrorHandling, 
+  withErrorHandling,
   withMetrics,
   createMiddlewareStack,
   type RequestIdContext,
   type CORSContext,
   type AuthContext,
-  type MetricsContext
+  type MetricsContext,
+  type SupabaseServiceRoleContext,
 } from '../_shared/middleware/index.ts';
 
 /**
@@ -36,7 +36,11 @@ type MetricsSummary = {
   last_hour_requests: number;
 };
 
-type Context = RequestIdContext & CORSContext & AuthContext & MetricsContext;
+type Context = RequestIdContext &
+  CORSContext &
+  AuthContext &
+  MetricsContext &
+  SupabaseServiceRoleContext;
 
 /**
  * Main handler with middleware composition
@@ -44,13 +48,6 @@ type Context = RequestIdContext & CORSContext & AuthContext & MetricsContext;
 const handler = async (req: Request, ctx: Context): Promise<Response> => {
   ctx.metrics.mark('metrics_fetch_started');
   
-  const config = loadConfig();
-  const supabase = createClient(
-    config.supabase.url,
-    config.supabase.serviceRoleKey,
-    { auth: { persistSession: false } }
-  );
-
   const url = new URL(req.url);
   const timeRange = url.searchParams.get('range') || '24h'; // 1h, 24h, 7d, 30d
   const functionName = url.searchParams.get('function');
@@ -142,6 +139,7 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
 const middlewareStack = createMiddlewareStack<Context>([
   withRequestId,
   withCORS,
+  withSupabaseServiceRole,
   withAdminAuth,
   withRateLimit(RATE_LIMITS.CHECK_SUBSCRIPTION),
   withMetrics('get-metrics'),

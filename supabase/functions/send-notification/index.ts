@@ -15,7 +15,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { Resend } from "https://esm.sh/resend@2.0.0";
-import { loadConfig } from '../_shared/config.ts';
 import { RATE_LIMITS } from '../_shared/constants.ts';
 import { SendNotificationRequestSchema, type SendNotificationRequest } from '../_shared/contracts/notifications.ts';
 import {
@@ -26,24 +25,27 @@ import {
   withRateLimit,
   withValidation,
   withErrorHandling,
+  withSupabaseServiceRole,
   type RequestIdContext,
   type CORSContext,
   type AuthContext,
   type ValidationContext,
+  type SupabaseServiceRoleContext,
 } from '../_shared/middleware/index.ts';
 
 // Context type includes all middleware contexts
-type Context = RequestIdContext & CORSContext & AuthContext & ValidationContext<SendNotificationRequest>;
+type Context = RequestIdContext &
+  CORSContext &
+  AuthContext &
+  ValidationContext<SendNotificationRequest> &
+  SupabaseServiceRoleContext;
 
 // Main handler with middleware-injected context
 const handler = async (req: Request, ctx: Context): Promise<Response> => {
-  const { requestId, corsHeaders, user, supabase, input } = ctx;
+  const { requestId, corsHeaders, user, supabase, input, config } = ctx;
   const { event_type, recipient_id, recipient_email, data } = input;
 
   console.log(`[${requestId}] Sending notification:`, { event_type, recipient_id });
-
-  // Load config for email templates
-  const config = loadConfig();
 
   // Get recipient email if not provided
   let toEmail = recipient_email;
@@ -280,6 +282,7 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
 const middlewareStack = createMiddlewareStack<Context>([
   withRequestId,
   withCORS,
+  withSupabaseServiceRole,
   withAuth,
   withRateLimit(RATE_LIMITS.SEND_NOTIFICATION),
   withValidation(SendNotificationRequestSchema),

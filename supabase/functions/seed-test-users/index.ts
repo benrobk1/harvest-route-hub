@@ -1,15 +1,15 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { loadConfig } from '../_shared/config.ts';
-import { 
-  withRequestId, 
-  withCORS, 
-  withErrorHandling, 
+import {
+  withRequestId,
+  withCORS,
+  withErrorHandling,
   withMetrics,
+  withSupabaseServiceRole,
   createMiddlewareStack,
   type RequestIdContext,
   type CORSContext,
-  type MetricsContext
+  type MetricsContext,
+  type SupabaseServiceRoleContext
 } from '../_shared/middleware/index.ts';
 
 /**
@@ -26,7 +26,7 @@ interface TestUser {
   full_name: string;
 }
 
-type Context = RequestIdContext & CORSContext & MetricsContext;
+type Context = RequestIdContext & CORSContext & MetricsContext & SupabaseServiceRoleContext;
 
 /**
  * Main handler with middleware composition
@@ -34,7 +34,7 @@ type Context = RequestIdContext & CORSContext & MetricsContext;
 const handler = async (req: Request, ctx: Context): Promise<Response> => {
   ctx.metrics.mark('seeding_started');
   
-  const config = loadConfig();
+  const { config, supabase: supabaseAdmin } = ctx;
   
   // Simple secret check for one-time seeding
   const authHeader = req.headers.get('authorization');
@@ -51,17 +51,6 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
       }
     );
   }
-
-  const supabaseAdmin = createClient(
-    config.supabase.url,
-    config.supabase.serviceRoleKey,
-    {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    }
-  );
 
   const testUsers: TestUser[] = [
     { email: 'test-consumer@example.com', password: 'password123', role: 'consumer', full_name: 'Test Consumer' },
@@ -138,6 +127,7 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
 const middlewareStack = createMiddlewareStack<Context>([
   withRequestId,
   withCORS,
+  withSupabaseServiceRole,
   withMetrics('seed-test-users'),
   withErrorHandling
 ]);

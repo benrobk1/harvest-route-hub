@@ -7,8 +7,6 @@
  */
 
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { loadConfig } from '../_shared/config.ts';
 import { RATE_LIMITS } from '../_shared/constants.ts';
 import { ClaimRouteRequestSchema } from '../_shared/contracts/index.ts';
 import {
@@ -19,24 +17,27 @@ import {
   withRateLimit,
   withValidation,
   withErrorHandling,
+  withSupabaseServiceRole,
   createMiddlewareStack,
   type RequestIdContext,
   type CORSContext,
   type AuthContext,
   type ValidationContext,
+  type SupabaseServiceRoleContext,
 } from '../_shared/middleware/index.ts';
 
 type ClaimRouteInput = {
   batch_id: string;
 };
 
-type Context = RequestIdContext & CORSContext & AuthContext & ValidationContext<ClaimRouteInput>;
+type Context = RequestIdContext &
+  CORSContext &
+  AuthContext &
+  ValidationContext<ClaimRouteInput> &
+  SupabaseServiceRoleContext;
 
 const handler = async (req: Request, ctx: Context): Promise<Response> => {
-  const { requestId, corsHeaders, user, input } = ctx;
-  
-  const config = loadConfig();
-  const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey);
+  const { requestId, corsHeaders, user, input, supabase } = ctx;
 
   console.log(`[${requestId}] Driver ${user.id} claiming batch ${input.batch_id}`);
 
@@ -94,6 +95,7 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
 const middlewareStack = createMiddlewareStack<Context>([
   withRequestId,
   withCORS,
+  withSupabaseServiceRole,
   withAuth,
   withDriverAuth,
   withRateLimit(RATE_LIMITS.CLAIM_ROUTE),

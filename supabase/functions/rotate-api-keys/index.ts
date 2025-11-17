@@ -1,19 +1,19 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { loadConfig } from '../_shared/config.ts';
 import { RATE_LIMITS } from '../_shared/constants.ts';
-import { 
-  withRequestId, 
-  withCORS, 
+import {
+  withRequestId,
+  withCORS,
   withAdminAuth,
   withRateLimit,
   withErrorHandling,
   withMetrics,
+  withSupabaseServiceRole,
   createMiddlewareStack,
   type RequestIdContext,
   type CORSContext,
   type AuthContext,
-  type MetricsContext
+  type MetricsContext,
+  type SupabaseServiceRoleContext
 } from '../_shared/middleware/index.ts';
 import {
   rotateAPIKey,
@@ -29,17 +29,16 @@ import {
  * Supports rotation, expiration, and status checking.
  */
 
-type Context = RequestIdContext & CORSContext & AuthContext & MetricsContext;
+type Context = RequestIdContext &
+  CORSContext &
+  AuthContext &
+  MetricsContext &
+  SupabaseServiceRoleContext;
 
 const handler = async (req: Request, ctx: Context): Promise<Response> => {
   ctx.metrics.mark('api_key_rotation_started');
   
-  const config = loadConfig();
-  const supabase = createClient(
-    config.supabase.url,
-    config.supabase.serviceRoleKey,
-    { auth: { persistSession: false } }
-  );
+  const { config, supabase } = ctx;
 
   const url = new URL(req.url);
   const action = url.searchParams.get('action') || 'status';
@@ -117,6 +116,7 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
 const middlewareStack = createMiddlewareStack<Context>([
   withRequestId,
   withCORS,
+  withSupabaseServiceRole,
   withAdminAuth,
   withRateLimit(RATE_LIMITS.CHECK_SUBSCRIPTION),
   withMetrics('rotate-api-keys'),

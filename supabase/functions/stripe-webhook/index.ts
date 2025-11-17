@@ -14,21 +14,21 @@
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import Stripe from 'https://esm.sh/stripe@18.5.0';
-import { loadConfig } from '../_shared/config.ts';
-import { 
-  withRequestId, 
-  withCORS, 
-  withErrorHandling, 
+import {
+  withRequestId,
+  withCORS,
+  withErrorHandling,
   withMetrics,
+  withSupabaseServiceRole,
   createMiddlewareStack,
   type RequestIdContext,
   type CORSContext,
-  type MetricsContext
+  type MetricsContext,
+  type SupabaseServiceRoleContext
 } from '../_shared/middleware/index.ts';
 
-type Context = RequestIdContext & CORSContext & MetricsContext;
+type Context = RequestIdContext & CORSContext & MetricsContext & SupabaseServiceRoleContext;
 
 /**
  * Main webhook handler with middleware composition
@@ -36,28 +36,28 @@ type Context = RequestIdContext & CORSContext & MetricsContext;
 const handler = async (req: Request, ctx: Context): Promise<Response> => {
   ctx.metrics.mark('webhook_received');
   
-  const config = loadConfig();
+  const { config, corsHeaders, requestId, supabase } = ctx;
   const stripeSecretKey = config.stripe?.secretKey || Deno.env.get('STRIPE_SECRET_KEY');
   const webhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET');
 
   if (!stripeSecretKey) {
-    console.error(`[${ctx.requestId}] ❌ STRIPE_SECRET_KEY not configured`);
+    console.error(`[${requestId}] ❌ STRIPE_SECRET_KEY not configured`);
     return new Response(
-      JSON.stringify({ error: 'Stripe configuration missing', code: 'CONFIG_ERROR' }), 
-      { 
+      JSON.stringify({ error: 'Stripe configuration missing', code: 'CONFIG_ERROR' }),
+      {
         status: 500,
-        headers: { ...ctx.corsHeaders, 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   }
 
   if (!webhookSecret) {
-    console.error(`[${ctx.requestId}] ❌ STRIPE_WEBHOOK_SECRET not configured`);
+    console.error(`[${requestId}] ❌ STRIPE_WEBHOOK_SECRET not configured`);
     return new Response(
-      JSON.stringify({ error: 'Webhook secret missing', code: 'CONFIG_ERROR' }), 
-      { 
+      JSON.stringify({ error: 'Webhook secret missing', code: 'CONFIG_ERROR' }),
+      {
         status: 500,
-        headers: { ...ctx.corsHeaders, 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   }
@@ -70,13 +70,13 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
   // Verify webhook signature
   const signature = req.headers.get('stripe-signature');
   if (!signature) {
-    console.error(`[${ctx.requestId}] ❌ Missing stripe-signature header`);
+    console.error(`[${requestId}] ❌ Missing stripe-signature header`);
     ctx.metrics.mark('signature_missing');
     return new Response(
-      JSON.stringify({ error: 'Missing signature', code: 'INVALID_SIGNATURE' }), 
-      { 
+      JSON.stringify({ error: 'Missing signature', code: 'INVALID_SIGNATURE' }),
+      {
         status: 400,
-        headers: { ...ctx.corsHeaders, 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   }
@@ -86,23 +86,21 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
 
   try {
     event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
-    console.log(`[${ctx.requestId}] ✅ Signature verified: ${event.type}`);
+    console.log(`[${requestId}] ✅ Signature verified: ${event.type}`);
     ctx.metrics.mark('signature_verified');
   } catch (err: any) {
-    console.error(`[${ctx.requestId}] ❌ Signature verification failed: ${err.message}`);
+    console.error(`[${requestId}] ❌ Signature verification failed: ${err.message}`);
     ctx.metrics.mark('signature_failed');
     return new Response(
-      JSON.stringify({ error: `Webhook Error: ${err.message}`, code: 'INVALID_SIGNATURE' }), 
-      { 
+      JSON.stringify({ error: `Webhook Error: ${err.message}`, code: 'INVALID_SIGNATURE' }),
+      {
         status: 400,
-        headers: { ...ctx.corsHeaders, 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   }
 
   // Idempotency check
-  const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey);
-
   const { data: existingEvent } = await supabase
     .from('stripe_webhook_events')
     .select('id')
@@ -110,13 +108,13 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
     .single();
 
   if (existingEvent) {
-    console.log(`[${ctx.requestId}] ⚠️ Event ${event.id} already processed, skipping`);
+    console.log(`[${requestId}] ⚠️ Event ${event.id} already processed, skipping`);
     ctx.metrics.mark('event_duplicate');
     return new Response(
-      JSON.stringify({ received: true, skipped: true }), 
-      { 
+      JSON.stringify({ received: true, skipped: true }),
+      {
         status: 200,
-        headers: { ...ctx.corsHeaders, 'Content-Type': 'application/json' }
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   }
@@ -131,20 +129,20 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
 
   if (insertError) {
     if (insertError.code === '23505') {
-      console.log(`[${ctx.requestId}] ⚠️ Event ${event.id} being processed concurrently`);
+      console.log(`[${requestId}] ⚠️ Event ${event.id} being processed concurrently`);
       ctx.metrics.mark('event_concurrent');
       return new Response(
-        JSON.stringify({ received: true, skipped: true }), 
-        { 
+        JSON.stringify({ received: true, skipped: true }),
+        {
           status: 200,
-          headers: { ...ctx.corsHeaders, 'Content-Type': 'application/json' }
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
     }
     throw insertError;
   }
 
-  console.log(`[${ctx.requestId}] 📝 Event ${event.id} recorded, processing...`);
+  console.log(`[${requestId}] 📝 Event ${event.id} recorded, processing...`);
   ctx.metrics.mark('event_processing');
 
   // Handle events
@@ -216,6 +214,7 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
 const middlewareStack = createMiddlewareStack<Context>([
   withRequestId,
   withCORS,
+  withSupabaseServiceRole,
   withMetrics('stripe-webhook'),
   withErrorHandling
 ]);

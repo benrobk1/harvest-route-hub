@@ -1,18 +1,17 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { loadConfig } from '../_shared/config.ts';
 import { RATE_LIMITS } from '../_shared/constants.ts';
 import { BatchGenerationService } from '../_shared/services/BatchGenerationService.ts';
 import {
   withRequestId,
   withCORS,
-  withAuth,
+  withSupabaseServiceRole,
   withAdminAuth,
   withRateLimit,
   withErrorHandling,
   createMiddlewareStack,
   type RequestIdContext,
   type CORSContext,
+  type SupabaseServiceRoleContext,
   type AuthContext,
 } from '../_shared/middleware/index.ts';
 
@@ -27,13 +26,13 @@ import {
  * RequestId + CORS + Auth + AdminAuth + RateLimit + ErrorHandling
  */
 
-type Context = RequestIdContext & CORSContext & AuthContext;
+type Context = RequestIdContext &
+  CORSContext &
+  AuthContext &
+  SupabaseServiceRoleContext;
 
 const handler = async (req: Request, ctx: Context): Promise<Response> => {
-  const { requestId, corsHeaders } = ctx;
-  
-  const config = loadConfig();
-  const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey);
+  const { requestId, corsHeaders, supabase, config } = ctx;
 
   console.log(`[${requestId}] Starting batch generation...`);
 
@@ -415,7 +414,7 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
 const middlewareStack = createMiddlewareStack<Context>([
   withRequestId,
   withCORS,
-  withAuth,
+  withSupabaseServiceRole,
   withAdminAuth,
   withRateLimit(RATE_LIMITS.GENERATE_BATCHES),
   withErrorHandling,

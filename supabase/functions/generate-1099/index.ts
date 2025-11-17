@@ -1,23 +1,23 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { PDFDocument, rgb, StandardFonts } from "https://esm.sh/pdf-lib@1.17.1";
-import { loadConfig } from '../_shared/config.ts';
 import { RATE_LIMITS } from '../_shared/constants.ts';
 import { Generate1099RequestSchema } from '../_shared/contracts/admin.ts';
-import { 
-  withRequestId, 
-  withCORS, 
+import {
+  withRequestId,
+  withCORS,
   withAdminAuth,
   withValidation,
   withRateLimit,
-  withErrorHandling, 
+  withErrorHandling,
   withMetrics,
+  withSupabaseServiceRole,
   createMiddlewareStack,
   type RequestIdContext,
   type CORSContext,
   type AuthContext,
   type MetricsContext,
-  type ValidationContext
+  type ValidationContext,
+  type SupabaseServiceRoleContext
 } from '../_shared/middleware/index.ts';
 
 /**
@@ -32,7 +32,12 @@ type Generate1099Request = {
   recipient_id: string;
 };
 
-type Context = RequestIdContext & CORSContext & AuthContext & MetricsContext & ValidationContext<Generate1099Request>;
+type Context = RequestIdContext &
+  CORSContext &
+  AuthContext &
+  MetricsContext &
+  ValidationContext<Generate1099Request> &
+  SupabaseServiceRoleContext;
 
 /**
  * Main handler with middleware composition
@@ -40,12 +45,11 @@ type Context = RequestIdContext & CORSContext & AuthContext & MetricsContext & V
 const handler = async (req: Request, ctx: Context): Promise<Response> => {
   ctx.metrics.mark('generation_started');
   
-  const config = loadConfig();
-  const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey);
+  const { config, supabase, input, corsHeaders, requestId } = ctx;
 
-  const { year, recipient_id } = ctx.input;
-  
-  console.log(`[${ctx.requestId}] Generating 1099 for recipient ${recipient_id}, year ${year}`);
+  const { year, recipient_id } = input;
+
+  console.log(`[${requestId}] Generating 1099 for recipient ${recipient_id}, year ${year}`);
   
   // Fetch recipient tax info
   const { data: profile, error: profileError } = await supabase
@@ -55,14 +59,14 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
     .single();
   
   if (profileError || !profile?.tax_id_encrypted) {
-    console.error(`[${ctx.requestId}] ❌ No tax info for recipient ${recipient_id}`);
+    console.error(`[${requestId}] ❌ No tax info for recipient ${recipient_id}`);
     ctx.metrics.mark('no_tax_info');
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       error: 'Recipient has not submitted tax information',
       code: 'NO_TAX_INFO'
     }), {
       status: 400,
-      headers: { ...ctx.corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
   
@@ -79,14 +83,14 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
   
   // Only generate 1099 if total >= $600 (IRS threshold)
   if (totalAmount < 600) {
-    console.log(`[${ctx.requestId}] ✅ Below threshold: $${totalAmount}`);
+    console.log(`[${requestId}] ✅ Below threshold: $${totalAmount}`);
     ctx.metrics.mark('below_threshold');
-    return new Response(JSON.stringify({ 
+    return new Response(JSON.stringify({
       below_threshold: true,
       message: `Total earnings $${totalAmount.toFixed(2)} below $600 threshold. 1099 not required.`,
       total: totalAmount
     }), {
-      headers: { ...ctx.corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
   }
@@ -172,12 +176,12 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
   const pdfBytes = await pdfDoc.save();
   const buffer = new Uint8Array(pdfBytes);
   
-  console.log(`[${ctx.requestId}] ✅ Generated 1099-NEC for ${recipient_id}: $${totalAmount.toFixed(2)}`);
+  console.log(`[${requestId}] ✅ Generated 1099-NEC for ${recipient_id}: $${totalAmount.toFixed(2)}`);
   ctx.metrics.mark('pdf_generated');
-  
+
   return new Response(buffer, {
     headers: {
-      ...ctx.corsHeaders,
+      ...corsHeaders,
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="1099-NEC-${year}-${recipient_id.slice(0, 8)}.pdf"`,
     },
@@ -188,6 +192,7 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
 const middlewareStack = createMiddlewareStack<Context>([
   withRequestId,
   withCORS,
+  withSupabaseServiceRole,
   withAdminAuth,
   withValidation(Generate1099RequestSchema),
   withRateLimit(RATE_LIMITS.GENERATE_1099),

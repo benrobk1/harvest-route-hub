@@ -7,15 +7,14 @@
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Stripe from "https://esm.sh/stripe@18.5.0";
-import { loadConfig } from '../_shared/config.ts';
 import { RATE_LIMITS } from '../_shared/constants.ts';
 import { PayoutService } from '../_shared/services/PayoutService.ts';
 import {
   withRequestId,
   withCORS,
   withAuth,
+  withSupabaseServiceRole,
   withAdminAuth,
   withRateLimit,
   withErrorHandling,
@@ -23,15 +22,16 @@ import {
   type RequestIdContext,
   type CORSContext,
   type AuthContext,
+  type SupabaseServiceRoleContext,
 } from '../_shared/middleware/index.ts';
 
-type Context = RequestIdContext & CORSContext & AuthContext;
+type Context = RequestIdContext &
+  CORSContext &
+  AuthContext &
+  SupabaseServiceRoleContext;
 
 const handler = async (req: Request, ctx: Context): Promise<Response> => {
-  const { requestId, corsHeaders } = ctx;
-  
-  const config = loadConfig();
-  const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey);
+  const { requestId, corsHeaders, config, supabase } = ctx;
 
   console.log(`[${requestId}] Processing pending payouts`);
 
@@ -62,6 +62,7 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
 const middlewareStack = createMiddlewareStack<Context>([
   withRequestId,
   withCORS,
+  withSupabaseServiceRole,
   withAuth,
   withAdminAuth,
   withRateLimit(RATE_LIMITS.PROCESS_PAYOUTS),

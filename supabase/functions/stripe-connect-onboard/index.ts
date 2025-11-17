@@ -1,21 +1,21 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import Stripe from "https://esm.sh/stripe@18.5.0";
-import { loadConfig } from '../_shared/config.ts';
 import { RATE_LIMITS } from '../_shared/constants.ts';
 import { StripeConnectOnboardRequestSchema } from '../_shared/contracts/stripe.ts';
-import { 
-  withRequestId, 
-  withCORS, 
+import {
+  withRequestId,
+  withCORS,
   withAuth,
   withValidation,
   withRateLimit,
-  withErrorHandling, 
+  withErrorHandling,
+  withSupabaseServiceRole,
   createMiddlewareStack,
   type RequestIdContext,
   type CORSContext,
   type AuthContext,
-  type ValidationContext
+  type ValidationContext,
+  type SupabaseServiceRoleContext
 } from '../_shared/middleware/index.ts';
 
 /**
@@ -26,16 +26,17 @@ import {
  */
 
 type StripeConnectOnboardInput = { origin?: string; returnPath?: string };
-type Context = RequestIdContext & CORSContext & AuthContext & ValidationContext<StripeConnectOnboardInput>;
+type Context = RequestIdContext &
+  CORSContext &
+  AuthContext &
+  ValidationContext<StripeConnectOnboardInput> &
+  SupabaseServiceRoleContext;
 
 /**
  * Main handler with middleware composition
  */
 const handler = async (req: Request, ctx: Context): Promise<Response> => {
-  const config = loadConfig();
-  const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey);
-  const user = ctx.user;
-  const body = ctx.input;
+  const { config, supabase, user, input: body } = ctx;
 
   // Verify user is farmer or driver
   const { data: userRoles, error: rolesError } = await supabase
@@ -128,6 +129,7 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
 const middlewareStack = createMiddlewareStack<Context>([
   withRequestId,
   withCORS,
+  withSupabaseServiceRole,
   withAuth,
   withRateLimit(RATE_LIMITS.STRIPE_CONNECT_ONBOARD),
   withValidation(StripeConnectOnboardRequestSchema),

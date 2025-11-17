@@ -8,14 +8,13 @@
  */
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
-import { loadConfig } from '../_shared/config.ts';
 import { RATE_LIMITS } from '../_shared/constants.ts';
 import {
   withRequestId,
   withCORS,
   withAuth,
+  withSupabaseServiceRole,
   withRateLimit,
   withValidation,
   withErrorHandling,
@@ -24,6 +23,7 @@ import {
   type CORSContext,
   type AuthContext,
   type ValidationContext,
+  type SupabaseServiceRoleContext,
 } from '../_shared/middleware/index.ts';
 
 const ReportIssueSchema = z.object({
@@ -50,13 +50,14 @@ const ReportIssueSchema = z.object({
 });
 
 type ReportIssueInput = z.infer<typeof ReportIssueSchema>;
-type Context = RequestIdContext & CORSContext & AuthContext & ValidationContext<ReportIssueInput>;
+type Context = RequestIdContext &
+  CORSContext &
+  AuthContext &
+  SupabaseServiceRoleContext &
+  ValidationContext<ReportIssueInput>;
 
 const handler = async (req: Request, ctx: Context): Promise<Response> => {
-  const { requestId, corsHeaders, user, input } = ctx;
-  
-  const config = loadConfig();
-  const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey);
+  const { requestId, corsHeaders, user, input, supabase } = ctx;
 
   // Check user role
   const { data: isDriver } = await supabase.rpc('has_role', {
@@ -197,6 +198,7 @@ async function notifyAdmins(supabase: any, issue: any, requestId: string) {
 const middlewareStack = createMiddlewareStack<Context>([
   withRequestId,
   withCORS,
+  withSupabaseServiceRole,
   withAuth,
   withRateLimit(RATE_LIMITS.REPORT_ISSUE),
   withValidation(ReportIssueSchema),

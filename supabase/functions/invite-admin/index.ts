@@ -1,19 +1,19 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { Resend } from "https://esm.sh/resend@4.0.0";
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
-import { loadConfig } from '../_shared/config.ts';
-import { 
-  withRequestId, 
-  withCORS, 
+import {
+  withRequestId,
+  withCORS,
   withAdminAuth,
   withValidation,
-  withErrorHandling, 
+  withErrorHandling,
+  withSupabaseServiceRole,
   createMiddlewareStack,
   type RequestIdContext,
   type CORSContext,
   type AuthContext,
-  type ValidationContext
+  type ValidationContext,
+  type SupabaseServiceRoleContext
 } from '../_shared/middleware/index.ts';
 
 /**
@@ -32,18 +32,20 @@ const InviteRequestSchema = z.object({
 
 type InviteRequest = z.infer<typeof InviteRequestSchema>;
 
-type Context = RequestIdContext & CORSContext & AuthContext & ValidationContext<InviteRequest>;
+type Context = RequestIdContext &
+  CORSContext &
+  AuthContext &
+  ValidationContext<InviteRequest> &
+  SupabaseServiceRoleContext;
 
 /**
  * Main handler with middleware composition
  */
 const handler = async (req: Request, ctx: Context): Promise<Response> => {
-  const config = loadConfig();
-  const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey);
-  const user = ctx.user;
-  const { email } = ctx.input;
+  const { config, supabase, user, input, corsHeaders, requestId } = ctx;
+  const { email } = input;
 
-  console.log(`[${ctx.requestId}] [INVITE-ADMIN] Processing invitation for ${email}`);
+  console.log(`[${requestId}] [INVITE-ADMIN] Processing invitation for ${email}`);
 
   // Check if user already exists
   const { data: existingProfile } = await supabase
@@ -57,7 +59,7 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
       JSON.stringify({ error: "User already exists. Please assign the role directly." }),
       {
         status: 400,
-        headers: { ...ctx.corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
   }
@@ -84,7 +86,7 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
     });
 
   if (insertError) {
-    console.error(`[${ctx.requestId}] [INVITE-ADMIN] Error storing invitation:`, insertError);
+    console.error(`[${requestId}] [INVITE-ADMIN] Error storing invitation:`, insertError);
     throw new Error("Failed to create invitation");
   }
 
@@ -112,7 +114,7 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
     `,
   });
 
-  console.log(`[${ctx.requestId}] [INVITE-ADMIN] Email sent successfully:`, emailResponse);
+  console.log(`[${requestId}] [INVITE-ADMIN] Email sent successfully:`, emailResponse);
 
   // Log admin action
   await supabase.rpc("log_admin_action", {
@@ -120,16 +122,16 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
     _new_value: { email, expires_at: expiresAt.toISOString() },
   });
 
-  console.log(`[${ctx.requestId}] [INVITE-ADMIN] ✅ Success`);
+  console.log(`[${requestId}] [INVITE-ADMIN] ✅ Success`);
 
   return new Response(
     JSON.stringify({ 
       success: true, 
-      message: `Invitation sent to ${email}. They have 7 days to accept.` 
+      message: `Invitation sent to ${email}. They have 7 days to accept.`
     }),
     {
       status: 200,
-      headers: { ...ctx.corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     }
   );
 };
@@ -138,6 +140,7 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
 const middlewareStack = createMiddlewareStack<Context>([
   withRequestId,
   withCORS,
+  withSupabaseServiceRole,
   withAdminAuth,
   withValidation(InviteRequestSchema),
   withErrorHandling

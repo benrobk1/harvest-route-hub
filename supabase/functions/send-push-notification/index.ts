@@ -1,21 +1,21 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { loadConfig } from '../_shared/config.ts';
 import { RATE_LIMITS } from '../_shared/constants.ts';
 import { SendPushNotificationRequestSchema } from '../_shared/contracts/notifications.ts';
-import { 
-  withRequestId, 
-  withCORS, 
+import {
+  withRequestId,
+  withCORS,
   withAuth,
   withValidation,
   withRateLimit,
-  withErrorHandling, 
+  withErrorHandling,
   withMetrics,
+  withSupabaseServiceRole,
   createMiddlewareStack,
   type RequestIdContext,
   type CORSContext,
   type AuthContext,
   type MetricsContext,
+  type SupabaseServiceRoleContext,
   type ValidationContext
 } from '../_shared/middleware/index.ts';
 
@@ -34,7 +34,12 @@ type SendPushRequest = {
   data?: Record<string, any>;
 };
 
-type Context = RequestIdContext & CORSContext & AuthContext & MetricsContext & ValidationContext<SendPushRequest>;
+type Context = RequestIdContext &
+  CORSContext &
+  AuthContext &
+  MetricsContext &
+  ValidationContext<SendPushRequest> &
+  SupabaseServiceRoleContext;
 
 /**
  * Main handler with middleware composition
@@ -42,8 +47,7 @@ type Context = RequestIdContext & CORSContext & AuthContext & MetricsContext & V
 const handler = async (req: Request, ctx: Context): Promise<Response> => {
   ctx.metrics.mark('notification_requested');
   
-  const config = loadConfig();
-  const supabase = createClient(config.supabase.url, config.supabase.serviceRoleKey);
+  const { supabase } = ctx;
 
   const { user_id, title, body: messageBody, data } = ctx.input;
 
@@ -117,6 +121,7 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
 const middlewareStack = createMiddlewareStack<Context>([
   withRequestId,
   withCORS,
+  withSupabaseServiceRole,
   withAuth,
   withValidation(SendPushNotificationRequestSchema),
   withRateLimit(RATE_LIMITS.SEND_PUSH_NOTIFICATION),

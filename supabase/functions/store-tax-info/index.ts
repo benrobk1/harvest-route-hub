@@ -12,7 +12,6 @@
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { loadConfig } from '../_shared/config.ts';
 import { RATE_LIMITS } from '../_shared/constants.ts';
 import { StoreTaxInfoRequestSchema, type StoreTaxInfoRequest } from '../_shared/contracts/index.ts';
 import { TaxInfoService } from '../_shared/services/TaxInfoService.ts';
@@ -24,23 +23,28 @@ import {
   withRateLimit,
   withValidation,
   withErrorHandling,
+  withSupabaseServiceRole,
   type RequestIdContext,
   type CORSContext,
   type AuthContext,
   type ValidationContext,
+  type SupabaseServiceRoleContext,
 } from '../_shared/middleware/index.ts';
 
 // Context type includes all middleware contexts
-type Context = RequestIdContext & CORSContext & AuthContext & ValidationContext<StoreTaxInfoRequest>;
+type Context = RequestIdContext &
+  CORSContext &
+  AuthContext &
+  ValidationContext<StoreTaxInfoRequest> &
+  SupabaseServiceRoleContext;
 
 // Main handler with middleware-injected context
 const handler = async (req: Request, ctx: Context): Promise<Response> => {
-  const { requestId, corsHeaders, user, supabase, input } = ctx;
+  const { requestId, corsHeaders, user, supabase, input, config } = ctx;
 
   console.log(`[${requestId}] Storing tax info for user ${user.id}`);
 
   // BUSINESS LOGIC
-  const config = loadConfig();
   const taxInfoService = new TaxInfoService(supabase, config);
 
   await taxInfoService.storeTaxInfo(
@@ -63,6 +67,7 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
 const middlewareStack = createMiddlewareStack<Context>([
   withRequestId,
   withCORS,
+  withSupabaseServiceRole,
   withAuth,
   withRateLimit(RATE_LIMITS.TAX_INFO),
   withValidation(StoreTaxInfoRequestSchema),

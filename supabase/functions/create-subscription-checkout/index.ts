@@ -1,23 +1,23 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import Stripe from 'https://esm.sh/stripe@18.5.0';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
-import { loadConfig } from '../_shared/config.ts';
 import { RATE_LIMITS } from '../_shared/constants.ts';
-import { 
-  withRequestId, 
-  withCORS, 
+import {
+  withRequestId,
+  withCORS,
   withAuth,
   withValidation,
   withRateLimit,
-  withErrorHandling, 
+  withErrorHandling,
   withMetrics,
+  withSupabaseServiceRole,
   createMiddlewareStack,
   type RequestIdContext,
   type CORSContext,
   type AuthContext,
   type MetricsContext,
-  type ValidationContext
+  type ValidationContext,
+  type SupabaseServiceRoleContext
 } from '../_shared/middleware/index.ts';
 
 /**
@@ -34,7 +34,12 @@ const CreateSubscriptionCheckoutSchema = z.object({
 
 type CreateSubscriptionCheckoutRequest = z.infer<typeof CreateSubscriptionCheckoutSchema>;
 
-type Context = RequestIdContext & CORSContext & AuthContext & MetricsContext & ValidationContext<CreateSubscriptionCheckoutRequest>;
+type Context = RequestIdContext &
+  CORSContext &
+  AuthContext &
+  MetricsContext &
+  ValidationContext<CreateSubscriptionCheckoutRequest> &
+  SupabaseServiceRoleContext;
 
 /**
  * Main handler with middleware composition
@@ -42,8 +47,7 @@ type Context = RequestIdContext & CORSContext & AuthContext & MetricsContext & V
 const handler = async (req: Request, ctx: Context): Promise<Response> => {
   ctx.metrics.mark('checkout_creation_started');
   
-  const config = loadConfig();
-  const user = ctx.user;
+  const { config, user } = ctx;
   
   if (!user.email) {
     throw new Error('User email not available');
@@ -111,6 +115,7 @@ const middlewareStack = createMiddlewareStack<Context>([
   withAuth,
   withValidation(CreateSubscriptionCheckoutSchema),
   withRateLimit(RATE_LIMITS.CREATE_SUBSCRIPTION),
+  withSupabaseServiceRole,
   withMetrics('create-subscription-checkout'),
   withErrorHandling
 ]);

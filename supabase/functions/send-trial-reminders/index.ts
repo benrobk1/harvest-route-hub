@@ -1,15 +1,15 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { loadConfig } from '../_shared/config.ts';
-import { 
-  withRequestId, 
-  withCORS, 
-  withErrorHandling, 
+import {
+  withRequestId,
+  withCORS,
+  withErrorHandling,
   withMetrics,
+  withSupabaseServiceRole,
   createMiddlewareStack,
   type RequestIdContext,
   type CORSContext,
-  type MetricsContext
+  type MetricsContext,
+  type SupabaseServiceRoleContext
 } from '../_shared/middleware/index.ts';
 
 /**
@@ -19,7 +19,7 @@ import {
  * Runs daily via pg_cron to notify users 7 days before trial ends.
  */
 
-type Context = RequestIdContext & CORSContext & MetricsContext;
+type Context = RequestIdContext & CORSContext & MetricsContext & SupabaseServiceRoleContext;
 
 /**
  * Main handler with middleware composition
@@ -27,11 +27,7 @@ type Context = RequestIdContext & CORSContext & MetricsContext;
 const handler = async (req: Request, ctx: Context): Promise<Response> => {
   ctx.metrics.mark('trial_check_started');
   
-  const config = loadConfig();
-  const supabaseClient = createClient(
-    config.supabase.url,
-    config.supabase.serviceRoleKey
-  );
+  const { supabase: supabaseClient } = ctx;
 
   console.log(`[${ctx.requestId}] Checking for expiring trials...`);
 
@@ -110,6 +106,7 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
 const middlewareStack = createMiddlewareStack<Context>([
   withRequestId,
   withCORS,
+  withSupabaseServiceRole,
   withMetrics('send-trial-reminders'),
   withErrorHandling
 ]);

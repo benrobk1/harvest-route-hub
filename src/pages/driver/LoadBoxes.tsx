@@ -10,6 +10,17 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Package, CheckCircle2, Truck } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { Database } from "@/integrations/supabase/types";
+
+type BatchStopWithOrder = Database["public"]["Tables"]["batch_stops"]["Row"] & {
+  orders: { id: string; box_code: string | null } | null;
+};
+
+type BatchOrdersData = {
+  id: string;
+  batch_number: number;
+  batch_stops: BatchStopWithOrder[] | null;
+};
 
 export default function LoadBoxes() {
   const { batchId } = useParams<{ batchId: string }>();
@@ -34,6 +45,7 @@ export default function LoadBoxes() {
             )
           )
         `)
+        .returns<BatchOrdersData>()
         .eq("id", batchId)
         .single();
 
@@ -125,8 +137,13 @@ export default function LoadBoxes() {
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
-            {batchData?.batch_stops?.map((stop: any) => {
-              const boxCode = stop.orders.box_code;
+            {batchData?.batch_stops?.map((stop) => {
+              const boxCode = stop.orders?.box_code;
+
+              if (!boxCode) {
+                return null;
+              }
+
               const isLoaded = loadedBoxes.has(boxCode);
               return (
                 <div

@@ -1,3 +1,5 @@
+import type { FarmerProfileWithUser } from '@/repositories/interfaces/IProductRepository';
+
 /**
  * PRODUCTS DOMAIN TYPES
  * Shared type definitions for products across the application
@@ -29,7 +31,7 @@ export interface ProductWithFarmer extends Product {
 
 export interface ShopData {
   products: Product[];
-  farmerData: Record<string, any>;
+  farmerData: Record<string, FarmerProfileWithUser>;
   consumerProfile: {
     zip_code: string | null;
   } | null;

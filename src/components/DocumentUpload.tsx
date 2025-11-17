@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, X } from 'lucide-react';
 import { useEffect } from 'react';
+import { getErrorMessage } from '@/lib/errors/getErrorMessage';
 
 interface DocumentUploadProps {
   userId: string;
@@ -109,11 +110,11 @@ export const DocumentUpload = ({ userId, documentType, currentUrl, onUploadCompl
       setCurrentPath(fileName);
       setPreviewUrl(null); // Reset preview, will regenerate on next render
       onUploadComplete?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Upload error:', error);
       toast({
         title: 'Upload failed',
-        description: error.message || 'Failed to upload document',
+        description: getErrorMessage(error) || 'Failed to upload document',
         variant: 'destructive',
       });
     } finally {
@@ -150,11 +151,11 @@ export const DocumentUpload = ({ userId, documentType, currentUrl, onUploadCompl
       setPreviewUrl(null);
       setCurrentPath(null);
       onUploadComplete?.();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Remove error:', error);
       toast({
         title: 'Failed to remove',
-        description: error.message,
+        description: getErrorMessage(error),
         variant: 'destructive',
       });
     }
@@ -175,7 +176,7 @@ export const DocumentUpload = ({ userId, documentType, currentUrl, onUploadCompl
         
         if (error) throw error;
         setPreviewUrl(data?.signedUrl || null);
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Error loading preview:', error);
       }
     };

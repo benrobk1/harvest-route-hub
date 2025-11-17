@@ -62,10 +62,11 @@ const AdminAuth = () => {
       // Wait for AuthContext to load roles before navigating
       await new Promise(resolve => setTimeout(resolve, 500));
       navigate("/admin/dashboard");
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Invalid credentials";
       toast({
         title: "Login failed",
-        description: error.message || "Invalid credentials",
+        description: message,
         variant: "destructive",
       });
     } finally {
@@ -99,10 +100,11 @@ const AdminAuth = () => {
         title: "Account created",
         description: "Please contact an administrator to activate your admin access.",
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Could not create account";
       toast({
         title: "Sign up failed",
-        description: error.message || "Could not create account",
+        description: message,
         variant: "destructive",
       });
     } finally {

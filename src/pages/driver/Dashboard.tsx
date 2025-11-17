@@ -20,6 +20,50 @@ import { RouteDensityMap, driverQueries } from "@/features/drivers";
 import { IssueReporter } from "@/features/drivers/components/IssueReporter";
 import { useNavigate } from "react-router-dom";
 import { User } from "lucide-react";
+import type { Database } from "@/integrations/supabase/types";
+
+type DriverBatchStopSecure = Database["public"]["Views"]["driver_batch_stops_secure"]["Row"];
+type DriverActiveBatch = {
+  id: string;
+  driver_batch_stops_secure: DriverBatchStopSecure[] | null;
+};
+
+type OrderNameLookup = {
+  id: string;
+  profiles: { full_name: string | null } | null;
+};
+
+type ManifestOrderItem = {
+  quantity: number;
+  products: { name: string | null; unit: string | null } | null;
+};
+
+type ManifestStop = {
+  sequence_number: number;
+  address: string | null;
+  notes: string | null;
+  estimated_arrival: string | null;
+  orders: {
+    box_code: string | null;
+    profiles: { full_name: string | null; phone: string | null } | null;
+    order_items: ManifestOrderItem[] | null;
+  } | null;
+};
+
+type ManifestBatch = {
+  batch_number: number;
+  delivery_date: string;
+  batch_stops: ManifestStop[] | null;
+};
+
+type ActiveRouteStop = {
+  id: string;
+  customer: string;
+  address: string | null;
+  status: string | null;
+  addressVisible: boolean;
+  isCollectionPoint: boolean;
+};
 
 const DriverDashboard = () => {
   const { user } = useAuth();
@@ -115,6 +159,7 @@ const DriverDashboard = () => {
             order_id
           )
         `)
+        .returns<DriverActiveBatch>()
         .eq('driver_id', user?.id)
         .in('status', ['assigned', 'in_progress'])
         .order('created_at', { ascending: false })
@@ -124,23 +169,27 @@ const DriverDashboard = () => {
       if (!batch) return [];
 
       // Get customer names separately (not in secure view)
-      const orderIds = batch.driver_batch_stops_secure?.map((s: any) => s.order_id) || [];
+      const orderIds = (batch.driver_batch_stops_secure ?? [])
+        .map(stop => stop.order_id)
+        .filter((id): id is string => Boolean(id));
       const { data: orders } = await supabase
         .from('orders')
         .select('id, profiles!inner(full_name)')
-        .in('id', orderIds);
+        .in('id', orderIds)
+        .returns<OrderNameLookup[]>();
 
       const orderMap = new Map(orders?.map(o => [o.id, o.profiles?.full_name]) || []);
 
       return batch.driver_batch_stops_secure
-        ?.sort((a: any, b: any) => a.sequence_number - b.sequence_number)
-        .map((stop: any) => ({
-          id: stop.id,
+        ?.sort((a, b) => (a.sequence_number ?? 0) - (b.sequence_number ?? 0))
+        .map<ActiveRouteStop>((stop) => ({
+          id: stop.id ?? '',
           customer: orderMap.get(stop.order_id) || 'Unknown',
           // Address already masked by secure view if not visible
           address: stop.street_address || stop.address,
           status: stop.status,
           addressVisible: !!stop.address_visible_at,
+          isCollectionPoint: stop.status === 'collection_point',
         })) || [];
     },
     enabled: !!user?.id,
@@ -266,6 +315,7 @@ const DriverDashboard = () => {
             )
           )
         `)
+        .returns<ManifestBatch>()
         .eq('id', batchId)
         .single();
 
@@ -284,7 +334,7 @@ const DriverDashboard = () => {
         .eq('id', user?.id)
         .single();
 
-      const sortedStops = (batch.batch_stops as any[])?.sort(
+      const sortedStops = [...(batch.batch_stops ?? [])].sort(
         (a, b) => a.sequence_number - b.sequence_number
       );
 
@@ -292,14 +342,14 @@ const DriverDashboard = () => {
         batchNumber: batch.batch_number.toString(),
         deliveryDate: format(new Date(batch.delivery_date), 'MMMM dd, yyyy'),
         driverName: driverProfile?.full_name || 'Driver',
-        totalStops: sortedStops?.length || 0,
-        stops: sortedStops?.map((stop: any) => ({
+        totalStops: sortedStops.length,
+        stops: sortedStops.map((stop) => ({
           sequence: stop.sequence_number,
           customerName: stop.orders?.profiles?.full_name || 'Customer',
           address: stop.address,
           phone: stop.orders?.profiles?.phone || null,
           boxCode: stop.orders?.box_code || null,
-          items: stop.orders?.order_items?.map((item: any) => ({
+          items: stop.orders?.order_items?.map((item) => ({
             name: item.products?.name || '',
             quantity: item.quantity,
             unit: item.products?.unit || '',
@@ -327,7 +377,7 @@ const DriverDashboard = () => {
     }
   };
   // Derived display values for Today's Earnings (use fallback estimates when no real payouts today)
-  const activeStopsCount = activeRoute?.filter((r: any) => !r.isCollectionPoint).length || 0;
+  const activeStopsCount = activeRoute?.filter((r) => !r.isCollectionPoint).length || 0;
   const usingFallbackToday = (earnings?.today.total || 0) === 0 && activeStopsCount > 0;
   const todayGross = usingFallbackToday ? activeStopsCount * FLAT_DELIVERY_FEE : (earnings?.today.total || 0);
   const todayTips = usingFallbackToday ? Math.round(activeStopsCount * FLAT_DELIVERY_FEE * 0.05) : (earnings?.today.tips || 0);

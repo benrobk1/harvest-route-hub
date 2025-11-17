@@ -42,7 +42,12 @@ export const mapOrderStatus = (dbStatus: string): OrderStatus => {
  * // "Apples, Carrots, +2 more (15 items total)"
  * ```
  */
-export const formatOrderItems = (items: any[]): string => {
+export type OrderItemSummary = {
+  quantity: number;
+  products: { name: string };
+};
+
+export const formatOrderItems = (items: OrderItemSummary[]): string => {
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const itemNames = items.map(item => item.products.name).slice(0, 2).join(', ');
   return items.length > 2 

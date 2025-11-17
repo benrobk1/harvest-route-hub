@@ -41,31 +41,44 @@ import { generateRouteManifestPDF, type RouteManifestData } from '@/lib/pdfGener
 import { useNavigate } from "react-router-dom";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import type { Database } from "@/integrations/supabase/types";
 
-interface BatchStop {
+type DriverBatchStopSecure = Database["public"]["Views"]["driver_batch_stops_secure"]["Row"];
+
+type OrderItemDetails = {
+  quantity: number;
+  products: { name: string | null; unit: string | null } | null;
+};
+
+type OrderDetails = {
   id: string;
-  address: string;
-  status: string;
+  box_code: string | null;
+  total_amount: number;
+  profiles: { full_name: string | null; phone: string | null } | null;
+  order_items: OrderItemDetails[] | null;
+};
+
+type BatchStop = {
+  id: string;
+  address: string | null;
+  status: string | null;
   sequence_number: number;
   estimated_arrival: string | null;
   notes: string | null;
-  orders: {
-    id: string;
-    box_code: string | null;
-    total_amount: number;
-    profiles: {
-      full_name: string;
-      phone: string | null;
-    };
-    order_items: Array<{
-      quantity: number;
-      products: {
-        name: string;
-        unit: string;
-      };
-    }>;
-  };
-}
+  order_id?: string | null;
+  orders: OrderDetails;
+};
+
+type RouteBatchResult = {
+  id: string;
+  batch_number: number;
+  delivery_date: string;
+  status: string;
+  lead_farmer_id: string | null;
+  batch_metadata: Array<{ collection_point_address: string | null }>; // join returns array
+  profiles: { full_name: string | null; farm_name: string | null } | null;
+  driver_batch_stops_secure: DriverBatchStopSecure[] | null;
+};
 
 export default function RouteDetails() {
   const { user } = useAuth();
@@ -116,6 +129,7 @@ export default function RouteDetails() {
           )
         `
         )
+        .returns<RouteBatchResult>()
         .eq("driver_id", user?.id)
         .in("status", ["assigned", "in_progress"])
         .order("created_at", { ascending: false })
@@ -137,7 +151,7 @@ export default function RouteDetails() {
           box_code: null,
           total_amount: 0,
           profiles: {
-            full_name: (data.profiles as any)?.farm_name || (data.profiles as any)?.full_name || 'Farm',
+            full_name: data.profiles?.farm_name || data.profiles?.full_name || 'Farm',
             phone: null
           },
           order_items: []
@@ -145,7 +159,9 @@ export default function RouteDetails() {
       };
 
       // Get order details separately
-      const orderIds = data.driver_batch_stops_secure?.map((s: any) => s.order_id) || [];
+      const orderIds = (data.driver_batch_stops_secure ?? [])
+        .map(stop => stop.order_id)
+        .filter((id): id is string => Boolean(id));
       const { data: orders } = await supabase
         .from('orders')
         .select(`
@@ -164,25 +180,36 @@ export default function RouteDetails() {
             )
           )
         `)
-        .in('id', orderIds);
+        .in('id', orderIds)
+        .returns<OrderDetails[]>();
 
       // Create order map for lookup
-      const orderMap = new Map(orders?.map(o => [o.id, o]) || []);
+      const orderMap = new Map((orders ?? []).map(o => [o.id, o]));
+
+      const fallbackOrder: OrderDetails = {
+        id: 'unknown-order',
+        box_code: null,
+        total_amount: 0,
+        profiles: { full_name: 'Customer', phone: null },
+        order_items: [],
+      };
 
       // Merge stop data with order data
-      const stopsWithOrders = data.driver_batch_stops_secure?.map((stop: any) => ({
+      const stopsWithOrders = (data.driver_batch_stops_secure ?? []).map<BatchStop>((stop) => ({
         ...stop,
-        orders: orderMap.get(stop.order_id)
+        address: stop.address,
+        status: stop.status,
+        orders: orderMap.get(stop.order_id ?? '') ?? fallbackOrder,
       }));
 
       // Sort stops by sequence
-      const sortedStops = stopsWithOrders?.sort(
+      const sortedStops = stopsWithOrders.sort(
         (a, b) => a.sequence_number - b.sequence_number
       );
 
       return {
         ...data,
-        batch_stops: [collectionPointStop, ...sortedStops] as BatchStop[],
+        batch_stops: [collectionPointStop, ...sortedStops],
       };
     },
     enabled: !!user?.id,
@@ -441,7 +468,7 @@ export default function RouteDetails() {
                     <span className="text-sm font-medium">Items to deliver:</span>
                   </div>
                   <ul className="space-y-1 text-sm text-muted-foreground">
-                    {stop.orders.order_items.map((item: any, idx: number) => (
+                    {stop.orders.order_items.map((item, idx) => (
                       <li key={idx}>
                         • {item.quantity} {item.products?.unit} {item.products?.name}
                       </li>

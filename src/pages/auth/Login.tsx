@@ -66,10 +66,11 @@ const Login = () => {
           if (error) throw error;
           lastError = null;
           break; // Success, exit retry loop
-        } catch (err: any) {
+        } catch (err) {
           lastError = err;
+          const message = err instanceof Error ? err.message : '';
           // If it's a network error and not the last attempt, retry
-          if (attempt < 1 && (err.message?.includes('fetch') || err.message?.includes('network'))) {
+          if (attempt < 1 && (message.includes('fetch') || message.includes('network'))) {
             await new Promise(resolve => setTimeout(resolve, 500));
             continue;
           }
@@ -102,8 +103,8 @@ const Login = () => {
       });
 
       handleSuccessfulLogin(roles);
-    } catch (error: any) {
-      const errorMsg = getAuthErrorMessage(error);
+    } catch (error: unknown) {
+      const errorMsg = getAuthErrorMessage(error instanceof Error ? error : new Error('Authentication failed'));
       setFormError(errorMsg);
       toast({
         title: errorMsg.title,

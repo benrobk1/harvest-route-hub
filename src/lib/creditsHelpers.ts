@@ -1,3 +1,5 @@
+import type { Database } from '@/integrations/supabase/types';
+
 /**
  * Credits System Helper Functions
  * 
@@ -114,7 +116,9 @@ export function calculateSubscriptionBonus(
  * @param ledger - Array of credit transactions
  * @returns Total credits earned this month (available next month)
  */
-export function calculateAvailableNextMonth(ledger: any[]): number {
+export type CreditsLedgerEntry = Database['public']['Tables']['credits_ledger']['Row'];
+
+export function calculateAvailableNextMonth(ledger: CreditsLedgerEntry[]): number {
   const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
   
   return ledger

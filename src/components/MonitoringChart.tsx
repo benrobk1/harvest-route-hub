@@ -14,6 +14,8 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
+type ChartDataValue = string | number | null | undefined;
+
 interface ChartConfig {
   [key: string]: {
     label: string;
@@ -21,9 +23,11 @@ interface ChartConfig {
   };
 }
 
+type ChartDataPoint = Record<string, ChartDataValue>;
+
 interface MonitoringChartProps {
   type: 'line' | 'area' | 'bar';
-  data: any[];
+  data: ChartDataPoint[];
   config: ChartConfig;
   dataKeys: string[];
   xAxisKey: string;
@@ -51,7 +55,7 @@ export function MonitoringChart({
             dataKey={xAxisKey}
             className="text-xs"
             tickFormatter={(value) => {
-              if (value.includes('T')) {
+              if (typeof value === 'string' && value.includes('T')) {
                 return new Date(value).toLocaleTimeString('en-US', {
                   hour: 'numeric',
                   minute: '2-digit',
@@ -87,7 +91,7 @@ export function MonitoringChart({
             dataKey={xAxisKey}
             className="text-xs"
             tickFormatter={(value) => {
-              if (value.includes('T')) {
+              if (typeof value === 'string' && value.includes('T')) {
                 return new Date(value).toLocaleTimeString('en-US', {
                   hour: 'numeric',
                   minute: '2-digit',

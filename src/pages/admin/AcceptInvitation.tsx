@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, Shield, ArrowLeft } from "lucide-react";
+import { getErrorMessage } from "@/lib/errors/getErrorMessage";
 
 const AcceptInvitation = () => {
   const [searchParams] = useSearchParams();
@@ -71,11 +72,11 @@ const AcceptInvitation = () => {
       setTimeout(() => {
         navigate("/auth/admin");
       }, 2000);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Error accepting invitation:", error);
       toast({
         title: "Failed to accept invitation",
-        description: error.message || "Please check your invitation link and try again",
+        description: getErrorMessage(error) || "Please check your invitation link and try again",
         variant: "destructive",
       });
     } finally {

@@ -9,6 +9,22 @@ import { Package } from "lucide-react";
 import { useState, useMemo } from "react";
 import { driverQueries } from "@/features/drivers";
 
+interface DeliveryBatchSummary {
+  id: string;
+  batch_number: number;
+  delivery_date: string;
+  status: string;
+  batch_stops: Array<{ count: number }>;
+  batch_metadata: Array<{
+    collection_point_address: string | null;
+    estimated_route_hours: number | null;
+  }>;
+  lead_farmer_profile: {
+    full_name: string | null;
+    zip_code: string | null;
+  } | null;
+}
+
 export function AvailableRoutes() {
   const { toast } = useToast();
   const [claimedRoutes, setClaimedRoutes] = useState<Set<string>>(new Set());
@@ -30,9 +46,9 @@ export function AvailableRoutes() {
     },
   });
 
-  const { data: availableBatches, refetch } = useQuery({
+  const { data: availableBatches, refetch } = useQuery<DeliveryBatchSummary[] | null>({
     queryKey: driverQueries.availableRoutes(),
-    queryFn: async () => {
+    queryFn: async (): Promise<DeliveryBatchSummary[] | null> => {
       const { data } = await supabase
         .from('delivery_batches')
         .select(`
@@ -53,8 +69,8 @@ export function AvailableRoutes() {
         .eq('status', 'pending')
         .is('driver_id', null)
         .gte('delivery_date', new Date().toISOString().split('T')[0]);
-      
-      return data;
+
+      return data as DeliveryBatchSummary[] | null;
     },
   });
 
@@ -62,7 +78,7 @@ export function AvailableRoutes() {
   const sortedBatches = useMemo(() => {
     if (!availableBatches) return [];
 
-    return [...availableBatches].sort((a: any, b: any) => {
+    return [...availableBatches].sort((a, b) => {
       // If no driver profile, use default sorting
       if (!driverProfile?.delivery_days) {
         return new Date(a.delivery_date).getTime() - new Date(b.delivery_date).getTime();
@@ -145,7 +161,7 @@ export function AvailableRoutes() {
             No available routes at this time. Check back later for new delivery batches.
           </p>
         ) : (
-          sortedBatches.map((batch: any) => (
+          sortedBatches.map((batch) => (
             <div key={batch.id} className="p-6 border rounded-lg hover:border-primary transition-colors bg-card space-y-4">
               <div className="flex items-center justify-between">
                 <div className="space-y-2">

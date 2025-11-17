@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { getErrorMessage } from "@/lib/errors/getErrorMessage";
 import { ArrowLeft, Loader2, XCircle, CheckCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
@@ -105,8 +106,8 @@ export default function FarmAffiliations() {
       setSelectedFarm("");
       setCommissionRate("2.0");
       queryClient.invalidateQueries({ queryKey: ["farm-affiliations"] });
-    } catch (error: any) {
-      toast.error(error.message);
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error));
     } finally {
       setIsAssigning(false);
     }

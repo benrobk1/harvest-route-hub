@@ -145,10 +145,11 @@ export * from './errors';
 
 ### TypeScript
 
-- **Strict mode enabled** - No implicit `any`
-- **Explicit return types** for public functions
-- **Interface over type** for object shapes
+- **Strict mode compliance** - Code must compile with `strict` enabled; do not weaken tsconfig settings for convenience
+- **`any` is exceptional** - Avoid the `any` type. When unavoidable, document why the escape hatch is needed and prefer narrower alternatives such as `unknown` + type guards
+- **Prefer explicit contracts** - Always add return types to exported functions/components and favor interfaces for object shapes
 - **Readonly arrays** for query keys
+- **Type safety first** - Guard against mixed runtime types (e.g., formatters that may receive numbers or strings) and keep data models aligned with platform types rather than loose records
 
 ```typescript
 // ✅ Good

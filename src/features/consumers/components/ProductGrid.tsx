@@ -1,13 +1,14 @@
 import ProductCard from '@/components/ProductCard';
 import ProductCardSkeleton from '@/components/ProductCardSkeleton';
 import { Product } from '@/features/products';
+import type { FarmerProfileWithUser } from '@/repositories/interfaces/IProductRepository';
 
 interface ProductGridProps {
   products: Product[];
   isLoading: boolean;
   searchQuery: string;
   onAddToCart: (product: Product, quantity: number) => void;
-  farmerData?: Record<string, any>;
+  farmerData?: Record<string, FarmerProfileWithUser>;
   consumerProfile?: { zip_code?: string } | null;
 }
 

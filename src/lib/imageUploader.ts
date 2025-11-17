@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { getErrorMessage } from '@/lib/errors/getErrorMessage';
 
 export interface ImageUploadResult {
   success: boolean;
@@ -58,15 +59,9 @@ export async function uploadImageFromUrl(
     const { data: urlData } = supabase.storage
       .from('product-images')
       .getPublicUrl(fileName);
-
-    const publicUrl = urlData?.publicUrl;
-    if (!publicUrl) {
-      return { success: false, error: 'Unable to retrieve uploaded image URL' };
-    }
-
-    return { success: true, url: publicUrl };
+    
+    return { success: true, url: urlData.publicUrl };
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error while uploading image';
-    return { success: false, error: errorMessage };
+    return { success: false, error: getErrorMessage(error) };
   }
 }

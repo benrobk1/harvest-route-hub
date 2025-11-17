@@ -4,8 +4,12 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
-import type { IProductRepository } from '../interfaces/IProductRepository';
+import type { IProductRepository, FarmerProfileWithUser } from '../interfaces/IProductRepository';
 import type { Product } from '@/features/products/types';
+import type { Database } from '@/integrations/supabase/types';
+
+type Profile = Database['public']['Tables']['profiles']['Row'];
+type MarketConfig = Database['public']['Tables']['market_configs']['Row'];
 
 export class SupabaseProductRepository implements IProductRepository {
   async getShopProducts(): Promise<Product[]> {
@@ -26,7 +30,9 @@ export class SupabaseProductRepository implements IProductRepository {
     return data as Product[];
   }
 
-  async getFarmerProfiles(farmProfileIds: string[]): Promise<Record<string, any>> {
+  async getFarmerProfiles(
+    farmProfileIds: string[],
+  ): Promise<Record<string, FarmerProfileWithUser>> {
     if (farmProfileIds.length === 0) return {};
 
     const { data } = await supabase
@@ -41,14 +47,18 @@ export class SupabaseProductRepository implements IProductRepository {
       `)
       .in('id', farmProfileIds);
 
-    const map: Record<string, any> = {};
-    data?.forEach(farm => {
-      map[farm.id] = farm;
+    const map: Record<string, FarmerProfileWithUser> = {};
+    data?.forEach((farm) => {
+      map[farm.id] = {
+        id: farm.id,
+        farmer_id: farm.farmer_id,
+        profiles: farm.profiles,
+      };
     });
     return map;
   }
 
-  async getConsumerProfile(userId: string): Promise<any> {
+  async getConsumerProfile(userId: string): Promise<Profile | null> {
     const { data } = await supabase
       .from('profiles')
       .select(`
@@ -68,7 +78,7 @@ export class SupabaseProductRepository implements IProductRepository {
     return data;
   }
 
-  async getMarketConfig(zipCode: string): Promise<any> {
+  async getMarketConfig(zipCode: string): Promise<MarketConfig | null> {
     const { data } = await supabase
       .from('market_configs')
       .select('*')

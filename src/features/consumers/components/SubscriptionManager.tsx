@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { formatMoney } from "@/lib/formatMoney";
+import { getErrorMessage } from "@/lib/errors/getErrorMessage";
 
 export const SubscriptionManager = () => {
   const { subscriptionStatus, refreshSubscription } = useAuth();
@@ -30,10 +31,10 @@ export const SubscriptionManager = () => {
           description: "Complete your subscription in the new window",
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: "Error",
-        description: error.message,
+        description: getErrorMessage(error),
         variant: "destructive",
       });
     } finally {

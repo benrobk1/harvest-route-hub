@@ -6,7 +6,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { createCartError } from '@/lib/errors/ErrorTypes';
 import type { ICartRepository } from '../interfaces/ICartRepository';
-import type { ShoppingCart, SavedCart } from '@/features/cart/types';
+import type { ShoppingCart, SavedCart, SavedCartItem } from '@/features/cart/types';
 
 export class SupabaseCartRepository implements ICartRepository {
   async getOrCreateCart(consumerId: string): Promise<ShoppingCart> {
@@ -134,7 +134,7 @@ export class SupabaseCartRepository implements ICartRepository {
   async saveCart(params: {
     consumerId: string;
     name: string;
-    items: any[];
+    items: SavedCartItem[];
   }): Promise<void> {
     const { error } = await supabase
       .from('saved_carts')
@@ -149,14 +149,14 @@ export class SupabaseCartRepository implements ICartRepository {
 
   async loadSavedCart(params: {
     cartId: string;
-    savedCartItems: any[];
+    savedCartItems: SavedCartItem[];
   }): Promise<void> {
     await supabase
       .from('cart_items')
       .delete()
       .eq('cart_id', params.cartId);
 
-    const itemsToInsert = params.savedCartItems.map((item: any) => ({
+    const itemsToInsert = params.savedCartItems.map((item) => ({
       cart_id: params.cartId,
       product_id: item.product_id,
       quantity: item.quantity,

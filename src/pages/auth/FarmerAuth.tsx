@@ -209,8 +209,8 @@ const FarmerAuth = () => {
         additionalInfo: "",
         collectionPointLeadFarmer: "",
       });
-    } catch (error: any) {
-      const errorMsg = getAuthErrorMessage(error);
+    } catch (error: unknown) {
+      const errorMsg = getAuthErrorMessage(error instanceof Error ? error : new Error('Account creation failed'));
       setFormError(errorMsg);
       toast({
         title: errorMsg.title,

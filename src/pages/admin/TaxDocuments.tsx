@@ -47,7 +47,7 @@ export default function TaxDocuments() {
 
         if (error) throw error;
         successCount++;
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error(`Failed to generate 1099 for ${user.full_name}:`, error);
         errorCount++;
       }

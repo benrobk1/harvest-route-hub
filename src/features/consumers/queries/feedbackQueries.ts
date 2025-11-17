@@ -33,7 +33,7 @@ export const feedbackQueries = {
   /**
    * All farm ratings for a specific farm
    */
-  farmRatings: (farmProfileId: string, filters?: Record<string, any>) => 
+  farmRatings: (farmProfileId: string, filters?: Record<string, unknown>) =>
     [...feedbackQueries.all(), 'farm', farmProfileId, filters] as const,
   
   /**
@@ -45,7 +45,7 @@ export const feedbackQueries = {
   /**
    * All item ratings for a specific product
    */
-  itemRatings: (productId: string, filters?: Record<string, any>) => 
+  itemRatings: (productId: string, filters?: Record<string, unknown>) =>
     [...feedbackQueries.all(), 'item', productId, filters] as const,
   
   /**

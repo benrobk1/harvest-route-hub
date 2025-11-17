@@ -3,7 +3,7 @@
  * Defines the contract for shopping cart data access operations
  */
 
-import type { ShoppingCart, SavedCart } from '@/features/cart/types';
+import type { ShoppingCart, SavedCart, SavedCartItem } from '@/features/cart/types';
 
 export interface ICartRepository {
   /**
@@ -40,19 +40,19 @@ export interface ICartRepository {
 
   /**
    * Save current cart as a template
-   */
+  */
   saveCart(params: {
     consumerId: string;
     name: string;
-    items: any[];
+    items: SavedCartItem[];
   }): Promise<void>;
 
   /**
    * Load saved cart into active cart
-   */
+  */
   loadSavedCart(params: {
     cartId: string;
-    savedCartItems: any[];
+    savedCartItems: SavedCartItem[];
   }): Promise<void>;
 
   /**

@@ -53,6 +53,6 @@ export const orderQueries = {
    * @param filters - Optional filters (status, date range, etc.)
    * @returns Query key for order history
    */
-  history: (userId: string, filters?: Record<string, any>) => 
+  history: (userId: string, filters?: Record<string, unknown>) =>
     [...orderQueries.all(), 'history', userId, filters] as const,
 };

@@ -3,9 +3,28 @@ export interface AuthError {
   description: string;
 }
 
-export function getAuthErrorMessage(error: any): AuthError {
-  const errorMessage = error?.message?.toLowerCase() || '';
-  const errorCode = error?.code?.toLowerCase() || '';
+type UnknownError = { message?: unknown; code?: unknown };
+
+function normalizeErrorDetails(error: unknown): { message: string; code: string } {
+  if (typeof error === 'string') {
+    return { message: error, code: '' };
+  }
+
+  if (typeof error === 'object' && error !== null) {
+    const { message, code } = error as UnknownError;
+    return {
+      message: typeof message === 'string' ? message : '',
+      code: typeof code === 'string' ? code : '',
+    };
+  }
+
+  return { message: '', code: '' };
+}
+
+export function getAuthErrorMessage(error: unknown): AuthError {
+  const { message, code } = normalizeErrorDetails(error);
+  const errorMessage = message.toLowerCase();
+  const errorCode = code.toLowerCase();
 
   // Email validation errors
   if (errorMessage.includes('invalid email') || errorMessage.includes('email')) {
@@ -106,7 +125,7 @@ export function getAuthErrorMessage(error: any): AuthError {
   if (errorMessage.includes('account creation failed')) {
     return {
       title: 'Registration Failed',
-      description: error?.message?.replace('Account creation failed: ', '') || 'Unable to create your account. Please try again.',
+      description: message.replace('Account creation failed: ', '') || 'Unable to create your account. Please try again.',
     };
   }
 
@@ -121,6 +140,6 @@ export function getAuthErrorMessage(error: any): AuthError {
   // Generic fallback
   return {
     title: 'Something Went Wrong',
-    description: error?.message || 'Please try again or contact support if the problem persists',
+    description: message || 'Please try again or contact support if the problem persists',
   };
 }

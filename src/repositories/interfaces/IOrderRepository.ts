@@ -3,7 +3,12 @@
  * Defines the contract for order data access operations
  */
 
-import type { OrderWithDetails } from '@/features/orders/types';
+import type { Order, OrderWithDetails } from '@/features/orders/types';
+
+export type ConsumerOrderSummary = Pick<
+  Order,
+  'id' | 'status' | 'total_amount' | 'delivery_date' | 'created_at'
+>;
 
 export interface IOrderRepository {
   /**
@@ -24,5 +29,5 @@ export interface IOrderRepository {
   /**
    * Get all orders for a consumer
    */
-  getConsumerOrders(consumerId: string): Promise<any[]>;
+  getConsumerOrders(consumerId: string): Promise<ConsumerOrderSummary[]>;
 }

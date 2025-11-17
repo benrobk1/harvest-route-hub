@@ -30,7 +30,7 @@ export interface UserProfile {
 export interface ConsumerProfile extends UserProfile {
   delivery_address: string | null;
   delivery_days: string[] | null;
-  push_subscription: any | null;
+  push_subscription: PushSubscriptionJSON | null;
   terms_accepted_at: string | null;
   privacy_accepted_at: string | null;
 }

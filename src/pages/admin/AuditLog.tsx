@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -10,27 +11,19 @@ import { Eye, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { adminQueries } from "@/features/admin";
 
-interface AuditLogEntry {
-  id: string;
-  admin_id: string;
-  action_type: string;
-  target_user_id: string | null;
-  target_resource_type: string | null;
-  target_resource_id: string | null;
-  old_value: any;
-  new_value: any;
-  ip_address: string | null;
-  user_agent: string | null;
-  created_at: string;
-  admin_email?: string;
-  admin_name?: string;
+type AuditLogRow = Database["public"]["Tables"]["admin_audit_log"]["Row"];
+
+type EnrichedAuditLogEntry = AuditLogRow & {
+  admin_email: string;
+  admin_name: string;
   target_email?: string;
   target_name?: string;
-}
+  ip_address: string | null;
+};
 
 const AuditLog = () => {
   const navigate = useNavigate();
-  const { data: logs, isLoading } = useQuery({
+  const { data: logs, isLoading } = useQuery<EnrichedAuditLogEntry[]>({
     queryKey: adminQueries.auditLogs(),
     queryFn: async () => {
       const { data, error } = await supabase
@@ -60,13 +53,16 @@ const AuditLog = () => {
             targetProfile = data;
           }
           
+          const ipAddress = typeof log.ip_address === 'string' ? log.ip_address : null;
+
           return {
             ...log,
             admin_name: adminProfile?.full_name || 'Unknown',
             admin_email: adminProfile?.email || 'Unknown',
-            target_name: targetProfile?.full_name,
-            target_email: targetProfile?.email,
-          } as AuditLogEntry;
+            target_name: targetProfile?.full_name ?? undefined,
+            target_email: targetProfile?.email ?? undefined,
+            ip_address: ipAddress,
+          } satisfies EnrichedAuditLogEntry;
         })
       );
       

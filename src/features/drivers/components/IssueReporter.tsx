@@ -9,11 +9,22 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AlertTriangle, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { getErrorMessage } from '@/lib/errors/getErrorMessage';
 
 interface IssueReporterProps {
   batchId?: string;
   orderId?: string;
   stopId?: string;
+}
+
+interface IssuePayload {
+  category: string;
+  severity: string;
+  title: string;
+  description: string;
+  delivery_batch_id?: string;
+  order_id?: string;
+  stop_id?: string;
 }
 
 const ISSUE_CATEGORIES = [
@@ -43,7 +54,7 @@ export const IssueReporter = ({ batchId, orderId, stopId }: IssueReporterProps) 
   const [description, setDescription] = useState('');
 
   const reportMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: IssuePayload) => {
       // Get current location
       let location = null;
       if (navigator.geolocation) {
@@ -87,10 +98,10 @@ export const IssueReporter = ({ batchId, orderId, stopId }: IssueReporterProps) 
       setDescription('');
       setSeverity('medium');
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: 'Failed to report issue',
-        description: error.message || 'Please try again later.',
+        description: getErrorMessage(error) || 'Please try again later.',
         variant: 'destructive',
       });
     },

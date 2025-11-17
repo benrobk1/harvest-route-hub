@@ -4,7 +4,7 @@
  */
 
 import { supabase } from '@/integrations/supabase/client';
-import type { IOrderRepository } from '../interfaces/IOrderRepository';
+import type { ConsumerOrderSummary, IOrderRepository } from '../interfaces/IOrderRepository';
 import type { OrderWithDetails } from '@/features/orders/types';
 
 export class SupabaseOrderRepository implements IOrderRepository {
@@ -108,7 +108,7 @@ export class SupabaseOrderRepository implements IOrderRepository {
     } as OrderWithDetails;
   }
 
-  async getConsumerOrders(consumerId: string): Promise<any[]> {
+  async getConsumerOrders(consumerId: string): Promise<ConsumerOrderSummary[]> {
     const { data, error } = await supabase
       .from('orders')
       .select(`
@@ -122,6 +122,12 @@ export class SupabaseOrderRepository implements IOrderRepository {
       .order('created_at', { ascending: false });
 
     if (error) throw error;
-    return data;
+    return (data ?? []).map(order => ({
+      id: order.id,
+      status: (order.status as ConsumerOrderSummary['status']) ?? 'pending',
+      total_amount: order.total_amount,
+      delivery_date: order.delivery_date,
+      created_at: order.created_at ?? '',
+    }));
   }
 }

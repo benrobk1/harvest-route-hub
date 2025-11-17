@@ -21,6 +21,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { CheckCircle2, XCircle, FileText, Eye, Loader2, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { getErrorMessage } from '@/lib/errors/getErrorMessage';
 
 interface UserProfile {
   id: string;
@@ -94,10 +95,10 @@ const UserApprovals = () => {
       if (data?.signedUrl) {
         window.open(data.signedUrl, '_blank');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error viewing document',
-        description: error.message,
+        description: getErrorMessage(error),
         variant: 'destructive',
       });
     }
@@ -247,10 +248,10 @@ const UserApprovals = () => {
       queryClient.invalidateQueries({ queryKey: adminQueries.metrics() });
       setSelectedUser(null);
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: 'Approval failed',
-        description: error.message,
+        description: getErrorMessage(error),
         variant: 'destructive',
       });
     },
@@ -303,10 +304,10 @@ const UserApprovals = () => {
       setSelectedUser(null);
       setRejectionReason('');
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: 'Rejection failed',
-        description: error.message,
+        description: getErrorMessage(error),
         variant: 'destructive',
       });
     },
@@ -417,10 +418,10 @@ const UserApprovals = () => {
       queryClient.invalidateQueries({ queryKey: adminQueries.metrics() });
       setSelectedUserIds(new Set());
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: 'Bulk approval failed',
-        description: error.message,
+        description: getErrorMessage(error),
         variant: 'destructive',
       });
     },
@@ -474,10 +475,10 @@ const UserApprovals = () => {
       setBulkRejectionReason('');
       setShowBulkRejectDialog(false);
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: 'Bulk rejection failed',
-        description: error.message,
+        description: getErrorMessage(error),
         variant: 'destructive',
       });
     },

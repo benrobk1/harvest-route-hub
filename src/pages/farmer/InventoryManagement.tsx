@@ -7,11 +7,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { formatMoney } from '@/lib/formatMoney';
+import { getErrorMessage } from '@/lib/errors/getErrorMessage';
 import { Package, Search, CheckCircle, Edit, Trash2, AlertCircle, Plus, FileSpreadsheet, ArrowLeft } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useState } from 'react';
 import { formatDistanceToNow } from 'date-fns';
-import { 
+import {
   ProductForm,
   BulkEditDialog,
   WeeklyInventoryReview
@@ -27,6 +28,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import type { Database } from '@/integrations/supabase/types';
+
+type ProductRow = Database['public']['Tables']['products']['Row'];
+
+interface ProductFormData {
+  name: string;
+  description: string;
+  price: string;
+  unit: string;
+  quantity: string;
+  image_url?: string | null;
+}
 
 export default function InventoryManagement() {
   const { user } = useAuth();
@@ -36,7 +49,7 @@ export default function InventoryManagement() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddingProduct, setIsAddingProduct] = useState(false);
   const [isBulkEditing, setIsBulkEditing] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [editingProduct, setEditingProduct] = useState<ProductRow | null>(null);
   const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
 
   const { data: farmProfile } = useQuery({
@@ -52,7 +65,7 @@ export default function InventoryManagement() {
     enabled: !!user?.id,
   });
 
-  const { data: products, isLoading } = useQuery({
+  const { data: products, isLoading } = useQuery<ProductRow[] | null>({
     queryKey: ['products', farmProfile?.id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -85,13 +98,13 @@ export default function InventoryManagement() {
       queryClient.invalidateQueries({ queryKey: ['products'] });
       toast.success(variables.currentStatus ? 'Product unapproved' : 'Product approved');
     },
-    onError: (error: any) => {
-      toast.error(`Failed to update product: ${error.message}`);
+    onError: (error) => {
+      toast.error(`Failed to update product: ${getErrorMessage(error)}`);
     },
   });
 
   const updateProductMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+    mutationFn: async ({ id, data }: { id: string; data: ProductFormData }) => {
       const { error } = await supabase
         .from('products')
         .update({
@@ -113,13 +126,13 @@ export default function InventoryManagement() {
       toast.success('Product updated successfully');
       setEditingProduct(null);
     },
-    onError: (error: any) => {
-      toast.error(`Failed to update product: ${error.message}`);
+    onError: (error) => {
+      toast.error(`Failed to update product: ${getErrorMessage(error)}`);
     },
   });
 
   const createProductMutation = useMutation({
-    mutationFn: async (data: any) => {
+    mutationFn: async (data: ProductFormData) => {
       const { error } = await supabase.from('products').insert({
         farm_profile_id: farmProfile?.id,
         name: data.name,
@@ -139,8 +152,8 @@ export default function InventoryManagement() {
       toast.success('Product created successfully');
       setIsAddingProduct(false);
     },
-    onError: (error: any) => {
-      toast.error(`Failed to create product: ${error.message}`);
+    onError: (error) => {
+      toast.error(`Failed to create product: ${getErrorMessage(error)}`);
     },
   });
 
@@ -160,8 +173,8 @@ export default function InventoryManagement() {
       toast.success('Product deleted successfully');
       setDeletingProductId(null);
     },
-    onError: (error: any) => {
-      toast.error(`Failed to delete product: ${error.message}`);
+    onError: (error) => {
+      toast.error(`Failed to delete product: ${getErrorMessage(error)}`);
     },
   });
 

@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { getErrorMessage } from '@/lib/errors/getErrorMessage';
 
 export interface ImageUploadResult {
   success: boolean;
@@ -60,7 +61,7 @@ export async function uploadImageFromUrl(
       .getPublicUrl(fileName);
     
     return { success: true, url: urlData.publicUrl };
-  } catch (error: any) {
-    return { success: false, error: error.message };
+  } catch (error: unknown) {
+    return { success: false, error: getErrorMessage(error) };
   }
 }

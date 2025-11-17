@@ -39,9 +39,17 @@ export interface SavedCart {
   id: string;
   consumer_id: string;
   name: string;
-  items: any[]; // Stored as JSONB
+  items: SavedCartItem[]; // Stored as JSONB
   created_at: string;
   updated_at: string;
+}
+
+export interface SavedCartItem {
+  product_id: string;
+  quantity: number;
+  unit_price: number;
+  product_name: string;
+  farm_name: string;
 }
 
 export interface AddToCartData {

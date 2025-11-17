@@ -20,10 +20,7 @@ export { composeMiddleware, createMiddlewareStack } from './compose.ts';
 export type { AuthContext } from './withAuth.ts';
 export type { DriverAuthContext } from './withDriverAuth.ts';
 export type { CORSContext } from './withCORS.ts';
-<<<<<<< HEAD
 export type { SupabaseServiceRoleContext } from './withSupabaseServiceRole.ts';
-=======
 export type { MetricsContext } from './withMetrics.ts';
 export type { RequestIdContext } from './withRequestId.ts';
 export type { ValidationContext } from './withValidation.ts';
->>>>>>> main

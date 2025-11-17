@@ -28,7 +28,7 @@ export interface EdgeFunctionConfig {
 
 /**
  * Initialize Sentry for error tracking
- * 
+ *
  * NOTE: Sentry Deno SDK integration is prepared but disabled by default.
  * Set SENTRY_DSN environment variable to enable error tracking.
  */
@@ -37,7 +37,7 @@ export function initSentry(config: EdgeFunctionConfig): void {
     console.warn('[CONFIG] Sentry DSN not configured. Error tracking disabled.');
     return;
   }
-  
+
   // TODO: Integrate Sentry Deno SDK
   // import * as Sentry from 'https://deno.land/x/sentry/mod.ts';
   // Sentry.init({
@@ -45,7 +45,7 @@ export function initSentry(config: EdgeFunctionConfig): void {
   //   environment: Deno.env.get('ENVIRONMENT') || 'production',
   //   tracesSampleRate: 1.0,
   // });
-  
+
   console.log(`[CONFIG] Sentry initialized: ${config.sentry.dsn.substring(0, 25)}...`);
 }
 
@@ -66,34 +66,28 @@ export function loadConfig(): EdgeFunctionConfig {
   if (!supabaseServiceRoleKey) {
     throw new Error('❌ SUPABASE_SERVICE_ROLE_KEY is required. Check your Lovable Cloud configuration.');
   }
-<<<<<<< HEAD
-=======
   if (!supabaseAnonKey) {
     throw new Error('❌ SUPABASE_ANON_KEY is required. Check your Lovable Cloud configuration.');
   }
-  if (!stripeSecretKey) {
-    throw new Error('❌ STRIPE_SECRET_KEY is required. Add it in Lovable Cloud Secrets UI.');
-  }
->>>>>>> main
 
   // Optional env vars - log warnings but continue
   const mapboxToken = Deno.env.get('MAPBOX_PUBLIC_TOKEN');
   const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
   const sentryDsn = Deno.env.get('SENTRY_DSN');
   const taxEncryptionKey = Deno.env.get('TAX_ENCRYPTION_KEY');
-  
+
   if (!stripeSecretKey) {
     console.warn('⚠️  STRIPE_SECRET_KEY not configured - payment processing endpoints will fail');
   }
-  
+
   if (!mapboxToken) {
     console.warn('⚠️  MAPBOX_PUBLIC_TOKEN not configured - geocoding will use ZIP fallbacks');
   }
-  
+
   if (!lovableApiKey) {
     console.warn('⚠️  LOVABLE_API_KEY not configured - batch optimization will use geographic fallback');
   }
-  
+
   if (!sentryDsn) {
     console.warn('⚠️  SENTRY_DSN not configured - error tracking disabled (console logs only)');
   }

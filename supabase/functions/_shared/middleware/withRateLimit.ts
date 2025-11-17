@@ -35,6 +35,21 @@ export const withRateLimit = <T extends RateLimitContext>(
       
       const { user, supabase } = ctx;
 
+      // Ensure user exists (required for rate limiting)
+      if (!user?.id) {
+        console.error('[RATE_LIMIT] User context missing - rate limiting requires authentication');
+        return new Response(
+          JSON.stringify({ 
+            error: 'UNAUTHORIZED',
+            message: 'Authentication required for rate limiting',
+          }),
+          { 
+            status: 401,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+
       // Check rate limit
       const rateCheck = await checkRateLimit(supabase, user.id, config);
 

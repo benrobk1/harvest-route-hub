@@ -23,7 +23,7 @@ export const requestNotificationPermission = async (userId: string): Promise<boo
     }
 
     // Register service worker
-    const registration = await navigator.serviceWorker.ready;
+    await navigator.serviceWorker.ready;
 
     // Note: For full push notification support, you need:
     // 1. A valid VAPID public key
@@ -43,7 +43,7 @@ export const requestNotificationPermission = async (userId: string): Promise<boo
 
     console.log('Notification permission granted');
     return true;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Failed to request notification permission:', error);
     return false;
   }
@@ -65,7 +65,7 @@ export const areNotificationsEnabled = async (userId: string): Promise<boolean> 
     }
 
     return (data.push_subscription as { enabled?: boolean }).enabled === true;
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Failed to check notification status:', error);
     return false;
   }

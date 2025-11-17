@@ -43,24 +43,30 @@ export async function uploadImageFromUrl(
     const fileName = `${farmProfileId}/${productName.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}.${fileExt}`;
     
     // Upload to Supabase storage (product-images bucket)
-    const { data, error } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from('product-images')
       .upload(fileName, blob, {
         contentType: blob.type,
         upsert: false,
       });
-    
-    if (error) {
-      return { success: false, error: error.message };
+
+    if (uploadError) {
+      return { success: false, error: uploadError.message };
     }
     
     // Get public URL
     const { data: urlData } = supabase.storage
       .from('product-images')
       .getPublicUrl(fileName);
-    
-    return { success: true, url: urlData.publicUrl };
-  } catch (error: any) {
-    return { success: false, error: error.message };
+
+    const publicUrl = urlData?.publicUrl;
+    if (!publicUrl) {
+      return { success: false, error: 'Unable to retrieve uploaded image URL' };
+    }
+
+    return { success: true, url: publicUrl };
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error while uploading image';
+    return { success: false, error: errorMessage };
   }
 }

@@ -21,7 +21,10 @@ export async function fetchKPIs(): Promise<KPIData> {
   const { data: allProfiles } = await supabase
     .from('profiles')
     .select('id, email');
-  const demoFilterIds = allProfiles?.filter(p => !p.email.endsWith('@demo.com')).map(p => p.id) || [];
+  const demoFilterIds = (allProfiles ?? [])
+    .filter((p): p is { id: string; email: string } => Boolean(p?.id) && typeof p?.email === 'string')
+    .filter(p => !p.email.endsWith('@demo.com'))
+    .map(p => p.id);
 
   if (demoFilterIds.length === 0) {
     // No matching profiles, return zeros
@@ -47,8 +50,8 @@ export async function fetchKPIs(): Promise<KPIData> {
     .lt('created_at', thirtyDaysAgo.toISOString())
     .in('consumer_id', demoFilterIds);
 
-  const households = new Set(recentOrders?.map(o => o.consumer_id) || []).size;
-  const priorHouseholds = new Set(priorOrders?.map(o => o.consumer_id) || []).size;
+  const households = new Set((recentOrders ?? []).map(o => o.consumer_id)).size;
+  const priorHouseholds = new Set((priorOrders ?? []).map(o => o.consumer_id)).size;
   const householdsTrend = priorHouseholds > 0 ? ((households - priorHouseholds) / priorHouseholds) * 100 : 0;
 
   // Monthly Churn: Calculate consumers who ordered last month but not this month
@@ -73,9 +76,9 @@ export async function fetchKPIs(): Promise<KPIData> {
     .eq('status', 'delivered')
     .gte('created_at', lastMonthEnd.toISOString())
     .in('consumer_id', demoFilterIds);
-  
-  const lastMonthSet = new Set(lastMonthOrders?.map(o => o.consumer_id) || []);
-  const currentMonthSet = new Set(currentMonthOrders?.map(o => o.consumer_id) || []);
+
+  const lastMonthSet = new Set((lastMonthOrders ?? []).map(o => o.consumer_id));
+  const currentMonthSet = new Set((currentMonthOrders ?? []).map(o => o.consumer_id));
   
   const lostCustomers = Array.from(lastMonthSet).filter(
     id => !currentMonthSet.has(id)
@@ -92,9 +95,14 @@ export async function fetchKPIs(): Promise<KPIData> {
     .gte('created_at', thirtyDaysAgo.toISOString())
     .in('consumer_id', demoFilterIds);
 
-  const totalRevenue = orderTotals?.reduce((sum, o) => sum + Number(o.total_amount), 0) || 0;
-  const aov = orderTotals && orderTotals.length > 0 ? totalRevenue / orderTotals.length : 0;
-  const demoOrderIds = orderTotals?.map(o => o.id) || [];
+  const orderTotalsData = (orderTotals ?? []).map(o => ({
+    total_amount: Number(o.total_amount ?? 0),
+    id: o.id,
+  })).filter((o): o is { total_amount: number; id: string } => Boolean(o.id));
+
+  const totalRevenue = orderTotalsData.reduce((sum, o) => sum + o.total_amount, 0);
+  const aov = orderTotalsData.length > 0 ? totalRevenue / orderTotalsData.length : 0;
+  const demoOrderIds = orderTotalsData.map(o => o.id);
 
   // On-Time Delivery %
   const { data: completedStops } = await supabase
@@ -104,13 +112,15 @@ export async function fetchKPIs(): Promise<KPIData> {
     .gte('created_at', thirtyDaysAgo.toISOString())
     .in('order_id', demoOrderIds.length > 0 ? demoOrderIds : ['00000000-0000-0000-0000-000000000000']);
 
-  const onTimeCount = completedStops?.filter(stop => {
+  const completedStopData = (completedStops ?? []) as Array<{ estimated_arrival?: string | null; actual_arrival?: string | null }>;
+
+  const onTimeCount = completedStopData.filter(stop => {
     if (!stop.estimated_arrival || !stop.actual_arrival) return false;
     return new Date(stop.actual_arrival) <= new Date(stop.estimated_arrival);
-  }).length || 0;
+  }).length;
 
-  const onTimePercent = completedStops && completedStops.length > 0 
-    ? (onTimeCount / completedStops.length) * 100 
+  const onTimePercent = completedStopData.length > 0
+    ? (onTimeCount / completedStopData.length) * 100
     : 0;
 
   // Farmer Share %
@@ -120,8 +130,11 @@ export async function fetchKPIs(): Promise<KPIData> {
     .gte('created_at', thirtyDaysAgo.toISOString())
     .in('order_id', demoOrderIds.length > 0 ? demoOrderIds : ['00000000-0000-0000-0000-000000000000']);
 
-  const farmerPayouts = payouts?.filter(p => p.recipient_type === 'farmer')
-    .reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+  const payoutData = (payouts ?? []) as Array<{ amount?: number | null; recipient_type?: string }>;
+
+  const farmerPayouts = payoutData
+    .filter(p => p.recipient_type === 'farmer')
+    .reduce((sum, p) => sum + Number(p.amount ?? 0), 0);
 
   const farmerShare = totalRevenue > 0 ? (farmerPayouts / totalRevenue) * 100 : 0;
 
@@ -139,16 +152,22 @@ export async function fetchKPIs(): Promise<KPIData> {
     .gte('created_at', thirtyDaysAgo.toISOString())
     .in('order_id', demoOrderIds.length > 0 ? demoOrderIds : ['00000000-0000-0000-0000-000000000000']);
 
-  const totalDriverPay = driverPayoutData?.reduce((sum, p) => sum + Number(p.amount), 0) || 0;
+  const driverPayouts = (driverPayoutData ?? []) as Array<{ amount?: number | null; orders?: { delivery_batch_id?: string | null } | null }>;
+
+  const totalDriverPay = driverPayouts.reduce((sum, p) => sum + Number(p.amount ?? 0), 0);
 
   // Get batch durations
-  const batchIds = [...new Set(driverPayoutData?.map(p => p.orders?.delivery_batch_id).filter(Boolean) || [])];
+  const batchIds = [...new Set(driverPayouts
+    .map(p => p.orders?.delivery_batch_id)
+    .filter((id): id is string => Boolean(id))
+  )];
   const { data: batches } = await supabase
     .from('delivery_batches')
     .select('estimated_duration_minutes')
     .in('id', batchIds);
 
-  const totalHours = batches?.reduce((sum, b) => sum + (b.estimated_duration_minutes / 60), 0) || 1;
+  const batchData = (batches ?? []) as Array<{ estimated_duration_minutes: number }>;
+  const totalHours = batchData.reduce((sum, b) => sum + ((b.estimated_duration_minutes ?? 0) / 60), 0) || 1;
   const driverHourly = totalHours > 0 ? totalDriverPay / totalHours : 0;
 
   // Orders per Route (Density)
@@ -158,10 +177,12 @@ export async function fetchKPIs(): Promise<KPIData> {
     .gte('created_at', thirtyDaysAgo.toISOString())
     .in('order_id', demoOrderIds.length > 0 ? demoOrderIds : ['00000000-0000-0000-0000-000000000000']);
 
-  const batchStopCounts = batchStops?.reduce((acc, stop) => {
+  const batchStopData = (batchStops ?? []) as Array<{ delivery_batch_id: string }>;
+
+  const batchStopCounts = batchStopData.reduce((acc, stop) => {
     acc[stop.delivery_batch_id] = (acc[stop.delivery_batch_id] || 0) + 1;
     return acc;
-  }, {} as Record<string, number>) || {};
+  }, {} as Record<string, number>);
 
   const stopCounts = Object.values(batchStopCounts);
   const ordersPerRoute = stopCounts.length > 0 

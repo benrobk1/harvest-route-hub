@@ -18,8 +18,10 @@ export const preloadImage = (url: string): Promise<void> => {
  * Get a placeholder for an image (can be enhanced with blurhash in the future)
  */
 export const getImagePlaceholder = (url: string | null): string => {
-  // Return a data URL for a simple gradient placeholder
-  return 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"%3E%3Crect width="400" height="300" fill="%23f0f0f0"/%3E%3C/svg%3E';
+  const hasValue = Boolean(url);
+  const fillColor = hasValue ? '%23e8e8e8' : '%23f0f0f0';
+
+  return `data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300"%3E%3Crect width="400" height="300" fill="${fillColor}"/%3E%3C/svg%3E`;
 };
 
 /**

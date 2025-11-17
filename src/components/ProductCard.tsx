@@ -92,7 +92,7 @@ const ProductCard = ({ product, onAddToCart, farmerData, consumerProfile }: Prod
               </AvatarFallback>
             </Avatar>
             <button
-              onClick={() => navigate(`/farm/${product.farm_profile_id}`)}
+              onClick={() => navigate(`/farm/${product.farm_profiles.id}`)}
               className="text-sm text-primary hover:underline"
             >
               {product.farm_profiles.farm_name}

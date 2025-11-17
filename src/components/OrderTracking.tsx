@@ -3,9 +3,19 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MapPin, Phone, User, Package, Clock } from "lucide-react";
 
+type OrderStatus =
+  | "ordered"
+  | "farm_pickup"
+  | "en_route"
+  | "delivered"
+  | "pending"
+  | "confirmed"
+  | "in-transit"
+  | "cancelled";
+
 interface OrderTrackingProps {
   orderId: string;
-  status: "ordered" | "farm_pickup" | "en_route" | "delivered";
+  status: OrderStatus;
   driverName?: string;
   driverPhone?: string;
   estimatedTime?: string;
@@ -26,12 +36,16 @@ const OrderTracking = ({
 }: OrderTrackingProps) => {
   const getStatusColor = () => {
     switch (status) {
+      case "pending":
       case "ordered":
         return "secondary";
+      case "confirmed":
       case "farm_pickup":
-        return "default";
       case "en_route":
+      case "in-transit":
         return "default";
+      case "cancelled":
+        return "destructive";
       case "delivered":
         return "default";
       default:
@@ -41,14 +55,20 @@ const OrderTracking = ({
 
   const getStatusText = () => {
     switch (status) {
+      case "pending":
       case "ordered":
         return "Order Placed";
+      case "confirmed":
+        return "Confirmed";
       case "farm_pickup":
         return "Farm Pickup";
+      case "in-transit":
       case "en_route":
-        return "En Route";
+        return "En Route ✅";
+      case "cancelled":
+        return "Cancelled";
       case "delivered":
-        return "Delivered";
+        return "Order Delivered";
       default:
         return "Processing";
     }

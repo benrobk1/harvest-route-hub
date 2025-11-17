@@ -1,4 +1,4 @@
-import { createClient, SupabaseClient, User } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient, type SupabaseClient, type User } from 'https://esm.sh/@supabase/supabase-js@2.57.2';
 import type { EdgeFunctionConfig } from '../config.ts';
 
 const corsHeaders = {

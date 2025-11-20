@@ -58,10 +58,14 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
   console.log(`[${ctx.requestId}] Found ${expiringTrials?.length || 0} expiring trials`);
   ctx.metrics.mark('trials_fetched');
 
-  const results = {
+  const results: {
+    success: boolean;
+    reminders_sent: number;
+    errors: Array<{ consumer_id: string; error: string }>;
+  } = {
     success: true,
     reminders_sent: 0,
-    errors: [] as any[]
+    errors: []
   };
 
   // Send reminder emails
@@ -83,11 +87,11 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
       console.log(`[${ctx.requestId}] Sent trial reminder to user ${trial.consumer_id}`);
       results.reminders_sent++;
       ctx.metrics.mark('reminder_sent');
-    } catch (notifError: any) {
+    } catch (notifError) {
       console.error(`[${ctx.requestId}] Failed to send reminder for ${trial.consumer_id}:`, notifError);
       results.errors.push({
         consumer_id: trial.consumer_id,
-        error: notifError.message
+        error: notifError instanceof Error ? notifError.message : 'Unknown notification error'
       });
       ctx.metrics.mark('reminder_failed');
     }
@@ -111,4 +115,4 @@ const middlewareStack = createMiddlewareStack<Context>([
   withErrorHandling
 ]);
 
-serve((req) => middlewareStack(handler)(req, {} as any));
+serve((req) => middlewareStack(handler)(req, {} as Context));

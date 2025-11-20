@@ -12,7 +12,7 @@ This document covers the standardized middleware pattern used across all Supabas
 ### Middleware Signature
 
 ```typescript
-type Middleware<T = any> = (
+type Middleware<T> = (
   handler: (req: Request, ctx: T) => Promise<Response>
 ) => (req: Request, ctx: T) => Promise<Response>;
 ```
@@ -59,7 +59,7 @@ const middlewareStack = createMiddlewareStack<Context>([
   withErrorHandling,
 ]);
 
-serve((req) => middlewareStack(handler)(req, {} as any));
+serve((req) => middlewareStack(handler)(req, {} as Context));
 ```
 
 ## Available Middleware

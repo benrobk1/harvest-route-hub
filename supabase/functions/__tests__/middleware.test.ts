@@ -11,6 +11,11 @@ import { withRequestId } from '../_shared/middleware/withRequestId.ts';
 import { withErrorHandling } from '../_shared/middleware/withErrorHandling.ts';
 import { withCORS } from '../_shared/middleware/withCORS.ts';
 
+type MiddlewareContext = {
+  requestId?: string;
+  corsHeaders?: Record<string, string>;
+};
+
 // Mock Supabase client for testing
 function createMockSupabaseClient(): SupabaseClient {
   const mockUrl = 'https://test.supabase.co';
@@ -19,7 +24,7 @@ function createMockSupabaseClient(): SupabaseClient {
 }
 
 Deno.test('withRequestId - generates and logs request ID', async () => {
-  let capturedContext: any;
+  let capturedContext: MiddlewareContext | undefined;
   
   const handler = withRequestId(async (req, ctx) => {
     capturedContext = ctx;
@@ -36,7 +41,7 @@ Deno.test('withRequestId - generates and logs request ID', async () => {
 });
 
 Deno.test('withRequestId - preserves existing context', async () => {
-  let capturedContext: any;
+  let capturedContext: MiddlewareContext | undefined;
   
   const handler = withRequestId(async (req, ctx) => {
     capturedContext = ctx;
@@ -106,7 +111,7 @@ Deno.test('withCORS - handles OPTIONS preflight', async () => {
 
 Deno.test('middleware composition - combines multiple middleware', async () => {
   const handler = withRequestId(
-    withCORS(async (req, ctx: any) => {
+    withCORS(async (req, ctx: MiddlewareContext) => {
       return new Response(JSON.stringify({ test: 'data' }), {
         headers: { 'Content-Type': 'application/json' }
       });

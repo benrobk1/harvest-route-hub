@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { adminQueries } from '@/features/admin';
+import { getErrorMessage } from '@/lib/errors/getErrorMessage';
 import {
   Dialog,
   DialogContent,
@@ -130,10 +131,10 @@ const Disputes = () => {
       setResolution('');
       setRefundAmount('');
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: 'Error',
-        description: error.message,
+        description: getErrorMessage(error),
         variant: 'destructive',
       });
     },

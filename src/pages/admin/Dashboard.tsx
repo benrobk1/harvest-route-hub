@@ -94,7 +94,7 @@ const AdminDashboard = () => {
         id: batch.id,
         name: batch.profiles?.full_name || 'Unknown Driver',
         route: `Batch #${batch.batch_number}`,
-        deliveries: `${batch.batch_stops?.filter((s: any) => s.status === 'delivered').length || 0}/${batch.batch_stops?.length || 0}`,
+        deliveries: `${(batch.batch_stops ?? []).filter((stop) => stop.status === 'delivered').length}/${batch.batch_stops?.length || 0}`,
         status: batch.status,
       })) || [];
     },

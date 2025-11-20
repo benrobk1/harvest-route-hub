@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { RATE_LIMITS } from '../_shared/constants.ts';
 import { BatchGenerationService } from '../_shared/services/BatchGenerationService.ts';
+import { getErrorMessage } from '../_shared/utils.ts';
 import {
   withRequestId,
   withCORS,
@@ -30,6 +31,83 @@ type Context = RequestIdContext &
   CORSContext &
   AuthContext &
   SupabaseServiceRoleContext;
+
+type OrderProfile = {
+  zip_code: string | null;
+  delivery_address: string | null;
+  full_name: string | null;
+};
+
+type PendingOrder = {
+  id: string;
+  consumer_id: string;
+  total_amount: number;
+  profiles: OrderProfile | null;
+};
+
+type GeocodedOrder = PendingOrder & {
+  latitude: number | null;
+  longitude: number | null;
+};
+
+type BatchStop = {
+  delivery_batch_id: string;
+  order_id: string;
+  address: string;
+  latitude: number | null;
+  longitude: number | null;
+  status: string;
+  sequence_number?: number;
+  estimated_arrival?: string;
+};
+
+type OsrmStep = {
+  maneuver: { type: string; instruction?: string };
+  instruction?: string;
+  distance: number;
+  duration: number;
+};
+
+type OsrmLeg = {
+  distance: number;
+  duration: number;
+  steps: OsrmStep[];
+};
+
+type OsrmRoute = {
+  distance: number;
+  duration: number;
+  geometry: string;
+  legs: OsrmLeg[];
+};
+
+type RouteData = {
+  total_distance_km: number;
+  total_duration_minutes: number;
+  stops: Array<{
+    sequence: number;
+    address: string;
+    latitude: number | null;
+    longitude: number | null;
+    estimated_arrival?: string;
+  }>;
+  optimization_method: string;
+  generated_at: string;
+  osrm_server: string;
+  route_geometry?: string;
+  legs?: Array<{
+    from_stop: number;
+    to_stop: number;
+    distance_km: number;
+    duration_minutes: number;
+    instructions: Array<{
+      maneuver: OsrmStep['maneuver'];
+      instruction?: string;
+      distance_km: number;
+      duration_minutes: number;
+    }>;
+  }>;
+};
 
 const handler = async (req: Request, ctx: Context): Promise<Response> => {
   const { requestId, corsHeaders, supabase, config } = ctx;
@@ -88,9 +166,9 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
 
     // Geocode addresses and group by ZIP
     console.log(`[${requestId}] Geocoding addresses...`);
-    const geocodedOrders = await Promise.all(
-      pendingOrders.map(async (order) => {
-        const profile = order.profiles as any;
+    const geocodedOrders: GeocodedOrder[] = await Promise.all(
+      (pendingOrders as PendingOrder[]).map(async (order) => {
+        const profile = order.profiles;
         const address = profile?.delivery_address;
         const zipCode = profile?.zip_code;
         const coords = address ? await batchService.geocodeAddress(address, zipCode) : null;
@@ -104,9 +182,9 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
     );
 
     // Group by ZIP code
-    const ordersByZip: { [key: string]: any[] } = {};
+    const ordersByZip: Record<string, GeocodedOrder[]> = {};
     for (const order of geocodedOrders) {
-      const profile = order.profiles as any;
+      const profile = order.profiles;
       const zipCode = profile?.zip_code || 'unknown';
       
       if (!ordersByZip[zipCode]) {
@@ -159,8 +237,8 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
         console.log(`[${requestId}] Batch ${batch.id} created with number ${nextBatchNumber}`);
 
         // Prepare stops
-        const unoptimizedStops = orders.map((order) => {
-          const orderProfile = order.profiles as any;
+        const unoptimizedStops: BatchStop[] = orders.map((order) => {
+          const orderProfile = order.profiles;
           return {
             delivery_batch_id: batch.id,
             order_id: order.id,
@@ -217,7 +295,7 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
           .filter(s => s.latitude && s.longitude)
           .map(s => [s.longitude!, s.latitude!]);
         
-        const osrmRoute = await batchService.getOsrmRoute(coordinates);
+        const osrmRoute: OsrmRoute | null = await batchService.getOsrmRoute(coordinates);
 
         // Calculate total distance and duration
         let totalDistance = 0;
@@ -252,7 +330,7 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
         const estimatedDuration = Math.ceil(totalDuration + (batchStops.length * 10));
 
         // Generate route data
-        const routeData: any = {
+        const routeData: RouteData = {
           total_distance_km: Math.round(totalDistance * 100) / 100,
           total_duration_minutes: estimatedDuration,
           stops: batchStops.map(stop => ({
@@ -269,12 +347,12 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
 
         if (osrmRoute) {
           routeData.route_geometry = osrmRoute.geometry;
-          routeData.legs = osrmRoute.legs.map((leg: any, index: number) => ({
+          routeData.legs = osrmRoute.legs.map((leg, index) => ({
             from_stop: index + 1,
             to_stop: index + 2,
             distance_km: Math.round(leg.distance * 100) / 100,
             duration_minutes: Math.round(leg.duration * 10) / 10,
-            instructions: leg.steps.map((step: any) => ({
+            instructions: leg.steps.map((step) => ({
               maneuver: step.maneuver,
               instruction: step.instruction,
               distance_km: Math.round(step.distance * 100) / 100,
@@ -332,7 +410,12 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
             .in('order_id', orderIds);
 
           let commissionableAmount = 0;
-          batchOrderItems?.forEach((item: any) => {
+          type BatchOrderItem = {
+            subtotal: number;
+            products?: { farm_profiles?: { farmer_id?: string | null } | null } | null;
+          };
+
+          batchOrderItems?.forEach((item: BatchOrderItem) => {
             const farmerId = item.products?.farm_profiles?.farmer_id;
             if (farmerId && farmerId !== batch.lead_farmer_id) {
               commissionableAmount += Number(item.subtotal);
@@ -387,9 +470,9 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
 
         console.log(`[${requestId}] Batch ${batch.id} completed with ${orders.length} stops`);
 
-      } catch (error: any) {
+      } catch (error) {
         console.error(`[${requestId}] Error processing ZIP ${zipCode}:`, error);
-        errors.push({ zipCode, error: error.message });
+        errors.push({ zipCode, error: getErrorMessage(error) });
       }
     }
 
@@ -420,4 +503,4 @@ const middlewareStack = createMiddlewareStack<Context>([
   withErrorHandling,
 ]);
 
-serve((req) => middlewareStack(handler)(req, {} as any));
+serve((req) => middlewareStack(handler)(req, {} as Context));

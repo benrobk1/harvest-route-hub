@@ -216,7 +216,7 @@ purpose, dependencies, context, failure behaviors, and observability notes.
 
 ### Security
 
-- JWT validation is mandatory for any route that processes user-specific data. Pair `withAuth`
+- JWT validation is mandatory for every route that processes user-specific data. Pair `withAuth`
   with `withAdminAuth` or custom role middleware when elevated permissions are required.
 - Configuration secrets (Stripe keys, Supabase service role) are only read inside
   `withSupabaseServiceRole` to limit surface area.

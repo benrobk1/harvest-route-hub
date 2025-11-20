@@ -11,6 +11,7 @@ import {
   type MetricsContext,
   type SupabaseServiceRoleContext
 } from '../_shared/middleware/index.ts';
+import { getErrorMessage } from '../_shared/utils.ts';
 
 /**
  * SEND CUTOFF REMINDERS EDGE FUNCTION
@@ -20,6 +21,19 @@ import {
  */
 
 type Context = RequestIdContext & CORSContext & MetricsContext & SupabaseServiceRoleContext;
+
+type ProfileEmail = { email: string | null };
+type OrderWithProfile = { consumer_id: string; profiles: ProfileEmail | null };
+type CartWithProfile = {
+  shopping_carts: { consumer_id: string; profiles: ProfileEmail | null } | null;
+};
+
+type ReminderError = { consumer_id: string; error: string };
+type ReminderResults = {
+  success: true;
+  reminders_sent: number;
+  errors: ReminderError[];
+};
 
 /**
  * Main handler with middleware composition
@@ -62,34 +76,30 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
   const consumersToNotify = new Set<string>();
   const consumerEmails = new Map<string, string>();
 
-  if (pendingOrders) {
-    for (const order of pendingOrders) {
-      const profile = order.profiles as any;
-      if (profile?.email) {
-        consumersToNotify.add(order.consumer_id);
-        consumerEmails.set(order.consumer_id, profile.email);
-      }
+  for (const order of pendingOrders ?? []) {
+    const profile = (order as OrderWithProfile).profiles;
+    if (profile?.email) {
+      consumersToNotify.add(order.consumer_id);
+      consumerEmails.set(order.consumer_id, profile.email);
     }
   }
 
-  if (cartsWithItems) {
-    for (const item of cartsWithItems) {
-      const cart = item.shopping_carts as any;
-      const profile = cart?.profiles as any;
-      if (cart?.consumer_id && profile?.email) {
-        consumersToNotify.add(cart.consumer_id);
-        consumerEmails.set(cart.consumer_id, profile.email);
-      }
+  for (const item of cartsWithItems ?? []) {
+    const cart = (item as CartWithProfile).shopping_carts;
+    const profile = cart?.profiles;
+    if (cart?.consumer_id && profile?.email) {
+      consumersToNotify.add(cart.consumer_id);
+      consumerEmails.set(cart.consumer_id, profile.email);
     }
   }
 
   console.log(`[${ctx.requestId}] Found ${consumersToNotify.size} consumers to notify`);
   ctx.metrics.mark('consumers_identified');
 
-  const results = {
+  const results: ReminderResults = {
     success: true,
     reminders_sent: 0,
-    errors: [] as any[]
+    errors: []
   };
 
   // Send reminder to each consumer
@@ -108,11 +118,11 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
 
       results.reminders_sent++;
       ctx.metrics.mark('reminder_sent');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(`[${ctx.requestId}] Failed to send reminder to ${consumerId}:`, error);
       results.errors.push({
         consumer_id: consumerId,
-        error: error.message
+        error: getErrorMessage(error)
       });
       ctx.metrics.mark('reminder_failed');
     }
@@ -136,4 +146,4 @@ const middlewareStack = createMiddlewareStack<Context>([
   withErrorHandling
 ]);
 
-serve((req) => middlewareStack(handler)(req, {} as any));
+serve((req) => middlewareStack(handler)(req, {} as Context));

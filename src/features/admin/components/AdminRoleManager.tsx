@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Shield, UserPlus, UserMinus, Loader2 } from "lucide-react";
 import { adminQueries } from "@/features/admin";
+import { Database } from "@/integrations/supabase/types";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -19,13 +20,24 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
+type AdminProfile = {
+  full_name: string;
+  isInvitation: boolean;
+  email?: string | null;
+  id?: string;
+};
+
+type AdminWithProfile = Database["public"]["Tables"]["user_roles"]["Row"] & {
+  profiles: Pick<Database["public"]["Tables"]["profiles"]["Row"], "full_name" | "email"> | null;
+};
+
 export const AdminRoleManager = () => {
   const [email, setEmail] = useState("");
   const [userToRevoke, setUserToRevoke] = useState<{ id: string; name: string } | null>(null);
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: admins, isLoading } = useQuery({
+  const { data: admins, isLoading } = useQuery<AdminWithProfile[]>({
     queryKey: adminQueries.admins(),
     queryFn: async () => {
       const { data, error } = await supabase
@@ -34,12 +46,12 @@ export const AdminRoleManager = () => {
         .eq('role', 'admin');
 
       if (error) throw error;
-      return data;
+      return data || [];
     },
   });
 
   const assignAdmin = useMutation({
-    mutationFn: async (userEmail: string) => {
+    mutationFn: async (userEmail: string): Promise<AdminProfile> => {
       // Find user by email
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
@@ -82,10 +94,10 @@ export const AdminRoleManager = () => {
         _target_user_id: profile.id,
         _new_value: { role: 'admin' },
       });
-      
+
       return { ...profile, isInvitation: false };
     },
-    onSuccess: (profile: any) => {
+    onSuccess: (profile: AdminProfile) => {
       if (profile.isInvitation) {
         toast({
           title: 'Invitation sent',
@@ -188,7 +200,7 @@ export const AdminRoleManager = () => {
               </div>
             ) : admins && admins.length > 0 ? (
               <div className="space-y-2">
-                {admins.map((admin: any) => (
+                {admins.map((admin) => (
                   <div
                     key={admin.id}
                     className="flex items-center justify-between p-3 border rounded-lg"

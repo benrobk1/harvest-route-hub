@@ -36,6 +36,24 @@ import { ScanLine, CheckCircle2, XCircle, Package } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { getErrorMessage } from "@/lib/errors";
+
+type OrderItemRecord = {
+  quantity: number;
+  products: {
+    name: string;
+  } | null;
+};
+
+type OrderRecord = {
+  id: string;
+  box_code: string;
+  profiles: {
+    full_name: string;
+    delivery_address: string;
+  };
+  order_items: OrderItemRecord[];
+};
 
 interface VerifiedOrder {
   orderId: string;
@@ -89,7 +107,7 @@ export const BoxCodeScanner = ({
           )
         `)
         .eq('box_code', scannedCode.toUpperCase())
-        .maybeSingle();
+        .maybeSingle<OrderRecord>();
 
       if (orderError) throw orderError;
 
@@ -108,10 +126,12 @@ export const BoxCodeScanner = ({
         boxCode: order.box_code,
         customerName: order.profiles.full_name,
         address: order.profiles.delivery_address,
-        items: order.order_items.map((item: any) => ({
-          name: item.products.name,
-          quantity: item.quantity,
-        })),
+        items: order.order_items
+          .filter((item): item is OrderItemRecord & { products: { name: string } } => !!item.products)
+          .map((item) => ({
+            name: item.products.name,
+            quantity: item.quantity,
+          })),
       };
 
       setVerifiedOrder(verified);
@@ -151,11 +171,12 @@ export const BoxCodeScanner = ({
         title: mode === 'loading' ? "Box Loaded!" : "Box Delivered!",
         description: `Box ${scannedCode} confirmed`,
       });
-    } catch (error: any) {
-      setError(error.message);
+    } catch (error: unknown) {
+      const message = getErrorMessage(error);
+      setError(message);
       toast({
         title: "Verification Error",
-        description: error.message,
+        description: message,
         variant: "destructive",
       });
     } finally {

@@ -31,7 +31,7 @@ type SendPushRequest = {
   user_id: string;
   title: string;
   body: string;
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
 };
 
 type Context = RequestIdContext &
@@ -129,4 +129,4 @@ const middlewareStack = createMiddlewareStack<Context>([
   withErrorHandling
 ]);
 
-serve((req) => middlewareStack(handler)(req, {} as any));
+serve((req) => middlewareStack(handler)(req, {} as Context));

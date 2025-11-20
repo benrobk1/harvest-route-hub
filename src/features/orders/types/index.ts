@@ -23,14 +23,22 @@ export interface OrderItem {
   created_at: string;
 }
 
+export interface OrderItemProduct {
+  id: string;
+  name: string;
+  unit: string;
+  farm_profiles: {
+    id: string;
+    farm_name: string;
+  };
+}
+
+export interface OrderItemWithDetails extends OrderItem {
+  products: OrderItemProduct;
+}
+
 export interface OrderWithDetails extends Order {
-  order_items: Array<{
-    quantity: number;
-    products: {
-      name: string;
-      unit: string;
-    };
-  }>;
+  order_items: OrderItemWithDetails[];
   delivery_batches: {
     driver_id: string;
     estimated_duration_minutes: number | null;

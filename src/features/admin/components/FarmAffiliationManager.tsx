@@ -9,6 +9,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { adminQueries } from '@/features/admin';
+import { getErrorMessage } from '@/lib/errors/getErrorMessage';
+import { Database } from '@/integrations/supabase/types';
+
+type LeadFarmerOption = {
+  user_id: string;
+  profiles: Pick<Database['public']['Tables']['profiles']['Row'], 'full_name'>;
+};
+
+type FarmProfile = Database['public']['Tables']['farm_profiles']['Row'];
 
 export function FarmAffiliationManager() {
   const { toast } = useToast();
@@ -18,25 +27,27 @@ export function FarmAffiliationManager() {
   const [commissionRate, setCommissionRate] = useState(5);
   const [assigning, setAssigning] = useState(false);
   
-  const { data: leadFarmers } = useQuery({
+  const { data: leadFarmers } = useQuery<LeadFarmerOption[]>({
     queryKey: adminQueries.leadFarmers(),
     queryFn: async () => {
       const { data } = await supabase
         .from('user_roles')
         .select('user_id, profiles!inner(full_name)')
-        .eq('role', 'lead_farmer');
-      
+        .eq('role', 'lead_farmer')
+        .returns<LeadFarmerOption[]>();
+
       return data || [];
     },
   });
-  
-  const { data: farms } = useQuery({
+
+  const { data: farms } = useQuery<FarmProfile[]>({
     queryKey: adminQueries.allFarms(),
     queryFn: async () => {
       const { data } = await supabase
         .from('farm_profiles')
-        .select('*');
-      
+        .select('*')
+        .returns<FarmProfile[]>();
+
       return data || [];
     },
   });
@@ -78,10 +89,10 @@ export function FarmAffiliationManager() {
       // Refetch data
       queryClient.invalidateQueries({ queryKey: adminQueries.leadFarmers() });
       queryClient.invalidateQueries({ queryKey: adminQueries.allFarms() });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Failed to assign',
-        description: error.message || 'Please try again',
+        description: getErrorMessage(error),
         variant: 'destructive',
       });
     } finally {
@@ -102,7 +113,7 @@ export function FarmAffiliationManager() {
               <SelectValue placeholder="Select lead farmer" />
             </SelectTrigger>
             <SelectContent>
-              {leadFarmers?.map((lf: any) => (
+              {leadFarmers?.map((lf) => (
                 <SelectItem key={lf.user_id} value={lf.user_id}>
                   {lf.profiles.full_name}
                 </SelectItem>

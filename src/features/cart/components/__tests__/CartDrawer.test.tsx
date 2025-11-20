@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { screen, fireEvent } from '@testing-library/react';
+import type { LinkProps } from 'react-router-dom';
 import { CartDrawer } from '../CartDrawer';
 import { renderWithProviders } from '@/test/helpers/renderWithProviders';
 import { useCart } from '../hooks/useCart';
@@ -10,7 +11,7 @@ vi.mock('react-router-dom', async () => {
   return {
     ...actual,
     useNavigate: () => mockNavigate,
-    Link: ({ children, to, onClick }: any) => (
+    Link: ({ children, to, onClick }: Pick<LinkProps, 'children' | 'to' | 'onClick'>) => (
       <a href={to} onClick={onClick}>{children}</a>
     ),
   };

@@ -6,14 +6,15 @@
 
 #### Type Safety
 - **Always use explicit types** for function parameters and return values
-- **Avoid `any`** - use `unknown` or proper types
+- **Avoid loose typing** - use `unknown` or proper types when flexibility is needed
 - **Use strict mode** - already enabled in `tsconfig.json`
 - **Leverage type inference** where types are obvious
 
 ```typescript
 // ❌ Bad
-function processOrder(order: any) {
-  return order.total;
+function processOrder(order: unknown) {
+  const unsafeOrder = order as { total?: number };
+  return unsafeOrder.total;
 }
 
 // ✅ Good

@@ -9,6 +9,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Shield, Loader2, ChevronDown } from 'lucide-react';
+import { getErrorMessage } from '@/lib/errors';
 
 export function TaxInformationForm() {
   const { toast } = useToast();
@@ -54,10 +55,10 @@ export function TaxInformationForm() {
       setTaxId('');
       setTaxName('');
       setTaxAddress('');
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Failed to save',
-        description: error.message || 'Please try again',
+        description: getErrorMessage(error) || 'Please try again',
         variant: 'destructive',
       });
     } finally {

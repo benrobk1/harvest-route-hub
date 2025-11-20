@@ -85,33 +85,37 @@ export class SimpleCache<T> {
 /**
  * Decorator to cache function results
  */
-export function cached<T>(
+export function cached<T, TArgs extends unknown[]>(
   cache: SimpleCache<T>,
-  keyFn: (...args: any[]) => string,
+  keyFn: (...args: TArgs) => string,
   ttlSeconds?: number
 ) {
   return function (
-    target: any,
+    _target: unknown,
     propertyKey: string,
-    descriptor: PropertyDescriptor
+    descriptor: TypedPropertyDescriptor<(...args: TArgs) => Promise<T> | T>
   ) {
     const originalMethod = descriptor.value;
 
-    descriptor.value = async function (...args: any[]) {
+    if (!originalMethod) {
+      return descriptor;
+    }
+
+    descriptor.value = async function (...args: TArgs) {
       const cacheKey = keyFn(...args);
-      
+
       // Check cache first
       const cached = cache.get(cacheKey);
       if (cached !== null) {
         console.log(`[CACHE] Hit: ${propertyKey} (${cacheKey})`);
         return cached;
       }
-      
+
       // Execute and cache
       console.log(`[CACHE] Miss: ${propertyKey} (${cacheKey})`);
       const result = await originalMethod.apply(this, args);
       cache.set(cacheKey, result, ttlSeconds);
-      
+
       return result;
     };
 
@@ -120,7 +124,7 @@ export function cached<T>(
 }
 
 // Global cache instances for different use cases
-export const marketConfigCache = new SimpleCache<any>(600); // 10 minutes
-export const geocodeCache = new SimpleCache<any>(3600); // 1 hour
-export const osrmCache = new SimpleCache<any>(1800); // 30 minutes
-export const userProfileCache = new SimpleCache<any>(300); // 5 minutes
+export const marketConfigCache = new SimpleCache<unknown>(600); // 10 minutes
+export const geocodeCache = new SimpleCache<unknown>(3600); // 1 hour
+export const osrmCache = new SimpleCache<unknown>(1800); // 30 minutes
+export const userProfileCache = new SimpleCache<unknown>(300); // 5 minutes

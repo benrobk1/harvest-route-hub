@@ -9,21 +9,29 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { formatMoney } from "@/lib/formatMoney";
 import { format } from "date-fns";
 import { adminQueries } from "@/features/admin";
+import type { Database } from "@/integrations/supabase/types";
+
+type CreditLedgerWithProfile = Database['public']['Tables']['credits_ledger']['Row'] & {
+  profiles: {
+    full_name: string | null;
+    email: string | null;
+  } | null;
+};
 
 const CreditsManager = () => {
   const navigate = useNavigate();
 
   const { data: creditsHistory, isLoading } = useQuery({
     queryKey: adminQueries.creditsHistory(),
-    queryFn: async () => {
+    queryFn: async (): Promise<CreditLedgerWithProfile[]> => {
       const { data, error } = await supabase
         .from('credits_ledger')
         .select('*, profiles(full_name, email)')
         .order('created_at', { ascending: false })
         .limit(100);
-      
+
       if (error) throw error;
-      return data;
+      return data || [];
     },
   });
 
@@ -63,7 +71,7 @@ const CreditsManager = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {creditsHistory?.map((credit: any) => (
+                {creditsHistory?.map((credit) => (
                   <TableRow key={credit.id}>
                     <TableCell>
                       <div className="font-medium">{credit.profiles?.full_name}</div>

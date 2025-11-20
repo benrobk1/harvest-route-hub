@@ -11,6 +11,7 @@ import {
   type MetricsContext,
   type SupabaseServiceRoleContext
 } from '../_shared/middleware/index.ts';
+import { getErrorMessage } from '../_shared/utils.ts';
 
 /**
  * SEED TEST USERS EDGE FUNCTION
@@ -106,9 +107,9 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
       console.log(`[${ctx.requestId}] ✅ Created ${user.role}: ${user.email}`);
       results.push({ email: user.email, role: user.role, success: true });
       ctx.metrics.mark(`user_created_${user.role}`);
-    } catch (error: any) {
+    } catch (error) {
       console.error(`[${ctx.requestId}] Failed to create user ${user.email}:`, error);
-      results.push({ email: user.email, success: false, error: error.message });
+      results.push({ email: user.email, success: false, error: getErrorMessage(error) });
       ctx.metrics.mark('user_creation_error');
     }
   }
@@ -132,4 +133,4 @@ const middlewareStack = createMiddlewareStack<Context>([
   withErrorHandling
 ]);
 
-serve((req) => middlewareStack(handler)(req, {} as any));
+serve((req) => middlewareStack(handler)(req, {} as Context));

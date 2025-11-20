@@ -75,4 +75,4 @@ const middlewareStack = createMiddlewareStack<Context>([
 ]);
 
 // Serve with composed middleware
-serve((req) => middlewareStack(handler)(req, {} as any));
+serve((req) => middlewareStack(handler)(req, {} as Context));

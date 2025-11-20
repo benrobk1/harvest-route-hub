@@ -62,6 +62,13 @@ interface UserProfile {
   delivery_days: string[] | null;
 }
 
+type ProfileWithLeadFarmer = UserProfile & {
+  lead_farmer?: {
+    full_name: string | null;
+    farm_name: string | null;
+  } | null;
+};
+
 
 const UserApprovals = () => {
   const { toast } = useToast();
@@ -117,7 +124,8 @@ const UserApprovals = () => {
           )
         `)
         .in('approval_status', ['pending', 'rejected'])
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .returns<ProfileWithLeadFarmer[]>();
 
       if (error) throw error;
 
@@ -132,8 +140,8 @@ const UserApprovals = () => {
           return {
             ...profile,
             roles: roles?.map((r) => r.role) || [],
-            lead_farmer_name: (profile as any).lead_farmer?.full_name,
-            lead_farmer_farm_name: (profile as any).lead_farmer?.farm_name,
+            lead_farmer_name: profile.lead_farmer?.full_name || undefined,
+            lead_farmer_farm_name: profile.lead_farmer?.farm_name || undefined,
           };
         })
       );

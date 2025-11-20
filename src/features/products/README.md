@@ -61,7 +61,7 @@ Fetches shop products with associated farmer and market data.
 **Returns:**
 - `products: Product[]` - Available shop products
 - `isLoading: boolean` - Loading state
-- `farmerData: Record<string, any>` - Farmer profile data by farm_profile_id
+- `farmerData: Record<string, unknown>` - Farmer profile data by farm_profile_id
 - `consumerProfile: { zip_code: string } | null` - Current user's profile
 - `marketConfig: MarketConfig | null` - Market configuration for user's ZIP
 
@@ -123,7 +123,7 @@ Aggregated shop data including products, farmers, and market configuration.
 ```typescript
 interface ShopData {
   products: Product[];
-  farmerData: Record<string, any>;
+  farmerData: Record<string, unknown>;
   consumerProfile: {
     zip_code: string | null;
   } | null;

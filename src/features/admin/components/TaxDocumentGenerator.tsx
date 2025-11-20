@@ -7,6 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { AlertCircle, FileText, Loader2 } from 'lucide-react';
+import { getErrorMessage } from '@/lib/errors/getErrorMessage';
 
 export function TaxDocumentGenerator() {
   const { toast } = useToast();
@@ -59,10 +60,10 @@ export function TaxDocumentGenerator() {
         title: '1099 generation complete',
         description: `Generated ${successCount} forms. ${belowThresholdCount} users below $600 threshold. ${errorCount} errors.`,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Generation failed',
-        description: error.message || 'Please try again',
+        description: getErrorMessage(error),
         variant: 'destructive',
       });
     } finally {

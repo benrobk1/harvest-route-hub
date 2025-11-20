@@ -7,13 +7,22 @@ import { Coins, TrendingUp, Calendar, AlertCircle } from "lucide-react";
 import { formatMoney } from "@/lib/formatMoney";
 import { calculateAvailableNextMonth } from "@/lib/creditsHelpers";
 import { consumerQueries } from "@/features/consumers";
+import type { Database } from "@/integrations/supabase/types";
+
+type CreditsLedgerEntry = Database['public']['Tables']['credits_ledger']['Row'];
 
 export const CreditsBreakdown = () => {
   const { user } = useAuth();
 
   const { data: creditsData } = useQuery({
     queryKey: consumerQueries.creditsBreakdown(user?.id || ''),
-    queryFn: async () => {
+    queryFn: async (): Promise<{
+      currentBalance: number;
+      monthlySpend: number;
+      earnedThisMonth: number;
+      availableNextMonth: number;
+      recentTransactions: CreditsLedgerEntry[];
+    }> => {
       // Get current subscription
       const { data: subscription } = await supabase
         .from('subscriptions')
@@ -126,7 +135,7 @@ export const CreditsBreakdown = () => {
                   <div>
                     <p className="text-sm font-medium mb-2">Recent Activity:</p>
                     <div className="space-y-2">
-                      {creditsData.recentTransactions.map((txn: any) => (
+                      {creditsData.recentTransactions.map((txn) => (
                         <div key={txn.id} className="flex justify-between items-center text-xs p-2 bg-muted rounded">
                           <span className="text-muted-foreground">{txn.description}</span>
                           <span className={txn.transaction_type === 'earned' ? 'text-green-600 font-medium' : 'text-foreground font-medium'}>

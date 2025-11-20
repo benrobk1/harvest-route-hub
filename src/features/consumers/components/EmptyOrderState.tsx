@@ -12,7 +12,7 @@ export const EmptyOrderState = () => {
         <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
         <h2 className="text-xl font-semibold mb-2">No Active Delivery</h2>
         <p className="text-muted-foreground mb-6">
-          You don't have any orders currently being delivered.
+          You don't have orders currently being delivered.
         </p>
         <div className="space-y-3">
           <Button onClick={() => navigate('/consumer/shop')} className="w-full max-w-xs">

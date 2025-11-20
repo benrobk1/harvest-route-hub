@@ -17,7 +17,7 @@ describe('getImagePlaceholder', () => {
     expect(placeholder).toMatch(/^data:image\/svg\+xml/);
   });
 
-  it('returns same placeholder for any input', () => {
+  it('returns same placeholder for every input', () => {
     const placeholder1 = getImagePlaceholder('url1');
     const placeholder2 = getImagePlaceholder('url2');
     expect(placeholder1).toBe(placeholder2);

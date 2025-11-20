@@ -248,7 +248,7 @@ supabase functions logs <function-name>
    - View function logs
    - Monitor real-time subscriptions
 
-4. **Hot Module Reload:** Vite supports HMR - save any file and see changes instantly without refresh
+4. **Hot Module Reload:** Vite supports HMR - save a file and see changes instantly without refresh
 
 5. **Type Safety:** This project uses strict TypeScript - let the compiler guide you. If it compiles, it usually works!
 

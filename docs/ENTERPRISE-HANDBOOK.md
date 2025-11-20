@@ -11,7 +11,7 @@ This handbook consolidates the expectations, controls, and operational playbooks
 ## Environments
 - **Local:** For feature development; uses anon Supabase keys and mock Stripe webhooks when needed.
 - **Preview:** Per-PR deploys that mirror production config (except live payouts). Used for UAT and accessibility checks.
-- **Production:** Full Stripe Connect, Resend notifications, and PagerDuty alerts. Admin role required for any privileged endpoint.
+- **Production:** Full Stripe Connect, Resend notifications, and PagerDuty alerts. Admin role required for every privileged endpoint.
 
 ## Reliability & Observability
 - **SLIs/SLOs:** Track checkout success rate, edge function latency, and driver route load times (see `docs/MONITORING.md`).

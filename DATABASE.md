@@ -810,7 +810,7 @@ Checks if a user has a specific role. Used in RLS policies to avoid recursive qu
 #### `get_consumer_address(_consumer_id, _delivery_batch_id)`
 Returns consumer address with access control:
 - Consumer can see own address
-- Admin can see any address
+- Admin can see every address
 - Driver can see address ONLY if:
   - Address is visible (`address_visible_at` set)
   - Order is in driver's assigned batch

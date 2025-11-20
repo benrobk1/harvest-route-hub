@@ -56,7 +56,7 @@ export const CompleteFeedbackDrawer = ({
   const [itemRatings, setItemRatings] = useState<Record<string, ItemRatingData>>({});
 
   // Extract unique farms from order items
-  const farms = order.order_items.reduce((acc, item: any) => {
+  const farms = order.order_items.reduce((acc, item) => {
     const farmId = item.products.farm_profiles.id;
     if (!acc[farmId]) {
       acc[farmId] = {
@@ -85,7 +85,7 @@ export const CompleteFeedbackDrawer = ({
 
       // Initialize item ratings
       const initialItemRatings: Record<string, ItemRatingData> = {};
-      order.order_items.forEach((item: any) => {
+      order.order_items.forEach((item) => {
         initialItemRatings[item.id] = {
           orderItemId: item.id,
           productId: item.products.id,
@@ -254,7 +254,7 @@ export const CompleteFeedbackDrawer = ({
                 <p className="text-sm text-muted-foreground">
                   Expand items to rate them (optional)
                 </p>
-                {order.order_items.map((item: any) => (
+                {order.order_items.map((item) => (
                   <ItemRating
                     key={item.id}
                     productName={item.products.name}

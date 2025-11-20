@@ -10,6 +10,7 @@ import { createMetricsCollector, MetricsCollector } from '../monitoring/metrics.
 export interface MetricsContext {
   requestId: string;
   metrics: MetricsCollector;
+  user?: { id?: string };
 }
 
 /**
@@ -43,19 +44,21 @@ export const withMetrics = (functionName: string) => {
           method: req.method,
           path: url.pathname,
           statusCode: response.status,
-          userId: (ctx as any).user?.id,
+          userId: ctx.user?.id,
         });
 
         return response;
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        const errorStack = error instanceof Error ? error.stack : undefined;
         // Log error metrics
         metrics.log({
           method: req.method,
           path: url.pathname,
           statusCode: 500,
-          userId: (ctx as any).user?.id,
-          errorMessage: error.message,
-          errorStack: error.stack,
+          userId: ctx.user?.id,
+          errorMessage,
+          errorStack,
         });
 
         throw error;

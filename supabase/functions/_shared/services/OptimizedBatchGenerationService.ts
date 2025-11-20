@@ -1,4 +1,4 @@
-import { BatchGenerationService } from './BatchGenerationService.ts';
+import { BatchGenerationService, RouteOptimizationResult, Stop } from './BatchGenerationService.ts';
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { geocodeCache, osrmCache } from '../monitoring/cache.ts';
 
@@ -48,7 +48,7 @@ export class OptimizedBatchGenerationService extends BatchGenerationService {
   /**
    * Cached OSRM route optimization
    */
-  override async optimizeRouteWithOsrm(stops: any[]): Promise<any> {
+  override async optimizeRouteWithOsrm(stops: Stop[]): Promise<RouteOptimizationResult> {
     // Create cache key from stop coordinates
     const coordString = stops
       .filter(s => s.latitude && s.longitude)

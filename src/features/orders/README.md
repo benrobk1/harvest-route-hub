@@ -109,7 +109,7 @@ export const orderQueries = {
   byUser: (userId: string) => [...orderQueries.all(), 'user', userId] as const,
   active: (userId: string) => [...orderQueries.all(), 'active', userId] as const,
   detail: (orderId: string) => [...orderQueries.all(), 'detail', orderId] as const,
-  history: (userId: string, filters?: Record<string, any>) => 
+  history: (userId: string, filters?: Record<string, unknown>) =>
     [...orderQueries.all(), 'history', userId, filters] as const,
 };
 ```

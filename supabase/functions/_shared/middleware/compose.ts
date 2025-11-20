@@ -4,7 +4,7 @@
  * Follows a bottom-up composition pattern where middlewares wrap each other
  */
 
-type Middleware<T = any> = (
+type Middleware<T> = (
   handler: (req: Request, ctx: T) => Promise<Response>
 ) => (req: Request, ctx: T) => Promise<Response>;
 
@@ -29,7 +29,7 @@ type Middleware<T = any> = (
  * }));
  * ```
  */
-export function composeMiddleware<T = any>(
+export function composeMiddleware<T>(
   middlewares: Middleware<T>[]
 ): Middleware<T> {
   return (handler: (req: Request, ctx: T) => Promise<Response>) => {
@@ -59,7 +59,7 @@ export function composeMiddleware<T = any>(
  * ]);
  * ```
  */
-export function createMiddlewareStack<T = any>(
+export function createMiddlewareStack<T>(
   middlewares: Middleware<T>[]
 ): Middleware<T> {
   // Reverse the order so the first middleware wraps everything else

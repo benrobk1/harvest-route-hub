@@ -58,8 +58,9 @@ export const withEncryption = <T extends EncryptionContext>(
           
           console.log(`[${ctx.requestId}] [ENCRYPTION] Request decrypted`);
         }
-      } catch (error: any) {
-        console.error(`[${ctx.requestId}] [ENCRYPTION] Decryption failed:`, error.message);
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error(`[${ctx.requestId}] [ENCRYPTION] Decryption failed:`, errorMessage);
         return new Response(
           JSON.stringify({ error: 'Failed to decrypt request' }),
           { status: 400 }
@@ -89,8 +90,9 @@ export const withEncryption = <T extends EncryptionContext>(
             }
           }
         );
-      } catch (error: any) {
-        console.error(`[${ctx.requestId}] [ENCRYPTION] Encryption failed:`, error.message);
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.error(`[${ctx.requestId}] [ENCRYPTION] Encryption failed:`, errorMessage);
         // Return unencrypted on encryption failure
         return response;
       }

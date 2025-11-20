@@ -85,7 +85,7 @@ export function generateRouteManifestPDF(data: RouteManifestData): void {
   addText('□ Verify box code matches customer', 9);
   addText('□ Confirm items with customer', 9);
   addText('□ Mark checkbox when delivered', 9);
-  addText('□ Note any issues or customer feedback', 9);
+  addText('□ Note issues or customer feedback', 9);
   addSpace(8);
   addLine();
   addSpace(5);

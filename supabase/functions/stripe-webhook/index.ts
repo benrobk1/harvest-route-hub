@@ -88,11 +88,12 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
     event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
     console.log(`[${requestId}] ✅ Signature verified: ${event.type}`);
     ctx.metrics.mark('signature_verified');
-  } catch (err: any) {
-    console.error(`[${requestId}] ❌ Signature verification failed: ${err.message}`);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown signature error';
+    console.error(`[${requestId}] ❌ Signature verification failed: ${message}`);
     ctx.metrics.mark('signature_failed');
     return new Response(
-      JSON.stringify({ error: `Webhook Error: ${err.message}`, code: 'INVALID_SIGNATURE' }),
+      JSON.stringify({ error: `Webhook Error: ${message}`, code: 'INVALID_SIGNATURE' }),
       {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -219,4 +220,4 @@ const middlewareStack = createMiddlewareStack<Context>([
   withErrorHandling
 ]);
 
-serve((req) => middlewareStack(handler)(req, {} as any));
+serve((req) => middlewareStack(handler)(req, {} as Context));

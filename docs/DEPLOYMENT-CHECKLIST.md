@@ -28,7 +28,7 @@ This checklist ensures all critical systems are verified before deploying to pro
 
 - [ ] **API Key Rotation**
   - Review API key versions in `api_keys` table
-  - Expire any test/development keys
+  - Expire test/development keys
   - Enable automated rotation schedule
   - Document: [SECURITY-HARDENING.md](./SECURITY-HARDENING.md)
 
@@ -400,7 +400,7 @@ This checklist ensures all critical systems are verified before deploying to pro
 
 2. **Document Deployment**
    - Record deployment time
-   - Note any issues encountered
+   - Note issues encountered
    - Update runbook with lessons learned
 
 ---
@@ -486,7 +486,7 @@ Rollback immediately if:
 - [ ] Check Sentry every 4 hours
 - [ ] Review daily metrics
 - [ ] Check for pattern changes
-- [ ] Document any anomalies
+- [ ] Document anomalies
 
 ### Metrics to Track
 

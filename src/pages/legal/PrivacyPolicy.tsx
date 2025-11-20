@@ -94,7 +94,7 @@ const PrivacyPolicy = () => {
                 <li>Request deletion of your data</li>
                 <li>Object to processing of your data</li>
                 <li>Request transfer of your data</li>
-                <li>Withdraw consent at any time</li>
+                <li>Withdraw consent whenever you choose</li>
               </ul>
             </section>
 
@@ -126,7 +126,7 @@ const PrivacyPolicy = () => {
             <section>
               <h2 className="text-xl font-semibold mb-3">10. Changes to This Policy</h2>
               <p className="text-muted-foreground">
-                We may update this privacy policy from time to time. We will notify you of any changes by posting the 
+                We may update this privacy policy from time to time. We will notify you of changes by posting the
                 new policy on this page and updating the "Last updated" date.
               </p>
             </section>
@@ -134,7 +134,7 @@ const PrivacyPolicy = () => {
             <section>
               <h2 className="text-xl font-semibold mb-3">11. Contact Us</h2>
               <p className="text-muted-foreground">
-                If you have any questions about this privacy policy or our privacy practices, please contact us at:
+                If you have questions about this privacy policy or our privacy practices, please contact us at:
               </p>
               <p className="text-muted-foreground mt-2">
                 Email: privacy@blueharvests.com<br />

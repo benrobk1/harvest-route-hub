@@ -98,7 +98,7 @@ Renders a grid of product cards with loading states and empty states.
 - `isLoading: boolean` - Loading state
 - `searchQuery: string` - Current search query
 - `onAddToCart: (product: Product, quantity: number) => void` - Add to cart handler
-- `farmerData?: Record<string, any>` - Farmer profile data
+- `farmerData?: Record<string, unknown>` - Farmer profile data
 - `consumerProfile?: { zip_code?: string } | null` - Consumer profile
 
 **Usage**:

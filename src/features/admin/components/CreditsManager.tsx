@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Gift, Loader2 } from "lucide-react";
+import { getErrorMessage } from "@/lib/errors/getErrorMessage";
 
 export function CreditsManager() {
   const [isLoading, setIsLoading] = useState(false);
@@ -62,9 +63,9 @@ export function CreditsManager() {
         transaction_type: "promotion",
         expires_in_days: "90"
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Award credits error:', error);
-      toast.error(error.message || "Failed to award credits");
+      toast.error(getErrorMessage(error));
     } finally {
       setIsLoading(false);
     }
@@ -110,7 +111,9 @@ export function CreditsManager() {
           <Label htmlFor="transaction_type">Credit Type *</Label>
           <Select
             value={formData.transaction_type}
-            onValueChange={(value: any) => setFormData({ ...formData, transaction_type: value })}
+            onValueChange={(value: typeof formData.transaction_type) =>
+              setFormData({ ...formData, transaction_type: value })
+            }
           >
             <SelectTrigger>
               <SelectValue />

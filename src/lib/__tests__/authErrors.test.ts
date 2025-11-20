@@ -28,12 +28,12 @@ describe('authErrors', () => {
   });
 
   it('should handle null error message', () => {
-    const message = getAuthErrorMessage(null as any);
+    const message = getAuthErrorMessage(null);
     expect(message).toBeTruthy();
   });
 
   it('should handle undefined error message', () => {
-    const message = getAuthErrorMessage(undefined as any);
+    const message = getAuthErrorMessage(undefined);
     expect(message).toBeTruthy();
   });
 });

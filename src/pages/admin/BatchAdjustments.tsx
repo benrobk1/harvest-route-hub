@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Truck, Package, Calendar, ArrowLeft, ChevronDown, DollarSign, MapPin } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { adminQueries } from '@/features/admin';
+import { getErrorMessage } from '@/lib/errors/getErrorMessage';
 
 const BatchAdjustments = () => {
   const { toast } = useToast();
@@ -86,10 +87,10 @@ const BatchAdjustments = () => {
       queryClient.invalidateQueries({ queryKey: adminQueries.batches() });
       setSelectedBatch(null);
     },
-    onError: (error: any) => {
+    onError: (error: unknown) => {
       toast({
         title: 'Error',
-        description: error.message,
+        description: getErrorMessage(error),
         variant: 'destructive',
       });
     },

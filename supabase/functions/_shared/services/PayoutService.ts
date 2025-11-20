@@ -18,6 +18,17 @@ export interface PayoutResult {
   }>;
 }
 
+type PayoutWithOrder = {
+  id: string;
+  amount: number;
+  recipient_type: 'farmer' | 'driver' | string;
+  stripe_connect_account_id: string;
+  description: string;
+  order_id: string;
+  recipient_id: string;
+  orders?: { id: string; status: string; delivery_date: string } | { id: string; status: string; delivery_date: string }[] | null;
+};
+
 export class PayoutService {
   constructor(
     private supabase: SupabaseClient,
@@ -81,7 +92,9 @@ export class PayoutService {
       return { successful: 0, failed: 0, skipped: 0, totalAmount: 0, errors: [] };
     }
 
-    console.log(`[${requestId}] [PAYOUTS] Found ${pendingPayouts.length} pending payouts`);
+    const payouts = pendingPayouts as PayoutWithOrder[];
+
+    console.log(`[${requestId}] [PAYOUTS] Found ${payouts.length} pending payouts`);
 
     const result: PayoutResult = {
       successful: 0,
@@ -93,7 +106,7 @@ export class PayoutService {
 
     // STEP 2: Process payouts in batches with concurrency limit
     const BATCH_SIZE = 10;
-    const batches = this.chunkArray(pendingPayouts, BATCH_SIZE);
+    const batches = this.chunkArray(payouts, BATCH_SIZE);
     
     console.log(`[${requestId}] [PAYOUTS] Processing ${batches.length} batches of ${BATCH_SIZE} payouts each`);
 
@@ -105,7 +118,13 @@ export class PayoutService {
       await Promise.all(
         batch.map(async (payout) => {
           try {
-            const order = payout.orders as any;
+            const order = Array.isArray(payout.orders) ? payout.orders[0] : payout.orders;
+
+            if (!order) {
+              console.warn(`[${requestId}] [PAYOUTS] Skipping payout ${payout.id} - missing order data`);
+              result.skipped++;
+              return;
+            }
 
             // Only process payouts for delivered orders
             if (order.status !== 'delivered') {
@@ -159,24 +178,26 @@ export class PayoutService {
             result.successful++;
             console.log(`[${requestId}] [PAYOUTS] ✅ Payout ${payout.id} completed successfully`);
 
-          } catch (error: any) {
-            console.error(`[${requestId}] [PAYOUTS] ❌ Failed to process payout ${payout.id}:`, error.message);
+          } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            const errorCode = typeof (error as { code?: string }).code === 'string' ? (error as { code: string }).code : undefined;
+            console.error(`[${requestId}] [PAYOUTS] ❌ Failed to process payout ${payout.id}:`, errorMessage);
 
             result.failed++;
             result.errors.push({
               payoutId: payout.id,
-              error: error.message,
-              code: error.code
+              error: errorMessage,
+              code: errorCode,
             });
 
             // Mark payout as failed for manual review
-            await this.supabase
-              .from('payouts')
-              .update({
-                status: 'failed',
-                description: `${payout.description} - Failed: ${error.message}`
-              })
-              .eq('id', payout.id);
+              await this.supabase
+                .from('payouts')
+                .update({
+                  status: 'failed',
+                  description: `${payout.description} - Failed: ${errorMessage}`
+                })
+                .eq('id', payout.id);
           }
         })
       );

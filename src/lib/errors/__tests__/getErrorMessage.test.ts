@@ -189,8 +189,7 @@ describe('getErrorMessage', () => {
 
   describe('Edge cases', () => {
     it('handles circular references gracefully', () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const error: any = { message: 'Circular' };
+      const error: { message: string; self?: unknown } = { message: 'Circular' };
       error.self = error;
       const result = getErrorMessage(error);
       // Should return "Unknown error" due to serialization failure

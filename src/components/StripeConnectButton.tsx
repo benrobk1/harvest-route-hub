@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { CreditCard, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { getErrorMessage } from '@/lib/errors';
 
 interface StripeConnectStatus {
   connected: boolean;
@@ -42,8 +43,13 @@ export const StripeConnectButton = () => {
 
       if (error) throw error;
       setStatus(data);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error checking Stripe Connect status:', error);
+      toast({
+        title: 'Error',
+        description: getErrorMessage(error),
+        variant: 'destructive',
+      });
     } finally {
       setIsChecking(false);
     }
@@ -97,11 +103,12 @@ export const StripeConnectButton = () => {
         console.error('No URL in response:', data);
         throw new Error('No onboarding URL received');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Connect error:', error);
+      const message = getErrorMessage(error);
       toast({
         title: 'Error',
-        description: error.message || 'Failed to initiate Stripe Connect onboarding',
+        description: message || 'Failed to initiate Stripe Connect onboarding',
         variant: 'destructive',
       });
     } finally {

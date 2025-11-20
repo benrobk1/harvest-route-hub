@@ -216,7 +216,7 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
             <div style="background: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
               <h3 style="margin-top: 0;">What This Means</h3>
               <p style="margin: 10px 0;">
-                Our delivery team is working diligently to ensure your order arrives safely. We apologize for any inconvenience this may cause.
+                Our delivery team is working diligently to ensure your order arrives safely. We apologize for the inconvenience this may cause.
               </p>
               <p style="margin: 10px 0;">
                 <strong>What you can do:</strong>
@@ -290,4 +290,4 @@ const middlewareStack = createMiddlewareStack<Context>([
 ]);
 
 // Serve with composed middleware
-serve((req) => middlewareStack(handler)(req, {} as any));
+serve((req) => middlewareStack(handler)(req, {} as Context));

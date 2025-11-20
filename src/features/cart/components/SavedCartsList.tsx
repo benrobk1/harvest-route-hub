@@ -26,8 +26,8 @@ export const SavedCartsList = ({ savedCarts, onLoad, onDelete, isLoading }: Save
   return (
     <div className="space-y-3">
       {savedCarts.map((cart) => {
-        const itemCount = cart.items.reduce((sum: number, item: any) => sum + item.quantity, 0);
-        const total = cart.items.reduce((sum: number, item: any) => sum + (item.quantity * item.unit_price), 0);
+        const itemCount = cart.items.reduce((sum, item) => sum + item.quantity, 0);
+        const total = cart.items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
 
         return (
           <Card key={cart.id} className="p-4">

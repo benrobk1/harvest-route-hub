@@ -132,15 +132,17 @@ export function generateSecureToken(length: number = 32): string {
 /**
  * Redact sensitive fields from logs
  */
-export function redactSensitiveData(
-  data: any,
+export function redactSensitiveData<T>(
+  data: T,
   sensitiveFields: string[] = ['password', 'ssn', 'credit_card', 'api_key', 'secret']
-): any {
+): T {
   if (typeof data !== 'object' || data === null) {
     return data;
   }
 
-  const redacted = Array.isArray(data) ? [...data] : { ...data };
+  const redacted: Record<string, unknown> | unknown[] = Array.isArray(data)
+    ? [...data]
+    : { ...(data as Record<string, unknown>) };
 
   for (const key in redacted) {
     if (sensitiveFields.some(field => key.toLowerCase().includes(field))) {
@@ -150,5 +152,5 @@ export function redactSensitiveData(
     }
   }
 
-  return redacted;
+  return redacted as T;
 }

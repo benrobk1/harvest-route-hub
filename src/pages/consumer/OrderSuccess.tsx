@@ -209,7 +209,7 @@ const OrderSuccess = () => {
             <div className="space-y-3">
               <h3 className="font-semibold text-lg">Items Ordered</h3>
               <div className="space-y-2">
-                {order.order_items?.map((item: any, idx: number) => (
+                {order.order_items?.map((item, idx: number) => (
                   <div key={idx} className="flex justify-between items-center p-3 bg-muted rounded-lg">
                     <div>
                       <p className="font-medium">{item.products.name}</p>

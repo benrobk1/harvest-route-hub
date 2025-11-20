@@ -94,7 +94,7 @@ const Login = () => {
 
       if (roles.length === 0) {
         await supabase.auth.signOut();
-        throw new Error("Your account doesn't have any assigned roles. Please contact support.");
+        throw new Error("Your account doesn't have assigned roles. Please contact support.");
       }
 
       toast({

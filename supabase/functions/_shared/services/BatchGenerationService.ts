@@ -7,12 +7,12 @@ import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
  * Handles complex routing, optimization, and batch creation logic.
  */
 
-interface Coordinates {
+export interface Coordinates {
   latitude: number;
   longitude: number;
 }
 
-interface Stop {
+export interface Stop {
   delivery_batch_id: string;
   order_id: string;
   address: string;
@@ -23,26 +23,35 @@ interface Stop {
   estimated_arrival?: string;
 }
 
-interface RouteOptimizationResult {
+export interface RouteOptimizationResult {
   optimizedStops: Stop[];
   method: string;
   distanceMatrix?: number[][];
+}
+
+interface OSRMManeuver {
+  type: string;
+  instruction?: string;
+}
+
+interface OSRMStep {
+  maneuver: OSRMManeuver;
+  name?: string;
+  distance: number;
+  duration: number;
+}
+
+interface OSRMLeg {
+  distance: number;
+  duration: number;
+  steps: OSRMStep[];
 }
 
 interface OSRMRoute {
   distance: number;
   duration: number;
   geometry: string;
-  legs: Array<{
-    distance: number;
-    duration: number;
-    steps: Array<{
-      maneuver: string;
-      instruction: string;
-      distance: number;
-      duration: number;
-    }>;
-  }>;
+  legs: OSRMLeg[];
 }
 
 export class BatchGenerationService {
@@ -202,15 +211,15 @@ export class BatchGenerationService {
         return null;
       }
 
-      const route = data.routes[0];
+      const route: OSRMRoute = data.routes[0];
       return {
         distance: route.distance / 1000, // Convert to km
         duration: route.duration / 60, // Convert to minutes
         geometry: route.geometry,
-        legs: route.legs.map((leg: any) => ({
+        legs: route.legs.map(leg => ({
           distance: leg.distance / 1000,
           duration: leg.duration / 60,
-          steps: leg.steps.map((step: any) => ({
+          steps: leg.steps.map((step: OSRMStep) => ({
             maneuver: step.maneuver.type,
             instruction: step.maneuver.instruction || `${step.maneuver.type} ${step.name || ''}`,
             distance: step.distance / 1000,

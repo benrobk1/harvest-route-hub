@@ -98,7 +98,7 @@ The code calculated new inventory in application code, causing race conditions:
 
 ```typescript
 // ❌ VULNERABLE CODE (BEFORE)
-const product = item.products as any;
+const product = item.products as ProductRow;
 await supabase
   .from('products')
   .update({ 

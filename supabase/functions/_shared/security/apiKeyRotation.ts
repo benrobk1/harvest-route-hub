@@ -123,13 +123,14 @@ export async function rotateAPIKey(
       newVersion: newVersion,
       transitionPeriod: `${transitionDays} days`
     };
-  } catch (error: any) {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown API key rotation error';
     console.error('[API_KEY_ROTATION] Error:', error);
     return {
       success: false,
       newVersion: 0,
       transitionPeriod: '',
-      error: error.message
+      error: message
     };
   }
 }

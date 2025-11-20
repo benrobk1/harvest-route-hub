@@ -168,7 +168,7 @@ export default function AffiliatedFarmers() {
       </div>
 
       {/* Collection Point Information */}
-      {displayCollectionPoint && (displayCollectionPoint as any).collection_point_address && (
+      {displayCollectionPoint?.collection_point_address && (
         <Card className="border-primary/20 bg-primary/5">
           <CardHeader>
             <div className="flex items-start justify-between">
@@ -183,18 +183,18 @@ export default function AffiliatedFarmers() {
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            {(displayCollectionPoint as any).collection_point_address && (
+            {displayCollectionPoint.collection_point_address && (
               <div className="flex items-start gap-2 text-sm">
                 <MapPin className="h-4 w-4 text-muted-foreground flex-shrink-0 mt-0.5" />
                 <span className="font-medium">
-                  {(displayCollectionPoint as any).collection_point_address}
+                  {displayCollectionPoint.collection_point_address}
                 </span>
               </div>
             )}
-            {(displayCollectionPoint as any).full_name && (
+            {displayCollectionPoint.full_name && (
               <div className="flex items-center gap-2 text-sm">
                 <span className="font-medium">
-                  Contact: {(displayCollectionPoint as any).full_name}
+                  Contact: {displayCollectionPoint.full_name}
                 </span>
               </div>
             )}
@@ -220,7 +220,7 @@ export default function AffiliatedFarmers() {
 
       {displayFarmers && displayFarmers.length > 0 ? (
         <div className="grid gap-6 md:grid-cols-2">
-          {displayFarmers.map((affiliation: any) => {
+          {displayFarmers.map((affiliation) => {
             const farmer = affiliation.farm_profiles;
             const profile = farmer?.profiles;
             const farmerRole = affiliation.farmer_role;

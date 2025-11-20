@@ -6,7 +6,7 @@
  */
 
 import { assertEquals, assertExists } from 'https://deno.land/std@0.192.0/testing/asserts.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient, type Session, type User } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || 'http://localhost:54321';
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || 'test-anon-key';
@@ -14,8 +14,8 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '
 const FUNCTION_URL = `${SUPABASE_URL}/functions/v1/process-payouts`;
 
 interface TestUser {
-  user: any;
-  session: any;
+  user: User;
+  session: Session;
   isAdmin: boolean;
 }
 
@@ -261,7 +261,7 @@ Deno.test({
       const body = await response.json();
       assertEquals(body.success, true);
       
-      // Check if failures are reported (if any payouts failed)
+      // Check if failures are reported when payouts fail
       if (body.failures && body.failures.length > 0) {
         assertExists(body.failures[0].payout_id);
         assertExists(body.failures[0].error);

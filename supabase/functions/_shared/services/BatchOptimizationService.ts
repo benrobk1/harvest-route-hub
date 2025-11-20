@@ -105,6 +105,23 @@ export interface OrderWithLocation {
   collection_point_id: string | null;
 }
 
+type OrderItemProductProfile = { collection_point_lead_farmer_id?: string | null };
+
+type OrderItemFarmProfile = {
+  farmer_id?: string | null;
+  profiles?: OrderItemProductProfile | OrderItemProductProfile[] | null;
+};
+
+type OrderItemProduct = {
+  farm_profile_id?: string | null;
+  farm_profiles?: OrderItemFarmProfile | OrderItemFarmProfile[] | null;
+};
+
+type OrderItem = {
+  product_id: string;
+  products?: OrderItemProduct | OrderItemProduct[] | null;
+};
+
 export interface BatchOptimization {
   batches: Array<{
     batch_id: number;
@@ -125,7 +142,24 @@ export interface BatchOptimizationResult {
   batches_created: number;
   total_orders: number;
   optimization_method: 'ai' | 'geographic_fallback';
-  batches: any[];
+  batches: SavedBatch[];
+}
+
+interface DeliveryBatchRecord {
+  id: string;
+  batch_number: number;
+  status: string;
+  lead_farmer_id: string | null;
+  delivery_date: string;
+  zip_codes: string[] | null;
+}
+
+export interface SavedBatch extends DeliveryBatchRecord {
+  metadata: {
+    order_count: number;
+    is_subsidized: boolean;
+    zip_codes: string[];
+  };
 }
 
 export class BatchOptimizationService {
@@ -172,7 +206,7 @@ export class BatchOptimizationService {
     console.log(`[BATCH_OPT] Found ${Object.keys(ordersByCollectionPoint).length} collection points`);
 
     // Process each collection point
-    const allBatches: any[] = [];
+    const allBatches: SavedBatch[] = [];
     let batchCounter = 1;
 
     for (const [collectionPointId, cpOrders] of Object.entries(ordersByCollectionPoint)) {
@@ -240,18 +274,18 @@ export class BatchOptimizationService {
 
     return orders.map(order => {
       const profile = Array.isArray(order.profiles) ? order.profiles[0] : order.profiles;
-      const items = Array.isArray(order.order_items) ? order.order_items : [];
-      
+      const items = Array.isArray(order.order_items) ? (order.order_items as OrderItem[]) : [];
+
       let collectionPointId = null;
       if (items.length > 0) {
-        const firstItem = items[0] as any;
+        const firstItem = items[0];
         const products = firstItem?.products;
         const productData = Array.isArray(products) ? products[0] : products;
-        
+
         if (productData?.farm_profiles) {
           const farmProfiles = productData.farm_profiles;
           const farmProfile = Array.isArray(farmProfiles) ? farmProfiles[0] : farmProfiles;
-          
+
           if (farmProfile?.profiles) {
             const farmerProfiles = farmProfile.profiles;
             const farmerProfile = Array.isArray(farmerProfiles) ? farmerProfiles[0] : farmerProfiles;
@@ -294,7 +328,7 @@ export class BatchOptimizationService {
     orders: OrderWithLocation[],
     targetDate: string,
     startBatchNumber: number
-  ): Promise<any[]> {
+  ): Promise<SavedBatch[]> {
     // Get collection point info
     const { data: collectionPoint } = await this.supabase
       .from('profiles')
@@ -397,7 +431,7 @@ CONSTRAINTS:
 2. Max round trip time from collection point: ${maxRouteHours} hours
 3. Prioritize geographic proximity over strict ZIP boundaries
 4. Minimize number of batches
-5. Flag any batches <${minSize} orders as "subsidized"
+5. Flag batches <${minSize} orders as "subsidized"
 
 OUTPUT FORMAT (JSON):
 {
@@ -516,8 +550,8 @@ Optimize the batching strategy and return ONLY valid JSON.`;
     collectionPointAddress: string,
     targetDate: string,
     startBatchNumber: number
-  ): Promise<any[]> {
-    const allBatches: any[] = [];
+  ): Promise<SavedBatch[]> {
+    const allBatches: SavedBatch[] = [];
     let batchNumber = startBatchNumber;
 
     for (const batch of optimization.batches) {

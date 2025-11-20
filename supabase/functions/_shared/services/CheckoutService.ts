@@ -28,6 +28,49 @@ export interface CheckoutResult {
   paymentStatus: 'paid' | 'pending' | 'requires_action';
 }
 
+type PaymentStatus = CheckoutResult['paymentStatus'];
+
+interface CartRecord {
+  id: string;
+  consumer_id: string;
+}
+
+interface MarketConfig {
+  delivery_fee: number | string;
+  minimum_order: number | string;
+  delivery_days: string[];
+  cutoff_time: string;
+  zip_code: string;
+  active: boolean;
+}
+
+interface ProductFarmProfile {
+  farm_name: string;
+  farmer_id: string;
+}
+
+interface ProductDetails {
+  id: string;
+  name: string;
+  price: number;
+  available_quantity: number;
+  farm_profile_id: string;
+  farm_profiles: ProductFarmProfile;
+}
+
+interface CartItem {
+  id: string;
+  product_id: string;
+  quantity: number;
+  unit_price: number;
+  products: ProductDetails;
+}
+
+interface UserProfile {
+  zip_code: string;
+  delivery_address: string;
+}
+
 export class CheckoutService {
   constructor(
     private supabase: SupabaseClient,
@@ -205,7 +248,7 @@ export class CheckoutService {
     }
   }
 
-  private async validateCart(cartId: string, userId: string, requestId: string): Promise<any> {
+  private async validateCart(cartId: string, userId: string, requestId: string): Promise<CartRecord> {
     const { data: cart, error } = await this.supabase
       .from('shopping_carts')
       .select('id, consumer_id')
@@ -220,7 +263,7 @@ export class CheckoutService {
     return cart;
   }
 
-  private async getCartItems(cartId: string, requestId: string): Promise<any[]> {
+  private async getCartItems(cartId: string, requestId: string): Promise<CartItem[]> {
     const { data: cartItems, error } = await this.supabase
       .from('cart_items')
       .select(`
@@ -247,10 +290,10 @@ export class CheckoutService {
       throw new CheckoutError('CHECKOUT_ERROR', 'Failed to fetch cart items');
     }
 
-    return cartItems || [];
+    return (cartItems ?? []) as CartItem[];
   }
 
-  private async getUserProfile(userId: string, requestId: string): Promise<any> {
+  private async getUserProfile(userId: string, requestId: string): Promise<UserProfile> {
     const { data: profile, error } = await this.supabase
       .from('profiles')
       .select('zip_code, delivery_address')
@@ -265,7 +308,7 @@ export class CheckoutService {
     return profile;
   }
 
-  private async getMarketConfig(zipCode: string, requestId: string): Promise<any> {
+  private async getMarketConfig(zipCode: string, requestId: string): Promise<MarketConfig> {
     const { data: marketConfig, error } = await this.supabase
       .from('market_configs')
       .select('*')
@@ -278,10 +321,10 @@ export class CheckoutService {
       throw new CheckoutError('NO_MARKET_CONFIG', `No active market configuration found for ZIP code ${zipCode}`);
     }
 
-    return marketConfig;
+    return marketConfig as MarketConfig;
   }
 
-  private async validateDeliveryDate(deliveryDate: string, marketConfig: any, requestId: string): Promise<void> {
+  private async validateDeliveryDate(deliveryDate: string, marketConfig: MarketConfig, requestId: string): Promise<void> {
     // Parse the ISO datetime but use just the date portion to avoid timezone issues
     const dateStr = deliveryDate.split('T')[0]; // Extract YYYY-MM-DD
     const deliveryDateObj = new Date(dateStr + 'T12:00:00Z'); // Use noon UTC to avoid day boundary issues
@@ -315,7 +358,7 @@ export class CheckoutService {
     }
   }
 
-  private async validatePricesAndInventory(cartItems: any[], requestId: string): Promise<{
+  private async validatePricesAndInventory(cartItems: CartItem[], requestId: string): Promise<{
     subtotal: number;
     insufficientProducts: string[];
   }> {
@@ -323,7 +366,7 @@ export class CheckoutService {
     const insufficientProducts: string[] = [];
 
     for (const item of cartItems) {
-      const product = item.products as any;
+      const product = item.products;
       
       // Validate price matches (prevent tampering)
       if (item.unit_price !== product.price) {
@@ -450,9 +493,11 @@ export class CheckoutService {
           : 'pending';
 
       return { paymentIntent, paymentStatus };
-    } catch (error: any) {
-      console.error(`[${requestId}] [CHECKOUT] ❌ Stripe payment failed:`, error.message);
-      throw new CheckoutError('PAYMENT_FAILED', error.message, { decline_code: error.decline_code });
+    } catch (error: unknown) {
+      const stripeError = error as Stripe.errors.StripeError;
+      const message = stripeError?.message || (error instanceof Error ? error.message : 'Unknown payment error');
+      console.error(`[${requestId}] [CHECKOUT] ❌ Stripe payment failed:`, message);
+      throw new CheckoutError('PAYMENT_FAILED', message, { decline_code: stripeError?.decline_code });
     }
   }
 
@@ -461,13 +506,13 @@ export class CheckoutService {
     deliveryDate: string,
     totalAmount: number,
     tipAmount: number,
-    paymentStatus: string,
+    paymentStatus: PaymentStatus,
     paymentIntent: Stripe.PaymentIntent | null,
-    cartItems: any[],
+    cartItems: CartItem[],
     platformFee: number,
     deliveryFee: number,
     creditsUsed: number,
-    profile: any,
+    profile: UserProfile,
     requestId: string,
     isDemoMode: boolean = false
   ): Promise<string> {
@@ -517,7 +562,7 @@ export class CheckoutService {
 
     // Create order items
     const orderItems = cartItems.map(item => {
-      const product = item.products as any;
+      const product = item.products;
       return {
         order_id: order.id,
         product_id: item.product_id,
@@ -563,11 +608,11 @@ export class CheckoutService {
     return order.id;
   }
 
-  private async createFarmerPayouts(orderId: string, cartItems: any[], requestId: string): Promise<void> {
+  private async createFarmerPayouts(orderId: string, cartItems: CartItem[], requestId: string): Promise<void> {
     const farmerPayouts = new Map<string, number>();
 
     for (const item of cartItems) {
-      const product = item.products as any;
+      const product = item.products;
       const farmProfile = product.farm_profiles;
       const itemTotal = product.price * item.quantity;
       const farmerShare = itemTotal * 0.88; // 88%
@@ -591,7 +636,7 @@ export class CheckoutService {
     }
   }
 
-  private async updateInventory(cartItems: any[], requestId: string): Promise<void> {
+  private async updateInventory(cartItems: CartItem[], requestId: string): Promise<void> {
     // CRITICAL FIX: Use atomic decrement to prevent inventory race conditions
     // Previously: SELECT quantity, then UPDATE quantity - item.quantity (RACE CONDITION!)
     // Now: UPDATE quantity = quantity - N (ATOMIC OPERATION)
@@ -675,7 +720,7 @@ export class CheckoutError extends Error {
   constructor(
     public code: string,
     message: string,
-    public details?: Record<string, any>
+    public details?: Record<string, unknown>
   ) {
     super(message);
     this.name = 'CheckoutError';

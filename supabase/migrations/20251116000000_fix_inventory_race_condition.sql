@@ -41,7 +41,7 @@ $$;
 
 -- Add check constraint to prevent negative inventory at database level
 -- This provides defense-in-depth: even if application logic fails,
--- database will reject any update that would make inventory negative
+-- database rejects every update that would make inventory negative
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -58,4 +58,4 @@ COMMENT ON FUNCTION decrement_product_quantity IS
   'Atomically decrements product quantity to prevent race conditions during concurrent checkouts. Returns old and new quantities for verification.';
 
 COMMENT ON CONSTRAINT products_available_quantity_nonnegative ON products IS
-  'Prevents overselling by rejecting any update that would make inventory negative. Defense-in-depth against race conditions.';
+  'Prevents overselling by rejecting each update that would make inventory negative. Defense-in-depth against race conditions.';

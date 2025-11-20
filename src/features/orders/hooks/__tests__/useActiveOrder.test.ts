@@ -21,12 +21,13 @@ vi.mock('@/contexts/AuthContext', () => ({
 
 const wrapper = ({ children }: { children: ReactNode }) => {
   const queryClient = createTestQueryClient();
-  return QueryClientProvider({ 
-    client: queryClient, 
-    children: BrowserRouter({ 
-      children: AuthProvider({ children }) 
-    }) 
-  }) as any;
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AuthProvider>{children}</AuthProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
+  );
 };
 
 describe('useActiveOrder', () => {

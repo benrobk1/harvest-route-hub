@@ -9,6 +9,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { z } from 'https://deno.land/x/zod@v3.22.4/mod.ts';
+import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { RATE_LIMITS } from '../_shared/constants.ts';
 import {
   withRequestId,
@@ -55,6 +56,23 @@ type Context = RequestIdContext &
   AuthContext &
   SupabaseServiceRoleContext &
   ValidationContext<ReportIssueInput>;
+
+type DeliveryIssue = ReportIssueInput & {
+  id: string;
+  reporter_type: 'driver' | 'farmer' | 'lead_farmer';
+};
+
+type AdminUser = {
+  user_id: string;
+  profiles: {
+    email: string;
+    full_name: string | null;
+    push_subscription?: { enabled?: boolean } | null;
+  };
+};
+
+type OrderConsumer = { consumer_id: string };
+type StopWithOrder = { orders?: { consumer_id: string } | null };
 
 const handler = async (req: Request, ctx: Context): Promise<Response> => {
   const { requestId, corsHeaders, user, input, supabase } = ctx;
@@ -106,10 +124,10 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
   console.log(`[${requestId}] Issue created: ${issue.id}`);
 
   // Notify admins
-  await notifyAdmins(supabase, issue, requestId);
+  await notifyAdmins(supabase, issue as DeliveryIssue, requestId);
 
   // Notify affected customers
-  await notifyAffectedCustomers(supabase, issue, requestId);
+  await notifyAffectedCustomers(supabase, issue as DeliveryIssue, requestId);
 
   return new Response(
     JSON.stringify({ success: true, issue_id: issue.id }),
@@ -120,7 +138,11 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
   );
 };
 
-async function notifyAdmins(supabase: any, issue: any, requestId: string) {
+async function notifyAdmins(
+  supabase: SupabaseClient,
+  issue: DeliveryIssue,
+  requestId: string
+) {
   const severityEmoji: Record<string, string> = {
     low: '🔵',
     medium: '🟡',
@@ -153,7 +175,7 @@ async function notifyAdmins(supabase: any, issue: any, requestId: string) {
 
   console.log(`[${requestId}] Notifying ${admins.length} admins`);
 
-  for (const admin of admins) {
+  for (const admin of admins as AdminUser[]) {
     try {
       const profile = admin.profiles;
 
@@ -205,9 +227,13 @@ const middlewareStack = createMiddlewareStack<Context>([
   withErrorHandling,
 ]);
 
-serve((req) => middlewareStack(handler)(req, {} as any));
+serve((req) => middlewareStack(handler)(req, {} as Context));
 
-async function notifyAffectedCustomers(supabase: any, issue: any, requestId: string) {
+async function notifyAffectedCustomers(
+  supabase: SupabaseClient,
+  issue: DeliveryIssue,
+  requestId: string
+) {
   try {
     let customerIds: string[] = [];
 
@@ -236,8 +262,8 @@ async function notifyAffectedCustomers(supabase: any, issue: any, requestId: str
         .from('orders')
         .select('consumer_id')
         .eq('delivery_batch_id', issue.delivery_batch_id);
-      
-      if (orders) customerIds = orders.map((o: any) => o.consumer_id);
+
+      if (orders) customerIds = orders.map((order: OrderConsumer) => order.consumer_id);
     }
 
     if (customerIds.length === 0) {

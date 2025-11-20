@@ -121,7 +121,7 @@ BEGIN
     RETURN;
   END IF;
 
-  -- Allow admins to see any address
+  -- Allow admins to see every address
   IF has_role(_calling_user_id, 'admin') THEN
     RETURN QUERY
     SELECT p.full_name, p.street_address, p.city, p.state, p.zip_code, p.phone

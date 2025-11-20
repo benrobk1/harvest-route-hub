@@ -44,7 +44,7 @@ export type SendNotificationRequest = z.infer<typeof SendNotificationRequestSche
 
 export const SendNotificationResponseSchema = z.object({
   success: z.boolean(),
-  response: z.any().optional(),
+  response: z.unknown().optional(),
 });
 
 export type SendNotificationResponse = z.infer<typeof SendNotificationResponseSchema>;

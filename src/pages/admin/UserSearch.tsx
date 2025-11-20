@@ -51,6 +51,13 @@ interface UserSearchResult {
   delivery_days: string[] | null;
 }
 
+type UserProfileWithLeadFarmer = UserSearchResult & {
+  lead_farmer?: {
+    full_name: string | null;
+    farm_name: string | null;
+  } | null;
+};
+
 const UserSearch = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState('');
@@ -70,7 +77,8 @@ const UserSearch = () => {
             farm_name
           )
         `)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .returns<UserProfileWithLeadFarmer[]>();
 
       // Apply search filter
       if (searchTerm) {
@@ -98,8 +106,8 @@ const UserSearch = () => {
           return {
             ...profile,
             roles: roles?.map((r) => r.role) || [],
-            lead_farmer_name: (profile as any).lead_farmer?.full_name,
-            lead_farmer_farm_name: (profile as any).lead_farmer?.farm_name,
+            lead_farmer_name: profile.lead_farmer?.full_name || undefined,
+            lead_farmer_farm_name: profile.lead_farmer?.farm_name || undefined,
           };
         })
       );
@@ -108,7 +116,7 @@ const UserSearch = () => {
       let filteredUsers = usersWithRoles;
       if (roleFilter !== 'all') {
         filteredUsers = usersWithRoles.filter((user) =>
-          user.roles.includes(roleFilter as any)
+          user.roles.includes(roleFilter)
         );
       }
 

@@ -6,7 +6,7 @@
  */
 
 import { assertEquals, assertExists } from 'https://deno.land/std@0.192.0/testing/asserts.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient, type Session, type User } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || 'http://localhost:54321';
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') || 'test-anon-key';
@@ -14,8 +14,8 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '
 const FUNCTION_URL = `${SUPABASE_URL}/functions/v1/generate-batches`;
 
 interface TestUser {
-  user: any;
-  session: any;
+  user: User;
+  session: Session;
   isAdmin: boolean;
 }
 
@@ -330,7 +330,7 @@ Deno.test({
       
       // Verify ZIP codes are different if multiple batches created
       if (body.batches.length > 1) {
-        const zipCodes = body.batches.map((b: any) => b.zip_code);
+        const zipCodes = body.batches.map((batch: { zip_code: string }) => batch.zip_code);
         const uniqueZips = new Set(zipCodes);
         assertEquals(uniqueZips.size > 1, true);
       }

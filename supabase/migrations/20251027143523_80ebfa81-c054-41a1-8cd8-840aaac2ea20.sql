@@ -1,4 +1,4 @@
--- Allow admins to update any profile (for approvals)
+-- Allow admins to update every profile (for approvals)
 CREATE POLICY "Admins can update all profiles"
 ON public.profiles
 FOR UPDATE

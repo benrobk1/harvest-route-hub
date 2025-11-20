@@ -1,10 +1,29 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, type Mock } from 'vitest';
 import { generateRouteManifestPDF, RouteManifestData } from '../pdfGenerator';
 import jsPDF from 'jspdf';
 
+type JsPDFMock = {
+  internal: {
+    pageSize: {
+      getWidth: () => number;
+      getHeight: () => number;
+    };
+  };
+  setFontSize: Mock<[number], void>;
+  setFont: Mock<[string, 'bold' | 'normal' | 'italic'], void>;
+  text: Mock<[string, number, number, jsPDF.TextOptionsLight?], void>;
+  setDrawColor: Mock<[number, number, number], void>;
+  line: Mock<[number, number, number, number], void>;
+  addPage: Mock<[], void>;
+  rect: Mock<[number, number, number, number, 'F'], void>;
+  setFillColor: Mock<[number, number, number], void>;
+  splitTextToSize: Mock<[string, number?], string[]>;
+  save: Mock<[string], void>;
+};
+
 // Mock jsPDF
 vi.mock('jspdf', () => ({
-  default: vi.fn(function(this: any) {
+  default: vi.fn(function(this: JsPDFMock) {
     this.internal = {
       pageSize: {
         getWidth: () => 210,
@@ -67,15 +86,15 @@ describe('generateRouteManifestPDF', () => {
   it('includes all stop information', () => {
     generateRouteManifestPDF(mockData);
     
-    const mockInstance = vi.mocked(jsPDF).mock.results[0].value;
+    const mockInstance = vi.mocked(jsPDF).mock.results[0].value as JsPDFMock;
     const textCalls = mockInstance.text.mock.calls;
-    
+
     // Check that customer names are included
-    expect(textCalls.some((call: any[]) => 
+    expect(textCalls.some((call) =>
       call[0]?.includes('Alice Consumer')
     )).toBe(true);
-    
-    expect(textCalls.some((call: any[]) => 
+
+    expect(textCalls.some((call) =>
       call[0]?.includes('Bob Consumer')
     )).toBe(true);
   });
@@ -83,11 +102,11 @@ describe('generateRouteManifestPDF', () => {
   it('includes batch metadata', () => {
     generateRouteManifestPDF(mockData);
     
-    const mockInstance = vi.mocked(jsPDF).mock.results[0].value;
+    const mockInstance = vi.mocked(jsPDF).mock.results[0].value as JsPDFMock;
     const textCalls = mockInstance.text.mock.calls;
-    
-    expect(textCalls.some((call: any[]) => call[0]?.includes('B-001'))).toBe(true);
-    expect(textCalls.some((call: any[]) => call[0]?.includes('John Driver'))).toBe(true);
+
+    expect(textCalls.some((call) => call[0]?.includes('B-001'))).toBe(true);
+    expect(textCalls.some((call) => call[0]?.includes('John Driver'))).toBe(true);
   });
 
   it('calls save with correct filename', () => {

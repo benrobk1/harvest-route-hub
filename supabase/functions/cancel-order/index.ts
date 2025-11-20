@@ -2,6 +2,7 @@ import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 
 import { CancelOrderRequestSchema } from '../_shared/contracts/index.ts';
 import { OrderCancellationService } from '../_shared/services/OrderCancellationService.ts';
+import { getErrorMessage } from '../_shared/utils.ts';
 import {
   createMiddlewareStack,
   withAuth,
@@ -49,8 +50,8 @@ const handler = stack(async (_req, ctx) => {
 
   try {
     await cancellationService.cancelOrder(orderId, user.id);
-  } catch (error: any) {
-    const errorMessage = error.message || 'Unknown error';
+  } catch (error) {
+    const errorMessage = getErrorMessage(error);
 
     if (errorMessage.includes('ORDER_NOT_FOUND')) {
       return new Response(

@@ -260,7 +260,7 @@ export class YourServiceError extends Error {
   constructor(
     public code: string,
     message: string,
-    public details?: any
+    public details?: unknown
   ) {
     super(message);
     this.name = 'YourServiceError';
@@ -311,7 +311,7 @@ try {
 ```typescript
 try {
   // Middleware and business logic
-} catch (error: any) {
+} catch (error: unknown) {
   // Domain-specific errors (4xx)
   if (error instanceof CheckoutError) {
     console.error(`[${requestId}] ❌ ${error.code}: ${error.message}`);
@@ -608,7 +608,7 @@ AND u.created_at > ai.created_at;
 
 ### Documentation Requirements
 
-For any multi-step operation in your edge function, document:
+For each multi-step operation in your edge function, document:
 
 1. **Operation order** - List the steps in sequence
 2. **Failure points** - Where can each step fail?
@@ -771,7 +771,7 @@ Deno.test('checkout - complete flow', async () => {
 3. ✅ Pick one simple function to refactor first
 4. ✅ Test thoroughly before and after
 5. ✅ Gradually migrate other functions
-6. ✅ Document any new patterns you discover
+6. ✅ Document new patterns you discover
 
 ---
 

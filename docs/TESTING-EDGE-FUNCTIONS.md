@@ -50,9 +50,10 @@ deno test --allow-all --watch __tests__/
 ```typescript
 import { assertEquals, assertExists } from 'https://deno.land/std@0.192.0/testing/asserts.ts';
 import { withRequestId } from '../_shared/middleware/withRequestId.ts';
+import type { RequestIdContext } from '../_shared/middleware/withRequestId.ts';
 
 Deno.test('withRequestId - generates unique request ID', async () => {
-  let capturedContext: any;
+  let capturedContext: RequestIdContext | undefined;
   
   const handler = withRequestId(async (req, ctx) => {
     capturedContext = ctx;

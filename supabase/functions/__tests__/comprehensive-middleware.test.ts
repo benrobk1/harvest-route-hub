@@ -11,6 +11,11 @@ import { withErrorHandling } from '../_shared/middleware/withErrorHandling.ts';
 import { withCORS, validateOrigin, getCorsHeaders } from '../_shared/middleware/withCORS.ts';
 import { createMetricsCollector } from '../_shared/monitoring/metrics.ts';
 
+type MiddlewareContext = {
+  corsHeaders?: Record<string, string>;
+  requestId?: string;
+};
+
 // ============================================================================
 // REQUEST ID MIDDLEWARE TESTS
 // ============================================================================
@@ -56,8 +61,10 @@ Deno.test('withRequestId - logs errors with request ID', async () => {
   
   try {
     await handler(req, {});
-  } catch (error: any) {
-    assertExists(error.message);
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      assertExists(error.message);
+    }
   }
 });
 
@@ -170,7 +177,7 @@ Deno.test('getCorsHeaders - includes credentials for allowed origins', () => {
 });
 
 Deno.test('withCORS - handles OPTIONS preflight', async () => {
-  const handler = withCORS(async (req, ctx: any) => {
+  const handler = withCORS(async (req, ctx: MiddlewareContext) => {
     return new Response('OK');
   });
 
@@ -185,7 +192,7 @@ Deno.test('withCORS - handles OPTIONS preflight', async () => {
 });
 
 Deno.test('withCORS - rejects non-allowed origins', async () => {
-  const handler = withCORS(async (req, ctx: any) => {
+  const handler = withCORS(async (req, ctx: MiddlewareContext) => {
     return new Response('OK');
   });
 
@@ -200,7 +207,7 @@ Deno.test('withCORS - rejects non-allowed origins', async () => {
 });
 
 Deno.test('withCORS - attaches CORS headers to response', async () => {
-  const handler = withCORS(async (req, ctx: any) => {
+  const handler = withCORS(async (req, ctx: MiddlewareContext) => {
     return new Response('OK', { headers: ctx.corsHeaders });
   });
 
@@ -271,7 +278,7 @@ Deno.test('metrics.log - logs error data', () => {
 
 Deno.test('middleware composition - RequestId + ErrorHandling', async () => {
   const handler = withRequestId(
-    withErrorHandling(async (req, ctx: any) => {
+    withErrorHandling(async (req, ctx: MiddlewareContext) => {
       if (!ctx.requestId) {
         throw new Error('Missing request ID');
       }
@@ -288,7 +295,7 @@ Deno.test('middleware composition - RequestId + ErrorHandling', async () => {
 Deno.test('middleware composition - full stack with error', async () => {
   const handler = withRequestId(
     withErrorHandling(
-      withCORS(async (req, ctx: any) => {
+      withCORS(async (req, ctx: MiddlewareContext) => {
         throw new Error('Test error in full stack');
       })
     )
@@ -305,10 +312,10 @@ Deno.test('middleware composition - full stack with error', async () => {
 });
 
 Deno.test('middleware composition - preserves context through layers', async () => {
-  let capturedContext: any;
-  
+  let capturedContext: MiddlewareContext | undefined;
+
   const handler = withRequestId(
-    withCORS(async (req, ctx: any) => {
+    withCORS(async (req, ctx: MiddlewareContext) => {
       capturedContext = ctx;
       return new Response('OK', { headers: ctx.corsHeaders });
     })
@@ -361,7 +368,7 @@ Deno.test('error handling - handles non-Error objects', async () => {
 });
 
 Deno.test('CORS - handles missing Origin header gracefully', async () => {
-  const handler = withCORS(async (req, ctx: any) => {
+  const handler = withCORS(async (req, ctx: MiddlewareContext) => {
     return new Response('OK', { headers: ctx.corsHeaders });
   });
 

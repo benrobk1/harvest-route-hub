@@ -14,7 +14,7 @@ vi.mock('react-router-dom', async () => {
 });
 
 describe('ProductCard', () => {
-  const mockProduct = {
+  const mockProduct: ReturnType<typeof createMockProduct> = {
     ...createMockProduct(),
     name: 'Fresh Tomatoes',
     price: 4.99,
@@ -26,7 +26,7 @@ describe('ProductCard', () => {
       farm_name: 'Green Acres Farm',
       location: '10001',
     },
-  } as any;
+  };
 
   const mockOnAddToCart = vi.fn();
 

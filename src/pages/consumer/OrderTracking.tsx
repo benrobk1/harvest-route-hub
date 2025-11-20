@@ -255,7 +255,7 @@ const ConsumerOrderTracking = () => {
                     <div className="space-y-2">
                       <p className="text-sm font-medium">Items:</p>
                       <div className="space-y-1">
-                        {order.order_items?.map((item: any, idx: number) => (
+                        {order.order_items?.map((item, idx: number) => (
                           <div key={idx} className="flex justify-between items-center text-sm">
                             <button
                               onClick={() => {

@@ -49,7 +49,7 @@ const TermsOfService = () => {
                 <li>Provide accurate, current, and complete information during registration</li>
                 <li>Maintain the security of your account credentials</li>
                 <li>Accept responsibility for all activities that occur under your account</li>
-                <li>Notify us immediately of any unauthorized use of your account</li>
+                <li>Notify us immediately about unauthorized use of your account</li>
               </ul>
             </section>
 
@@ -61,7 +61,7 @@ const TermsOfService = () => {
                 <li>Provide accurate delivery information</li>
                 <li>Be available to receive deliveries at scheduled times</li>
                 <li>Pay for orders in full and on time</li>
-                <li>Report any issues with orders promptly</li>
+                <li>Report issues with orders promptly</li>
               </ul>
 
               <h3 className="font-semibold mt-4 mb-2">4.2 Farmers</h3>
@@ -136,7 +136,7 @@ const TermsOfService = () => {
               <h2 className="text-xl font-semibold mb-3">10. Prohibited Activities</h2>
               <p className="text-muted-foreground mb-2">You agree not to:</p>
               <ul className="list-disc pl-6 text-muted-foreground space-y-1">
-                <li>Violate any laws or regulations</li>
+                <li>Violate laws or regulations</li>
                 <li>Infringe on others' rights</li>
                 <li>Transmit harmful code or malware</li>
                 <li>Attempt to gain unauthorized access to the Platform</li>
@@ -149,16 +149,16 @@ const TermsOfService = () => {
             <section>
               <h2 className="text-xl font-semibold mb-3">11. Limitation of Liability</h2>
               <p className="text-muted-foreground">
-                To the maximum extent permitted by law, Blue Harvests shall not be liable for any indirect, incidental, 
-                special, consequential, or punitive damages, or any loss of profits or revenues, whether incurred directly 
-                or indirectly, or any loss of data, use, goodwill, or other intangible losses.
+                To the maximum extent permitted by law, Blue Harvests shall not be liable for indirect, incidental,
+                special, consequential, or punitive damages, or for loss of profits or revenues, whether incurred directly
+                or indirectly, or for loss of data, use, goodwill, or other intangible losses.
               </p>
             </section>
 
             <section>
               <h2 className="text-xl font-semibold mb-3">12. Indemnification</h2>
               <p className="text-muted-foreground">
-                You agree to indemnify and hold harmless Blue Harvests from any claims, damages, losses, liabilities, 
+                You agree to indemnify and hold harmless Blue Harvests from claims, damages, losses, liabilities,
                 and expenses arising from your use of the Platform or violation of these Terms.
               </p>
             </section>
@@ -166,8 +166,8 @@ const TermsOfService = () => {
             <section>
               <h2 className="text-xl font-semibold mb-3">13. Termination</h2>
               <p className="text-muted-foreground">
-                We reserve the right to suspend or terminate your account at any time for violation of these Terms or 
-                for any other reason at our sole discretion. Upon termination, your right to use the Platform will 
+                We reserve the right to suspend or terminate your account at our discretion for violation of these Terms or
+                for other reasons. Upon termination, your right to use the Platform will
                 immediately cease.
               </p>
             </section>
@@ -183,8 +183,8 @@ const TermsOfService = () => {
             <section>
               <h2 className="text-xl font-semibold mb-3">15. Changes to Terms</h2>
               <p className="text-muted-foreground">
-                We reserve the right to modify these Terms at any time. We will notify users of any material changes 
-                by posting the new Terms on this page and updating the "Last updated" date. Your continued use of the 
+                We reserve the right to modify these Terms whenever necessary. We will notify users of material changes
+                by posting the new Terms on this page and updating the "Last updated" date. Your continued use of the
                 Platform after changes constitutes acceptance of the new Terms.
               </p>
             </section>

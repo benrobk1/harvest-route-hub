@@ -15,7 +15,7 @@ export interface FunctionMetrics {
   userId?: string;
   errorMessage?: string;
   errorStack?: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface PerformanceMarker {
@@ -126,7 +126,7 @@ export function logSlowQuery(requestId: string, query: string, durationMs: numbe
 export function logBusinessEvent(
   requestId: string,
   eventType: string,
-  details: Record<string, any>
+  details: Record<string, unknown>
 ): void {
   console.log(JSON.stringify({
     type: 'business_event',
@@ -144,7 +144,7 @@ export function logSecurityEvent(
   requestId: string,
   eventType: string,
   userId: string | undefined,
-  details: Record<string, any>
+  details: Record<string, unknown>
 ): void {
   console.warn(JSON.stringify({
     type: 'security_event',

@@ -1,13 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useProductSearch } from '../useProductSearch';
-import { createMockProducts } from '@/test/factories/productFactory';
+import { createMockProducts, createMockProduct } from '@/test/factories/productFactory';
 
 describe('useProductSearch', () => {
-  const mockProducts = createMockProducts(5, {
+  const mockProducts: ReturnType<typeof createMockProduct>[] = createMockProducts(5, {
     farm_profiles: { id: 'farm-1', farm_name: 'Test Farm', location: null },
     harvest_date: null,
-  }) as any;
+  });
 
   it('should initialize with empty search query', () => {
     const { result } = renderHook(() => useProductSearch(mockProducts));

@@ -57,8 +57,8 @@ export async function retryWithBackoff<T>(
   for (let i = 0; i < maxRetries; i++) {
     try {
       return await fn();
-    } catch (error: any) {
-      lastError = error;
+    } catch (error: unknown) {
+      lastError = error instanceof Error ? error : new Error(String(error));
       
       if (i < maxRetries - 1) {
         const delay = baseDelayMs * Math.pow(2, i);
@@ -131,7 +131,7 @@ export async function processWithConcurrency<T, R>(
 /**
  * Debounce function calls
  */
-export function debounce<T extends (...args: any[]) => any>(
+export function debounce<T extends (...args: unknown[]) => unknown>(
   fn: T,
   delayMs: number
 ): (...args: Parameters<T>) => void {
@@ -152,7 +152,7 @@ export function debounce<T extends (...args: any[]) => any>(
 /**
  * Throttle function calls
  */
-export function throttle<T extends (...args: any[]) => any>(
+export function throttle<T extends (...args: unknown[]) => unknown>(
   fn: T,
   limitMs: number
 ): (...args: Parameters<T>) => void {

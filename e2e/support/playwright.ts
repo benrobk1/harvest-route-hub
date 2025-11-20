@@ -20,14 +20,13 @@ try {
 } catch (error) {
   hasPlaywright = false;
   const bun = await import('bun:test');
-  
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const skipTest = (title: string, fn?: (...args: unknown[]) => unknown) => bun.test.skip(title, fn as any);
+
+  const skipTest = (title: string, fn?: (...args: unknown[]) => unknown) =>
+    bun.test.skip(title, fn as (...args: unknown[]) => unknown);
   const noop = () => {};
 
   // Use Proxy for cleaner stub implementation while maintaining type safety
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const stubTest: any = new Proxy(
+  const stubTest = new Proxy(
     (title: string, fn?: (...args: unknown[]) => unknown) => skipTest(title, fn),
     {
       get(target, prop) {
@@ -56,13 +55,13 @@ try {
         if (prop === 'afterEach') {
           return (...args: Parameters<typeof bun.afterEach>) => bun.afterEach?.(...args);
         }
-        // Default: return skipTest for any unknown property
+        // Default: return skipTest for unknown properties
         return skipTest;
       }
     }
-  );
+  ) as unknown as PlaywrightTest;
 
-  test = stubTest as PlaywrightTest;
+  test = stubTest;
   
   // Type the expect stub to match Playwright's expect interface
   expect = (() => {

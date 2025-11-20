@@ -188,12 +188,168 @@ Product has **10 units**. Two customers buy 7 each:
 
 ---
 
+## 🐛 Bug #3: Credits Redemption Race Condition
+
+### **Severity:** CRITICAL
+### **Impact:** Users could overspend credits beyond their available balance
+
+### **Location:**
+- File: `supabase/functions/_shared/services/CheckoutService.ts`
+- Methods: `calculateCreditsUsed()` (lines 397-420) and `redeemCredits()` (lines 675-709)
+
+### **The Problem:**
+
+The code used a **SELECT-calculate-INSERT** pattern vulnerable to race conditions:
+
+```typescript
+// ❌ VULNERABLE CODE (BEFORE)
+// In calculateCreditsUsed():
+const { data: latestCredit } = await this.supabase
+  .from('credits_ledger')
+  .select('balance_after')
+  .eq('consumer_id', userId)
+  .order('created_at', { ascending: false })
+  .limit(1)
+  .single();
+
+const availableCredits = latestCredit?.balance_after || 0;
+const creditsUsed = Math.min(availableCredits, totalBeforeCredits);
+
+// ... later in redeemCredits():
+const { data: latestCredit } = await this.supabase
+  .from('credits_ledger')
+  .select('balance_after')
+  .eq('consumer_id', userId)
+  .order('created_at', { ascending: false })
+  .limit(1)
+  .single();
+
+const currentBalance = latestCredit?.balance_after || 0;
+const newBalance = currentBalance - creditsUsed;
+
+await this.supabase.from('credits_ledger').insert({
+  balance_after: newBalance,
+  amount: -creditsUsed
+});
+```
+
+### **Attack Scenario:**
+
+User has **$50 in credits**. Places two $30 orders simultaneously:
+
+1. **T+0ms:** Checkout A reads balance = $50, calculates creditsUsed = $30
+2. **T+1ms:** Checkout B reads balance = $50 (same!), calculates creditsUsed = $30
+3. **T+5ms:** Checkout A processes payment for $0 (fully covered by credits)
+4. **T+6ms:** Checkout B processes payment for $0 (fully covered by credits)
+5. **T+10ms:** Checkout A inserts new balance = $20
+6. **T+11ms:** Checkout B inserts new balance = $20
+
+**Result:** User placed two $30 orders ($60 total) but only $30 was deducted from credits!
+
+### **Real-World Impact:**
+
+- **Financial Loss:** Platform loses money when users overspend credits
+- **Fraud Potential:** Malicious users could exploit this with multiple concurrent checkouts
+- **Accounting Errors:** Credit ledger becomes inconsistent with actual redemptions
+
+### **The Fix:**
+
+Use **atomic database function** for credit redemption:
+
+```sql
+-- New PostgreSQL function
+CREATE OR REPLACE FUNCTION redeem_credits_atomic(
+  p_consumer_id UUID,
+  p_order_id UUID,
+  p_credits_to_redeem NUMERIC,
+  p_description TEXT DEFAULT 'Credits redeemed for order'
+)
+RETURNS TABLE (new_balance NUMERIC, old_balance NUMERIC, transaction_id UUID)
+AS $$
+BEGIN
+  -- Get current balance
+  SELECT balance_after INTO v_old_balance
+  FROM credits_ledger
+  WHERE consumer_id = p_consumer_id
+  ORDER BY created_at DESC
+  LIMIT 1;
+
+  v_old_balance := COALESCE(v_old_balance, 0);
+  v_new_balance := v_old_balance - p_credits_to_redeem;
+
+  -- Validate sufficient credits
+  IF v_new_balance < 0 THEN
+    RAISE EXCEPTION 'Insufficient credits. Balance: %, Requested: %', v_old_balance, p_credits_to_redeem;
+  END IF;
+
+  -- Atomically insert new ledger entry
+  INSERT INTO credits_ledger (...)
+  VALUES (...)
+  RETURNING id INTO v_transaction_id;
+
+  RETURN QUERY SELECT v_new_balance, v_old_balance, v_transaction_id;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Add constraint to prevent negative balances
+ALTER TABLE credits_ledger
+ADD CONSTRAINT credits_ledger_balance_nonnegative
+CHECK (balance_after >= 0);
+```
+
+```typescript
+// ✅ SECURE CODE (AFTER)
+// In calculateCreditsUsed():
+const { data: availableCredits, error } = await this.supabase.rpc('get_available_credits', {
+  p_consumer_id: userId
+});
+
+const creditsUsed = Math.min(availableCredits || 0, totalBeforeCredits);
+
+// In redeemCredits():
+const { data, error } = await this.supabase.rpc('redeem_credits_atomic', {
+  p_consumer_id: userId,
+  p_order_id: orderId,
+  p_credits_to_redeem: creditsUsed
+});
+
+if (error?.message?.includes('Insufficient credits')) {
+  throw new CheckoutError('INSUFFICIENT_CREDITS', 'Not enough credits available');
+}
+```
+
+### **Why This Works:**
+
+1. **Atomic Transaction:** PostgreSQL executes the entire function in a single transaction
+2. **Serialization:** Concurrent redemptions are automatically serialized by the database
+3. **Validation:** Function validates sufficient balance before inserting
+4. **Defense-in-Depth:** CHECK constraint prevents negative balances even if logic fails
+5. **Error Detection:** Returns clear error when insufficient credits (catches races)
+
+### **Same Scenario, Fixed:**
+
+User has **$50 in credits**. Places two $30 orders:
+
+1. **T+0ms:** Checkout A calls `redeem_credits_atomic(userId, $30)` → DB: $50 - $30 = $20 ✅
+2. **T+1ms:** Checkout B calls `redeem_credits_atomic(userId, $30)` → DB: $20 - $30 = -$10
+3. **T+2ms:** Function REJECTS Checkout B (insufficient credits!)
+4. **T+3ms:** Checkout B gets error: "INSUFFICIENT_CREDITS"
+
+**Result:** Only $30 redeemed (correct!), Checkout B properly rejected, no overspending.
+
+### **Files Changed:**
+- ✅ `supabase/migrations/20251120000000_fix_credits_race_condition.sql` - Atomic functions + constraint
+- ✅ `supabase/functions/_shared/services/CheckoutService.ts` - Updated to use atomic operations
+
+---
+
 ## 📊 Summary
 
 | Bug | Severity | Exploitable? | Fix Type | Test Coverage |
 |-----|----------|--------------|----------|---------------|
 | Batch Claiming Race | CRITICAL | Yes - concurrent requests | Atomic UPDATE | Documented |
 | Inventory Race | CRITICAL | Yes - concurrent checkouts | Database function + constraint | Pending |
+| Credits Redemption Race | CRITICAL | Yes - concurrent checkouts | Database function + constraint | Pending |
 
 ## 🧪 Testing Recommendations
 
@@ -210,6 +366,13 @@ Product has **10 units**. Two customers buy 7 each:
    - Run simultaneously (use `Promise.all`)
    - Verify only 1 succeeds, other gets "INSUFFICIENT_INVENTORY"
 
+3. **Credits Redemption:**
+   - User with $50 credits
+   - Two checkouts for $30 each (both using credits)
+   - Run simultaneously (use `Promise.all`)
+   - Verify only 1 succeeds, other gets "INSUFFICIENT_CREDITS"
+   - Verify final balance is $20 (not $50)
+
 ### Automated Testing:
 - TODO: Add integration tests with actual database
 - TODO: Add load testing with Artillery (concurrent requests)
@@ -219,10 +382,16 @@ Product has **10 units**. Two customers buy 7 each:
 
 These fixes are **backwards compatible** and can be deployed immediately:
 
-1. **Migration:** Run `20251116000000_fix_inventory_race_condition.sql`
+1. **Migrations:** Run in order:
+   - `20251116000000_fix_inventory_race_condition.sql`
+   - `20251120000000_fix_credits_race_condition.sql`
 2. **Deploy:** Push code changes to production
-3. **Verify:** Monitor logs for `INSUFFICIENT_INVENTORY` errors (should increase initially as race conditions are now properly detected)
-4. **Alert:** Set up alerts for repeated `BATCH_UNAVAILABLE` errors (could indicate UX issue with stale data)
+3. **Verify:** Monitor logs for:
+   - `INSUFFICIENT_INVENTORY` errors (should increase as race conditions are caught)
+   - `INSUFFICIENT_CREDITS` errors (indicates credit races being prevented)
+4. **Alert:** Set up alerts for:
+   - Repeated `BATCH_UNAVAILABLE` errors (could indicate UX issue with stale data)
+   - Spike in `INSUFFICIENT_CREDITS` errors (could indicate attempted fraud)
 
 ## 📚 References
 

@@ -395,26 +395,27 @@ export class CheckoutService {
   }
 
   private async calculateCreditsUsed(
-    userId: string, 
-    useCredits: boolean, 
+    userId: string,
+    useCredits: boolean,
     totalBeforeCredits: number,
     requestId: string
   ): Promise<number> {
     if (!useCredits) return 0;
 
-    const { data: latestCredit } = await this.supabase
-      .from('credits_ledger')
-      .select('balance_after')
-      .eq('consumer_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
+    // Use atomic function to get current balance (prevents TOCTOU race condition)
+    const { data: availableCredits, error } = await this.supabase.rpc('get_available_credits', {
+      p_consumer_id: userId
+    });
 
-    const availableCredits = latestCredit?.balance_after || 0;
-    const creditsUsed = Math.min(availableCredits, totalBeforeCredits);
+    if (error) {
+      console.error(`[${requestId}] [CHECKOUT] Failed to get available credits:`, error);
+      throw new CheckoutError('CREDITS_ERROR', `Failed to get available credits: ${error.message}`);
+    }
+
+    const creditsUsed = Math.min(availableCredits || 0, totalBeforeCredits);
 
     console.log(`[${requestId}] [CHECKOUT] Credits: available=$${availableCredits}, using=$${creditsUsed}`);
-    
+
     return creditsUsed;
   }
 
@@ -673,27 +674,39 @@ export class CheckoutService {
   }
 
   private async redeemCredits(userId: string, orderId: string, creditsUsed: number, requestId: string): Promise<void> {
-    const { data: latestCredit } = await this.supabase
-      .from('credits_ledger')
-      .select('balance_after')
-      .eq('consumer_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
+    // CRITICAL FIX: Use atomic redemption to prevent credits race condition
+    // Previously: SELECT balance, then INSERT (RACE CONDITION!)
+    // Now: Atomic function that validates and updates in single transaction
+    //
+    // WHY THIS MATTERS:
+    // - Scenario: User has $50 credits. Places two $30 orders simultaneously.
+    // - OLD BUG: Both read $50, both insert balance=$20, user spent $60 but only $30 deducted!
+    // - NEW FIX: Atomic function ensures only one can succeed, other gets INSUFFICIENT_CREDITS error
 
-    const currentBalance = latestCredit?.balance_after || 0;
-    const newBalance = currentBalance - creditsUsed;
-
-    await this.supabase.from('credits_ledger').insert({
-      consumer_id: userId,
-      order_id: orderId,
-      transaction_type: 'redemption',
-      amount: -creditsUsed,
-      balance_after: newBalance,
-      description: `Credits redeemed for order`
+    const { data, error } = await this.supabase.rpc('redeem_credits_atomic', {
+      p_consumer_id: userId,
+      p_order_id: orderId,
+      p_credits_to_redeem: creditsUsed,
+      p_description: 'Credits redeemed for order'
     });
 
-    console.log(`[${requestId}] [CHECKOUT] Credits redeemed: $${creditsUsed} (new balance: $${newBalance})`);
+    if (error) {
+      // Check if it's an insufficient credits error (race condition detected!)
+      if (error.code === '23514' || error.message?.includes('Insufficient credits')) {
+        console.error(`[${requestId}] [CHECKOUT] ❌ Insufficient credits (race condition caught): ${error.message}`);
+        throw new CheckoutError('INSUFFICIENT_CREDITS', `Insufficient credits available: ${error.message}`);
+      }
+
+      console.error(`[${requestId}] [CHECKOUT] Failed to redeem credits:`, error);
+      throw new CheckoutError('CREDITS_ERROR', `Failed to redeem credits: ${error.message}`);
+    }
+
+    if (!data || data.length === 0) {
+      throw new CheckoutError('CREDITS_ERROR', 'Credit redemption returned no data');
+    }
+
+    const { new_balance, old_balance } = data[0];
+    console.log(`[${requestId}] [CHECKOUT] ✅ Credits redeemed atomically: $${creditsUsed} (balance: $${old_balance} → $${new_balance})`);
   }
 
   private async clearCart(cartId: string, requestId: string): Promise<void> {

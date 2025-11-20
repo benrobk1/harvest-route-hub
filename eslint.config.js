@@ -12,12 +12,14 @@ export default tseslint.config(
     extends: [
       js.configs.recommended,
       ...tseslint.configs.recommended,
+      ...tseslint.configs.recommendedTypeChecked,
     ],
     files: ["**/*.{ts,tsx}"],
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.browser,
       parserOptions: {
+        project: ["./tsconfig.app.json"],
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -28,8 +30,12 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": "off",
-      "@typescript-eslint/no-unused-vars": "off",
+      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
       [noExplicitLooseRule]: "error",
+      // Selectively disable strict type-checked rules that are too restrictive for this codebase
+      "@typescript-eslint/no-confusing-void-expression": "off",
+      "@typescript-eslint/no-unnecessary-condition": "off",
+      "@typescript-eslint/restrict-template-expressions": "off",
     },
   },
   {

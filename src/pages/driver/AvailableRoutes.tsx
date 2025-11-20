@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import { Package, MapPin, Calendar } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { driverQueries } from "@/features/drivers";
 
@@ -153,3 +152,4 @@ export default function AvailableRoutes() {
     </div>
   );
 }
+import { Package } from "lucide-react";

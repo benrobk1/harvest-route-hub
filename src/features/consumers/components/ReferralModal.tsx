@@ -65,7 +65,7 @@ export const ReferralModal = ({ open, onOpenChange }: ReferralModalProps) => {
     if (navigator.share) {
       try {
         await navigator.share(shareData);
-      } catch (err) {
+      } catch {
         handleCopyLink();
       }
     } else {

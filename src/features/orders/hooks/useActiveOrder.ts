@@ -4,7 +4,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { POLLING_INTERVALS } from '@/config/ui-constants';
 import { getOrderRepository } from '@/repositories';
 import { orderQueries } from '../queries';
-import type { OrderWithDetails } from '../types';
 
 /**
  * Hook for tracking consumer's active order in real-time

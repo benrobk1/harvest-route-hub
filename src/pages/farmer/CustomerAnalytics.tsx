@@ -1,10 +1,10 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, MapPin, TrendingUp, Users, ChevronDown } from 'lucide-react';
+import { ArrowLeft, TrendingUp, Users } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatMoney } from '@/lib/formatMoney';
@@ -12,7 +12,6 @@ import { farmerQueries } from '@/features/farmers';
 import type { CustomerZipSummary } from '@/features/farmers';
 import type { Database } from '@/integrations/supabase/types';
 
-const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', 'hsl(var(--accent))', 'hsl(var(--muted))'];
 
 type OrderWithZip = Database['public']['Tables']['orders']['Row'] & {
   profiles: {
@@ -169,24 +168,6 @@ function summarizeOrdersByZip(orders: OrderWithZip[] = []): ZipDataWithCustomers
 }
 
 // Demo data for Milton zip code with customer details
-const DEMO_ZIP_DATA = [
-  {
-    zip_code: '12547',
-    order_count: 264,
-    total_revenue: 10032,
-    unique_customers: 40,
-    most_common_produce: 'Tomatoes, Lettuce, Carrots',
-    avg_days_between_orders: 14,
-    avg_order_size: 38,
-    customers: [
-      { name: 'Sarah Johnson', orders: 12, revenue: 456, avg_order: 38, common_produce: 'Tomatoes, Basil', days_between: 7 },
-      { name: 'Mike Chen', orders: 8, revenue: 312, avg_order: 39, common_produce: 'Lettuce, Carrots', days_between: 14 },
-      { name: 'Emily Rodriguez', orders: 15, revenue: 585, avg_order: 39, common_produce: 'Tomatoes, Lettuce', days_between: 10 },
-      { name: 'James Wilson', orders: 6, revenue: 228, avg_order: 38, common_produce: 'Carrots, Peppers', days_between: 21 },
-      { name: 'Lisa Anderson', orders: 10, revenue: 380, avg_order: 38, common_produce: 'Tomatoes, Cucumbers', days_between: 12 },
-    ]
-  }
-];
 
 export default function CustomerAnalytics() {
   const { user } = useAuth();

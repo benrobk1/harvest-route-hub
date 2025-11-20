@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Users, Truck, Sprout, DollarSign, TrendingUp, MapPin, FileText, Database, Loader2 } from "lucide-react";
+import { MapPin } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -14,7 +14,7 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   
   // Fetch metrics
-  const { data: metrics, isLoading: metricsLoading, refetch } = useQuery({
+  const { data: metrics, isLoading: metricsLoading } = useQuery({
     queryKey: adminQueries.metrics(),
     queryFn: async () => {
       // Count consumers

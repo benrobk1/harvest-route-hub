@@ -9,7 +9,6 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StripeConnectButton } from "@/components/StripeConnectButton";
-import { PayoutsDashboard } from "@/features/payouts";
 import { DocumentUpload } from "@/components/DocumentUpload";
 import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle2 } from "lucide-react";

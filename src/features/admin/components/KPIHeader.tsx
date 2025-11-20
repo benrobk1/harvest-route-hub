@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchKPIs } from '@/lib/adminKPIs';
-import { Users, DollarSign, CheckCircle, Sprout, TrendingUp, Package, Heart, UserMinus } from 'lucide-react';
+import { Users, DollarSign, CheckCircle, Package, Heart, UserMinus } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatMoney } from '@/lib/formatMoney';
 import { cn } from '@/lib/utils';

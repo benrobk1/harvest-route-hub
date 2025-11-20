@@ -68,7 +68,7 @@ export const createMockStripeClient = () => ({
     }),
   },
   webhooks: {
-    constructEvent: vi.fn().mockImplementation((payload, sig, secret) => ({
+      constructEvent: vi.fn().mockImplementation((_payload, _sig, _secret) => ({
       id: 'evt_test_123',
       type: 'payment_intent.succeeded',
       data: {

@@ -9,60 +9,6 @@ import { useNavigate } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 import { farmerQueries } from '@/features/farmers';
 
-// Demo data for collection point
-const DEMO_COLLECTION_POINT = {
-  name: 'Thompson Family Farm',
-  address: '456 Farm Road, Milton, NY 12547',
-  contact: null,
-  phone: null,
-  email: null
-};
-
-const DEMO_AFFILIATED_FARMERS = [
-  {
-    id: '1',
-    farm_name: 'Green Valley Organics',
-    farmer_name: 'John Thompson',
-    role: 'Farmer',
-    address: '123 Valley Road, Milton, NY 12547',
-    phone: '(845) 555-0201',
-    email: 'john@greenvalley.farm',
-    location: 'Milton, NY',
-    bio: 'Certified organic vegetables and herbs, specializing in heirloom tomatoes',
-    commission_rate: 2.0,
-    active_products: 8,
-    product_names: 'Tomatoes, Lettuce, Carrots, Basil, Peppers, Cucumbers',
-  },
-  {
-    id: '2',
-    farm_name: 'Sunrise Acres',
-    farmer_name: 'Emily Rodriguez',
-    role: 'Farmer',
-    address: '789 Harvest Lane, Milton, NY 12547',
-    phone: '(845) 555-0202',
-    email: 'emily@sunriseacres.farm',
-    location: 'Milton, NY',
-    bio: 'Family-run farm growing seasonal produce with sustainable practices',
-    commission_rate: 2.0,
-    active_products: 6,
-    product_names: 'Squash, Zucchini, Kale, Spinach, Beets',
-  },
-  {
-    id: '3',
-    farm_name: 'Heritage Fields',
-    farmer_name: 'Michael Chen',
-    role: 'Farmer',
-    address: '321 Orchard Street, Milton, NY 12547',
-    phone: '(845) 555-0203',
-    email: 'michael@heritagefields.farm',
-    location: 'Milton, NY',
-    bio: 'Preserving traditional farming methods while growing diverse crops',
-    commission_rate: 2.0,
-    active_products: 10,
-    product_names: 'Beans, Peas, Radishes, Turnips, Cabbage, Onions',
-  },
-];
-
 export default function AffiliatedFarmers() {
   const { user } = useAuth();
   const navigate = useNavigate();

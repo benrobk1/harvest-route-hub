@@ -2,8 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Clock, Info, MapPin } from 'lucide-react';
+import { Clock, MapPin } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { driverQueries } from '@/features/drivers';
@@ -78,6 +77,17 @@ export const RouteDensityMap = ({ batchId }: RouteDensityMapProps) => {
   };
 
   const densityStatus = getDensityStatus(totalCount);
+  const densityLabel = {
+    excellent: 'Ideal clustering',
+    good: 'Healthy density',
+    warning: 'Light density',
+  }[densityStatus];
+
+  const densityClassName = {
+    excellent: 'bg-green-600',
+    good: 'bg-blue-600',
+    warning: 'bg-amber-500 text-black',
+  }[densityStatus];
 
   return (
     <Card>
@@ -89,12 +99,13 @@ export const RouteDensityMap = ({ batchId }: RouteDensityMapProps) => {
         <CardDescription>
           {totalCount} stops clustered for maximum efficiency
         </CardDescription>
+        <Badge className={cn('w-fit', densityClassName)}>{densityLabel}</Badge>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Visual stop grid */}
         <div className="relative min-h-[200px] bg-gradient-to-br from-primary/5 to-secondary/5 rounded-lg overflow-hidden p-4 border">
           <div className="grid grid-cols-8 gap-2">
-            {stops.map((stop, idx) => (
+            {stops.map((stop, _idx) => (
               <div
                 key={stop.id}
                 className={cn(

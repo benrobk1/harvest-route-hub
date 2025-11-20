@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ShoppingCart, Minus, Plus, Trash2, Save, History } from "lucide-react";
 import { formatMoney } from "@/lib/formatMoney";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { useState } from "react";
 import { useCart } from "../hooks/useCart";
 import { SaveCartDialog } from "./SaveCartDialog";
@@ -12,8 +12,8 @@ import { SavedCartsList } from "./SavedCartsList";
 import CartItemSkeleton from "./CartItemSkeleton";
 
 export const CartDrawer = () => {
-  const { 
-    cart, 
+  const {
+    cart,
     cartCount, 
     cartTotal, 
     updateQuantity, 
@@ -22,19 +22,10 @@ export const CartDrawer = () => {
     savedCarts = [], 
     saveCart, 
     loadSavedCart, 
-    deleteSavedCart 
+    deleteSavedCart
   } = useCart();
-  const navigate = useNavigate();
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [open, setOpen] = useState(false);
-
-  const handleCheckout = () => {
-    setOpen(false);
-    // Small delay to ensure sheet closes before navigation
-    setTimeout(() => {
-      navigate('/consumer/checkout');
-    }, 100);
-  };
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>

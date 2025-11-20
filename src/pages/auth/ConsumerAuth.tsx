@@ -9,7 +9,6 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, ShoppingBag, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
 import { z } from "zod";
 import { getAuthErrorMessage } from "@/lib/authErrors";
 
@@ -20,7 +19,6 @@ const ConsumerAuth = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
-  const { roles } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [referralCode, setReferralCode] = useState(searchParams.get('ref') || '');
   const [formError, setFormError] = useState<{ title: string; description: string } | null>(null);

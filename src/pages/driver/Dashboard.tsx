@@ -2,10 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { DollarSign, Package, TrendingUp, Star, Navigation, Clock, Printer, MapPin, FileText } from "lucide-react";
-import { format } from "date-fns";
-import { generateRouteManifestPDF, type RouteManifestData } from '@/lib/pdfGenerator';
-import { useToast } from "@/hooks/use-toast";
+import { DollarSign, Package, TrendingUp, Star, Navigation, Clock, MapPin, FileText } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -33,28 +30,8 @@ type OrderNameLookup = {
   profiles: { full_name: string | null } | null;
 };
 
-type ManifestOrderItem = {
-  quantity: number;
-  products: { name: string | null; unit: string | null } | null;
-};
 
-type ManifestStop = {
-  sequence_number: number;
-  address: string | null;
-  notes: string | null;
-  estimated_arrival: string | null;
-  orders: {
-    box_code: string | null;
-    profiles: { full_name: string | null; phone: string | null } | null;
-    order_items: ManifestOrderItem[] | null;
-  } | null;
-};
 
-type ManifestBatch = {
-  batch_number: number;
-  delivery_date: string;
-  batch_stops: ManifestStop[] | null;
-};
 
 type ActiveRouteStop = {
   id: string;
@@ -67,7 +44,6 @@ type ActiveRouteStop = {
 
 const DriverDashboard = () => {
   const { user } = useAuth();
-  const { toast } = useToast();
   const navigate = useNavigate();
 
   // Fetch earnings from delivery fees and tips
@@ -280,8 +256,8 @@ const DriverDashboard = () => {
     queryFn: async () => {
       const monthStart = new Date();
       monthStart.setDate(monthStart.getDate() - 30);
-      
-      const { data, count } = await supabase
+
+      const { count } = await supabase
         .from('delivery_batches')
         .select('id', { count: 'exact' })
         .eq('driver_id', user?.id)
@@ -293,89 +269,7 @@ const DriverDashboard = () => {
     enabled: !!user?.id,
   });
 
-  const handlePrintManifest = async (batchId: string) => {
-    try {
-      const { data: batch } = await supabase
-        .from('delivery_batches')
-        .select(`
-          batch_number,
-          delivery_date,
-          batch_stops (
-            sequence_number,
-            address,
-            notes,
-            estimated_arrival,
-            orders!inner(
-              box_code,
-              profiles!inner(full_name, phone),
-              order_items (
-                quantity,
-                products (name, unit)
-              )
-            )
-          )
-        `)
-        .returns<ManifestBatch>()
-        .eq('id', batchId)
-        .single();
 
-      if (!batch) {
-        toast({
-          title: 'Error',
-          description: 'Could not load batch data',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      const { data: driverProfile } = await supabase
-        .from('profiles')
-        .select('full_name')
-        .eq('id', user?.id)
-        .single();
-
-      const sortedStops = [...(batch.batch_stops ?? [])].sort(
-        (a, b) => a.sequence_number - b.sequence_number
-      );
-
-      const manifestData: RouteManifestData = {
-        batchNumber: batch.batch_number.toString(),
-        deliveryDate: format(new Date(batch.delivery_date), 'MMMM dd, yyyy'),
-        driverName: driverProfile?.full_name || 'Driver',
-        totalStops: sortedStops.length,
-        stops: sortedStops.map((stop) => ({
-          sequence: stop.sequence_number,
-          customerName: stop.orders?.profiles?.full_name || 'Customer',
-          address: stop.address,
-          phone: stop.orders?.profiles?.phone || null,
-          boxCode: stop.orders?.box_code || null,
-          items: stop.orders?.order_items?.map((item) => ({
-            name: item.products?.name || '',
-            quantity: item.quantity,
-            unit: item.products?.unit || '',
-          })) || [],
-          notes: stop.notes,
-          estimatedArrival: stop.estimated_arrival 
-            ? format(new Date(stop.estimated_arrival), 'h:mm a')
-            : null,
-        })) || [],
-      };
-
-      generateRouteManifestPDF(manifestData);
-      
-      toast({
-        title: 'Route manifest downloaded',
-        description: 'PDF saved to your downloads folder',
-      });
-    } catch (error) {
-      console.error('Error generating manifest:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to generate manifest',
-        variant: 'destructive',
-      });
-    }
-  };
   // Derived display values for Today's Earnings (use fallback estimates when no real payouts today)
   const activeStopsCount = activeRoute?.filter((r) => !r.isCollectionPoint).length || 0;
   const usingFallbackToday = (earnings?.today.total || 0) === 0 && activeStopsCount > 0;

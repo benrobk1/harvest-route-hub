@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { CheckCircle2, Navigation, Phone, MapPin } from 'lucide-react';
+import { CheckCircle2, MapPin, Navigation } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Stop {

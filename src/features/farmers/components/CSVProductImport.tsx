@@ -62,7 +62,7 @@ export function CSVProductImport({ open, onOpenChange, farmProfileId, onImportCo
       if (result.valid.length === 0) {
         handleValidationError(createCSVImportError('No valid products found. Please fix the errors and try again.'));
       }
-    } catch (error) {
+    } catch {
       handleError(createCSVImportError('Failed to parse CSV. Please check the file format.'));
     } finally {
       setParsing(false);
@@ -98,8 +98,8 @@ export function CSVProductImport({ open, onOpenChange, farmProfileId, onImportCo
             
             if (error) throw error;
             imported++;
-          } catch (error) {
-            console.error('Failed to import product:', product.name, error);
+          } catch {
+            console.error('Failed to import product:', product.name);
             failed++;
           }
         });
@@ -121,7 +121,7 @@ export function CSVProductImport({ open, onOpenChange, farmProfileId, onImportCo
       setPreview(null);
       setErrors([]);
       setImportProgress(0);
-    } catch (error) {
+    } catch {
       handleError(createCSVImportError('Import failed. Please try again.'));
     } finally {
       setImporting(false);

@@ -12,18 +12,15 @@ import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Sprout, Info } from 'lucide-react';
 import { formatMoney } from '@/lib/formatMoney';
-import { calculateRevenueSplit } from '@/lib/deliveryFeeHelpers';
 
 interface PriceBreakdownDrawerProps {
   price: number;
   farmName: string;
-  isCheckout?: boolean;
 }
 
-const PriceBreakdownDrawer = ({ 
-  price, 
+const PriceBreakdownDrawer = ({
+  price,
   farmName,
-  isCheckout = false 
 }: PriceBreakdownDrawerProps) => {
   // REVENUE MODEL: 88/2/10 split (product price only)
   // - 88% to farmer (significantly higher than traditional grocery ~10-15%)

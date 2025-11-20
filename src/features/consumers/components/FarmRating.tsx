@@ -71,7 +71,7 @@ export const FarmRating = ({
             <div className="space-y-2">
               <label className="text-sm font-medium">Quick Feedback (Optional)</label>
               <div className="flex flex-wrap gap-2">
-                {Object.entries(FARM_FEEDBACK_TAGS).map(([category, tags]) =>
+                {Object.entries(FARM_FEEDBACK_TAGS).map(([, tags]) =>
                   tags.map(tag => (
                     <Badge
                       key={tag}

@@ -50,8 +50,6 @@ describe('Order Integration Tests', () => {
         expect(result.current.isLoading).toBe(false);
       });
 
-      // Cart total should meet minimum of $25
-      const minimumOrder = 25;
       expect(typeof result.current.cartTotal).toBe('number');
     });
 

@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, X } from 'lucide-react';
+import { Upload, FileText, CheckCircle2, Loader2, X } from 'lucide-react';
 import { useEffect } from 'react';
 import { getErrorMessage } from '@/lib/errors/getErrorMessage';
 

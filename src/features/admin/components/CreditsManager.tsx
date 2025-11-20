@@ -41,7 +41,7 @@ export function CreditsManager() {
       }
 
       // Award credits using edge function
-      const { data, error } = await supabase.functions.invoke('award-credits', {
+      const { error } = await supabase.functions.invoke('award-credits', {
         body: {
           consumer_id: profile.id,
           amount: parseFloat(formData.amount),

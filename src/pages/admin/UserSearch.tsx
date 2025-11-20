@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Search, Loader2, User, MapPin, Phone, Mail } from 'lucide-react';
+import { ArrowLeft, Search, Loader2, User, MapPin, Phone } from 'lucide-react';
 import { UserRatingDisplay, adminQueries } from '@/features/admin';
 import {
   Dialog,

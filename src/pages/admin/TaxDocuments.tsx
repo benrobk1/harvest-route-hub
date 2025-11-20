@@ -8,7 +8,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ArrowLeft, Loader2, FileText, Download, AlertCircle } from "lucide-react";
+import { ArrowLeft, Loader2, FileText, AlertCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 export default function TaxDocuments() {

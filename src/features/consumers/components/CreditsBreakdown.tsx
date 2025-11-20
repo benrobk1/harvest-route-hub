@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Coins, TrendingUp, Calendar, AlertCircle } from "lucide-react";
+import { Coins, TrendingUp, Calendar } from "lucide-react";
 import { formatMoney } from "@/lib/formatMoney";
 import { calculateAvailableNextMonth } from "@/lib/creditsHelpers";
 import { consumerQueries } from "@/features/consumers";

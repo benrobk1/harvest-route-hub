@@ -59,6 +59,8 @@ export const AdminRoleManager = () => {
         .eq('email', userEmail)
         .maybeSingle();
 
+      if (profileError) throw profileError;
+
       // If user doesn't exist, send invitation instead
       if (!profile) {
         const { data, error } = await supabase.functions.invoke('invite-admin', {

@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Activity, AlertCircle, Clock, TrendingUp, Zap, Shield } from 'lucide-react';
+import { Activity, AlertCircle, TrendingUp, Zap, Shield } from 'lucide-react';
 import { MonitoringChart } from '@/components/MonitoringChart';
 import { Skeleton } from '@/components/ui/skeleton';
 

@@ -5,7 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
-import { MapPin, Phone, Mail, Calendar, ArrowLeft, ExternalLink, User } from 'lucide-react';
+import { MapPin, Phone, Mail, Calendar, ArrowLeft, ExternalLink } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function MyLeadFarmer() {

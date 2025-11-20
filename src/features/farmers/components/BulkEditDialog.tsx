@@ -20,7 +20,7 @@ import {
 } from '@/lib/csvParser';
 import { uploadImageFromUrl } from '@/lib/imageUploader';
 import { ValidationPreviewTable } from './ValidationPreviewTable';
-import { Download, Upload, FileSpreadsheet, Loader2, AlertCircle } from 'lucide-react';
+import { Download, Upload, Loader2, AlertCircle } from 'lucide-react';
 import { getErrorMessage } from '@/lib/errors/getErrorMessage';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -35,7 +35,6 @@ interface BulkEditDialogProps {
 export function BulkEditDialog({ open, onOpenChange, farmProfileId, products, onComplete }: BulkEditDialogProps) {
   const { handleError, handleValidationError } = useErrorHandler();
   const [mode, setMode] = useState<'create' | 'update'>('create');
-  const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<CSVProductRow[] | null>(null);
   const [editablePreview, setEditablePreview] = useState<CSVProductRow[]>([]);
   const [errors, setErrors] = useState<Array<{ row: number; field: string; error: string }>>([]);
@@ -100,7 +99,6 @@ export function BulkEditDialog({ open, onOpenChange, farmProfileId, products, on
       return;
     }
 
-    setFile(selectedFile);
     try {
       const result = await parseProductFile(selectedFile, mode);
       setPreview(result.valid);
@@ -165,7 +163,7 @@ export function BulkEditDialog({ open, onOpenChange, farmProfileId, products, on
               if (error) throw error;
             }
             imported++;
-          } catch (error) {
+          } catch {
             failed++;
           }
         }));
@@ -176,10 +174,9 @@ export function BulkEditDialog({ open, onOpenChange, farmProfileId, products, on
       toast({ title: 'Import complete', description: `${imported} products ${mode === 'update' ? 'updated' : 'imported'}, ${failed} failed` });
       onComplete();
       onOpenChange(false);
-      setFile(null);
       setPreview(null);
       setErrors([]);
-    } catch (error) {
+    } catch {
       handleError(createCSVImportError('Import failed. Please try again.'));
     } finally {
       setImporting(false);

@@ -34,7 +34,6 @@ const Checkout = () => {
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [useCredits, setUseCredits] = useState(false);
   const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const [orderId, setOrderId] = useState<string | null>(null);
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [tipPercentage, setTipPercentage] = useState<number>(0);
@@ -115,7 +114,6 @@ const Checkout = () => {
   }, [marketConfig, selectedDate, availableDates]);
 
   const deliveryFee = DELIVERY_FEE_USD;
-  const platformFee = cartTotal * 0.10; // 10% platform fee
   const subtotal = cartTotal;
   
   // Calculate tip

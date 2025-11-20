@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Sprout, Upload, X } from "lucide-react";
+import { ArrowLeft, Sprout, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -14,7 +14,6 @@ import { StripeConnectButton } from "@/components/StripeConnectButton";
 import { PayoutsDashboard } from "@/features/payouts";
 import { DocumentUpload } from "@/components/DocumentUpload";
 import { TaxInformationForm } from "@/components/TaxInformationForm";
-import { Badge } from "@/components/ui/badge";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 

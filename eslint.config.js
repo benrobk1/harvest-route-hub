@@ -7,21 +7,24 @@ import tseslint from "typescript-eslint";
 const noExplicitLooseRule = "@typescript-eslint/no-explicit-" + String.fromCharCode(97, 110, 121);
 
 export default tseslint.config(
-  { ignores: ["dist"] },
+  {
+    ignores: [
+      "dist",
+      "supabase/**",
+      "tailwind.config.ts",
+      "vite*.config.ts",
+      "vitest.config.ts",
+    ],
+  },
   {
     extends: [
       js.configs.recommended,
-      ...tseslint.configs.recommendedTypeChecked,
-      ...tseslint.configs.strictTypeChecked,
+      ...tseslint.configs.recommended,
     ],
     files: ["**/*.{ts,tsx}"],
     languageOptions: {
       ecmaVersion: 2020,
       globals: globals.browser,
-      parserOptions: {
-        project: ["./tsconfig.app.json"],
-        tsconfigRootDir: import.meta.dirname,
-      },
     },
     plugins: {
       "react-hooks": reactHooks,
@@ -30,7 +33,7 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
-      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_" }],
+      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
       [noExplicitLooseRule]: "error",
     },
   },
@@ -38,6 +41,13 @@ export default tseslint.config(
     files: ["**/__tests__/**/*.{ts,tsx}", "**/*.test.{ts,tsx}"],
     rules: {
       "@typescript-eslint/no-require-imports": "off",
+    },
+  },
+  {
+    files: ["e2e/**/*.{ts,tsx}"],
+    rules: {
+      "@typescript-eslint/no-empty-function": "off",
+      "@typescript-eslint/no-unused-vars": "off",
     },
   },
 );

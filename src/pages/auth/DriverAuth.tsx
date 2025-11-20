@@ -11,7 +11,6 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Truck, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
 import { z } from "zod";
 import { getAuthErrorMessage } from "@/lib/authErrors";
 
@@ -21,7 +20,6 @@ const passwordSchema = z.string().min(6, "Password must be at least 6 characters
 const DriverAuth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { roles } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [formError, setFormError] = useState<{ title: string; description: string } | null>(null);
   const [emailError, setEmailError] = useState('');

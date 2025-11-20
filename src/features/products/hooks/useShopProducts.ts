@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { getProductRepository } from '@/repositories';
 import { productQueries } from '../queries';
-import type { Product } from '../types';
 
 /**
  * Hook for fetching shop products with farmer and market data

@@ -25,7 +25,7 @@ export const BoxCodeDisplay = ({ boxCode, orderId, customerName, deliveryDate }:
         description: "Box code copied to clipboard",
       });
       setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "Failed to copy code",

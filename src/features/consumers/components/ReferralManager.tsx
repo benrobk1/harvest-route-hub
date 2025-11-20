@@ -84,7 +84,7 @@ export const ReferralManager = () => {
         description: "Referral code copied to clipboard",
       });
       setTimeout(() => setCopied(false), 2000);
-    } catch (error) {
+    } catch {
       toast({
         title: "Error",
         description: "Failed to copy code",
@@ -105,7 +105,7 @@ export const ReferralManager = () => {
           text: 'Use my referral code to get fresh farm produce delivered!',
           url: shareUrl,
         });
-      } catch (error) {
+      } catch {
         // User cancelled share or error occurred
       }
     } else {
@@ -116,7 +116,7 @@ export const ReferralManager = () => {
           title: "Link Copied!",
           description: "Share this link with friends",
         });
-      } catch (error) {
+      } catch {
         toast({
           title: "Error",
           description: "Failed to copy link",

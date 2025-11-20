@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -25,11 +25,7 @@ export const StripeConnectButton = () => {
     payouts_enabled: false,
   });
 
-  useEffect(() => {
-    checkStatus();
-  }, []);
-
-  const checkStatus = async () => {
+  const checkStatus = useCallback(async () => {
     setIsChecking(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -53,7 +49,11 @@ export const StripeConnectButton = () => {
     } finally {
       setIsChecking(false);
     }
-  };
+  }, [toast]);
+
+  useEffect(() => {
+    checkStatus();
+  }, [checkStatus]);
 
   const handleConnect = async () => {
     setIsLoading(true);

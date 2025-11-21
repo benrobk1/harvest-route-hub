@@ -100,11 +100,8 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
     }
 
     // Deduplicate carts in this batch (since inner join creates multiple rows per cart)
-    // Track last row ID for accurate pagination cursor (not just unique carts)
-    let lastRowCartId: string | null = null;
     for (const row of batch) {
       const cart = row as CartWithProfile;
-      lastRowCartId = cart.id; // Track the last cart ID we see (even if duplicate)
       
       if (!seenCartIds.has(cart.id)) {
         seenCartIds.add(cart.id);
@@ -120,14 +117,11 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
 
     // Update cursor for next iteration using the last row we saw
     // This is necessary even for duplicates to avoid re-querying the same rows
-    if (lastRowCartId) {
-      lastCartId = lastRowCartId;
-    }
+    const lastRowInBatch = batch[batch.length - 1] as CartWithProfile;
+    lastCartId = lastRowInBatch.id;
     
-    // Check if we should continue: need both conditions to be true
-    // 1. We haven't reached the cart limit (hasMore is still true)
-    // 2. We got a full batch, indicating there may be more rows
-    if (hasMore && batch.length < CART_BATCH_SIZE) {
+    // Stop if we got a partial batch (no more rows available)
+    if (batch.length < CART_BATCH_SIZE) {
       hasMore = false;
     }
   }

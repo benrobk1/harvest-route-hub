@@ -132,21 +132,75 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
   const consumersToNotify = new Set<string>();
   const consumerEmails = new Map<string, string>();
 
-  for (const order of pendingOrders ?? []) {
-    const profile = (order as OrderWithProfile).profiles;
-    if (profile?.email) {
-      consumersToNotify.add(order.consumer_id);
-      consumerEmails.set(order.consumer_id, profile.email);
+  // OPTIMIZED: Paginate through all pending orders for tomorrow
+  // Process in batches to prevent OOM with 50k+ users
+  const PAGE_SIZE = 1000;
+  let pendingOrdersPage = 0;
+  let hasMoreOrders = true;
+
+  while (hasMoreOrders) {
+    const { data: pendingOrders } = await supabaseClient
+      .from('orders')
+      .select('consumer_id, profiles (email)')
+      .eq('delivery_date', tomorrowDate)
+      .eq('status', 'pending')
+      .range(pendingOrdersPage * PAGE_SIZE, (pendingOrdersPage + 1) * PAGE_SIZE - 1);
+
+    if (!pendingOrders || pendingOrders.length === 0) {
+      hasMoreOrders = false;
+      break;
     }
+
+    for (const order of pendingOrders) {
+      const profile = (order as OrderWithProfile).profiles;
+      if (profile?.email) {
+        consumersToNotify.add(order.consumer_id);
+        consumerEmails.set(order.consumer_id, profile.email);
+      }
+    }
+
+    pendingOrdersPage++;
+    // Continue if we got a full page, indicating there may be more results
+    hasMoreOrders = pendingOrders.length >= PAGE_SIZE;
   }
 
-  for (const cart of cartsWithItems ?? []) {
-    const profile = (cart as CartWithProfile).profiles;
-    if (cart?.consumer_id && profile?.email) {
-      consumersToNotify.add(cart.consumer_id);
-      consumerEmails.set(cart.consumer_id, profile.email);
+  console.log(`[${ctx.requestId}] Processed ${pendingOrdersPage} pages of pending orders`);
+
+  // OPTIMIZED: Paginate through carts with items to prevent OOM
+  // Process in batches to handle 50k+ users
+  let cartsPage = 0;
+  let hasMoreCarts = true;
+
+  while (hasMoreCarts) {
+    const { data: cartsWithItems } = await supabaseClient
+      .from('shopping_carts')
+      .select(`
+        consumer_id,
+        profiles (email),
+        cart_items!inner(id)
+      `)
+      .range(cartsPage * PAGE_SIZE, (cartsPage + 1) * PAGE_SIZE - 1);
+
+    if (!cartsWithItems || cartsWithItems.length === 0) {
+      hasMoreCarts = false;
+      break;
     }
+
+    for (const cart of cartsWithItems) {
+      const profile = (cart as CartWithProfile).profiles;
+      if (cart?.consumer_id && profile?.email) {
+        consumersToNotify.add(cart.consumer_id);
+        consumerEmails.set(cart.consumer_id, profile.email);
+      }
+    }
+
+    cartsPage++;
+    // Continue if we got a full page, indicating there may be more results
+    hasMoreCarts = cartsWithItems.length >= PAGE_SIZE;
   }
+
+  console.log(`[${ctx.requestId}] Processed ${cartsPage} pages of active carts`);
+  ctx.metrics.mark('consumers_fetched');
 
   console.log(`[${ctx.requestId}] Found ${consumersToNotify.size} consumers to notify`);
   ctx.metrics.mark('consumers_identified');

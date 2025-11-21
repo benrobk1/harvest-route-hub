@@ -2,7 +2,8 @@ import { chromium, FullConfig } from '@playwright/test';
 
 /**
  * Global setup script that runs before all tests.
- * Creates test users and prepares the database.
+ * Verifies the application is reachable and performs readiness checks.
+ * Individual tests handle their own user creation with unique emails.
  */
 async function globalSetup(config: FullConfig) {
   const baseURL = config.projects[0].use.baseURL || 'http://localhost:8080';
@@ -10,7 +11,7 @@ async function globalSetup(config: FullConfig) {
   console.log('🚀 Starting global test setup...');
   console.log(`📍 Base URL: ${baseURL}`);
 
-  // Launch a browser to create test accounts
+  // Launch a browser to verify app readiness
   const browser = await chromium.launch();
   const context = await browser.newContext();
   const page = await context.newPage();

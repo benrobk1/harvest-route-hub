@@ -22,10 +22,10 @@ test.describe('Admin Workflow', () => {
     await auth.signUp('admin');
 
     // Navigate to user approvals
-    await navigateAndWait(page, '/admin/user-approvals');
+    await navigateAndWait(page, '/admin/approvals');
 
     // Verify user approvals page loaded
-    await expect(page).toHaveURL(/\/admin\/user-approvals/);
+    await expect(page).toHaveURL(/\/admin\/approvals/);
 
     // Look for user approval content with flexible selectors
     const approvalsContent = page.locator(
@@ -44,10 +44,10 @@ test.describe('Admin Workflow', () => {
     await auth.signUp('admin');
 
     // Navigate to product approvals
-    await navigateAndWait(page, '/admin/product-approval');
+    await navigateAndWait(page, '/admin/products');
 
     // Verify product approval page loaded
-    await expect(page).toHaveURL(/\/admin\/product-approval/);
+    await expect(page).toHaveURL(/\/admin\/products/);
 
     // Look for product approval content
     const productContent = page.locator(
@@ -116,10 +116,10 @@ test.describe('Admin Workflow', () => {
     await auth.signUp('admin');
 
     // Navigate to admin roles
-    await navigateAndWait(page, '/admin/admin-roles');
+    await navigateAndWait(page, '/admin/roles');
 
     // Verify admin roles page loaded
-    await expect(page).toHaveURL(/\/admin\/admin-roles/);
+    await expect(page).toHaveURL(/\/admin\/roles/);
 
     // Look for roles content
     const rolesContent = page.locator(

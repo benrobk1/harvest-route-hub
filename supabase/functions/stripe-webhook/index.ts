@@ -144,15 +144,15 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
     );
   }
 
-  // Idempotency check - verify this event hasn't already been processed
+  // Idempotency check - only skip if event was successfully completed
   const { data: existingEvent } = await supabase
     .from('stripe_webhook_events')
-    .select('id')
+    .select('id, status')
     .eq('stripe_event_id', event.id)
     .single();
 
-  if (existingEvent) {
-    console.log(`[${requestId}] ⚠️ Event ${event.id} already processed, skipping`);
+  if (existingEvent && existingEvent.status === 'completed') {
+    console.log(`[${requestId}] ⚠️ Event ${event.id} already completed, skipping`);
     ctx.metrics.mark('event_duplicate');
     return new Response(
       JSON.stringify({ received: true, skipped: true }),
@@ -163,36 +163,77 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
     );
   }
 
-  console.log(`[${requestId}] 📝 Processing event ${event.id}...`);
-  ctx.metrics.mark('event_processing');
+  if (existingEvent && existingEvent.status === 'processing') {
+    console.log(`[${requestId}] ⚠️ Event ${event.id} is being processed concurrently, skipping`);
+    ctx.metrics.mark('event_concurrent');
+    return new Response(
+      JSON.stringify({ received: true, skipped: true }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+  }
 
-  /**
-   * Helper function to record the event as processed after successful business logic execution.
-   * This ensures idempotency while preventing partial state issues.
-   */
-  const recordEventProcessed = async () => {
-    const { error: insertError } = await supabase
+  // Record event with 'processing' status
+  let eventRecordId: string | null = null;
+  
+  if (!existingEvent) {
+    const { data: insertedEvent, error: insertError } = await supabase
       .from('stripe_webhook_events')
       .insert({
         stripe_event_id: event.id,
         event_type: event.type,
-      });
+        status: 'processing'
+      })
+      .select('id')
+      .single();
 
     if (insertError) {
-      // If we get a duplicate key error, another concurrent process completed first
       if (insertError.code === '23505') {
-        console.log(`[${requestId}] ⚠️ Event ${event.id} was processed concurrently`);
-      } else {
-        console.error(`[${requestId}] ❌ Failed to record event: ${insertError.message}`);
-        throw insertError;
+        console.log(`[${requestId}] ⚠️ Event ${event.id} being processed concurrently (race condition)`);
+        ctx.metrics.mark('event_concurrent');
+        return new Response(
+          JSON.stringify({ received: true, skipped: true }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
       }
-    } else {
-      console.log(`[${requestId}] ✅ Event ${event.id} recorded as processed`);
+      throw insertError;
     }
-  };
+    
+    eventRecordId = insertedEvent?.id || null;
+  } else {
+    // Existing event in 'failed' status - allow reprocessing
+    if (!existingEvent.id) {
+      console.error(`[${requestId}] ⚠️ Existing event found without ID`);
+      throw new Error('Invalid event record: missing ID');
+    }
+    
+    eventRecordId = existingEvent.id;
+    console.log(`[${requestId}] 🔄 Retrying failed event ${event.id}`);
+    ctx.metrics.mark('event_retry');
+    
+    // Update status to 'processing' before retry
+    const { error: updateError } = await supabase
+      .from('stripe_webhook_events')
+      .update({ status: 'processing' })
+      .eq('id', eventRecordId);
+    
+    if (updateError) {
+      console.error(`[${requestId}] ⚠️ Failed to update event status to processing: ${updateError.message}`);
+      throw updateError;
+    }
+  }
 
-  // Handle events
-  switch (event.type) {
+  console.log(`[${requestId}] 📝 Event ${event.id} recorded, processing...`);
+  ctx.metrics.mark('event_processing');
+
+  // Handle events - wrap in try-catch to mark as failed on error
+  try {
+    switch (event.type) {
     case 'payment_intent.succeeded': {
       const paymentIntent = event.data.object as Stripe.PaymentIntent;
       console.log(`[${ctx.requestId}] Payment succeeded: ${paymentIntent.id}`);
@@ -507,9 +548,43 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
     default:
       console.log(`[${ctx.requestId}] ⚠️ Unhandled event type: ${event.type}`);
       ctx.metrics.mark('event_unhandled');
+    }
+  } catch (processingError) {
+    // Mark event as failed so it can be retried
+    if (eventRecordId) {
+      const { error: updateError } = await supabase
+        .from('stripe_webhook_events')
+        .update({ status: 'failed' })
+        .eq('id', eventRecordId);
+      
+      if (updateError) {
+        console.error(`[${ctx.requestId}] ⚠️ Failed to mark event as failed: ${updateError.message}`);
+      } else {
+        console.log(`[${ctx.requestId}] ❌ Event ${event.id} marked as failed for retry`);
+      }
+    }
+    
+    // Re-throw the error to be handled by error middleware
+    throw processingError;
   }
 
   ctx.metrics.mark('event_processed');
+  
+  // Mark event as completed after successful processing
+  if (eventRecordId) {
+    const { error: updateError } = await supabase
+      .from('stripe_webhook_events')
+      .update({ status: 'completed' })
+      .eq('id', eventRecordId);
+    
+    if (updateError) {
+      console.error(`[${ctx.requestId}] ⚠️ Failed to mark event as completed: ${updateError.message}`);
+      // Don't throw - event was processed successfully, this is just a status update
+    } else {
+      console.log(`[${ctx.requestId}] ✅ Event ${event.id} marked as completed`);
+    }
+  }
+  
   return new Response(
     JSON.stringify({ received: true, event: event.type }),
     { 

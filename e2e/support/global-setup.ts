@@ -5,7 +5,7 @@ import { chromium, FullConfig } from '@playwright/test';
  * Creates test users and prepares the database.
  */
 async function globalSetup(config: FullConfig) {
-  const baseURL = config.projects[0].use.baseURL || 'http://localhost:5173';
+  const baseURL = config.projects[0].use.baseURL || 'http://localhost:8080';
 
   console.log('🚀 Starting global test setup...');
   console.log(`📍 Base URL: ${baseURL}`);

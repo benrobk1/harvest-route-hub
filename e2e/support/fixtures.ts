@@ -12,7 +12,7 @@ export class AuthHelper {
   async signUp(role: 'consumer' | 'farmer' | 'driver' | 'admin', password = 'TestPassword123!') {
     const email = `test-${role}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}@example.com`;
 
-    await this.page.goto(`/${role}/auth`);
+    await this.page.goto(`/auth/${role}`);
     await this.page.waitForLoadState('networkidle');
 
     // Fill signup form
@@ -32,7 +32,7 @@ export class AuthHelper {
    * Login an existing user
    */
   async login(email: string, password: string, role: 'consumer' | 'farmer' | 'driver' | 'admin') {
-    await this.page.goto(`/${role}/auth`);
+    await this.page.goto(`/auth/${role}`);
     await this.page.waitForLoadState('networkidle');
 
     await this.page.fill('input[type="email"]', email);

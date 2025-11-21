@@ -161,9 +161,14 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
       throw insertError;
     }
     
-    eventRecordId = insertedEvent?.id;
+    eventRecordId = insertedEvent?.id || null;
   } else {
     // Existing event in 'failed' status - allow reprocessing
+    if (!existingEvent.id) {
+      console.error(`[${requestId}] ⚠️ Existing event found without ID`);
+      throw new Error('Invalid event record: missing ID');
+    }
+    
     eventRecordId = existingEvent.id;
     console.log(`[${requestId}] 🔄 Retrying failed event ${event.id}`);
     ctx.metrics.mark('event_retry');

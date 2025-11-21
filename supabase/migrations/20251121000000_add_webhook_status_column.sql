@@ -21,4 +21,4 @@ CREATE INDEX IF NOT EXISTS idx_stripe_webhook_events_stripe_event_id_status
 
 -- Add comment explaining the status column
 COMMENT ON COLUMN public.stripe_webhook_events.status IS 
-  'Processing status: processing (being processed), completed (successfully finished), failed (processing failed and needs manual intervention)';
+  'Processing status: processing (being processed), completed (successfully finished), failed (processing failed and will be retried on next webhook attempt)';

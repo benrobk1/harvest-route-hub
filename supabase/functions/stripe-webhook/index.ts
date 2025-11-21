@@ -167,6 +167,17 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
     eventRecordId = existingEvent.id;
     console.log(`[${requestId}] 🔄 Retrying failed event ${event.id}`);
     ctx.metrics.mark('event_retry');
+    
+    // Update status to 'processing' before retry
+    const { error: updateError } = await supabase
+      .from('stripe_webhook_events')
+      .update({ status: 'processing' })
+      .eq('id', eventRecordId);
+    
+    if (updateError) {
+      console.error(`[${requestId}] ⚠️ Failed to update event status to processing: ${updateError.message}`);
+      throw updateError;
+    }
   }
 
   console.log(`[${requestId}] 📝 Event ${event.id} recorded, processing...`);

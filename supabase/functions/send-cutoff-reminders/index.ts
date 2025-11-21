@@ -24,7 +24,7 @@ type Context = RequestIdContext & CORSContext & MetricsContext & SupabaseService
 
 type ProfileEmail = { email: string | null };
 type OrderWithProfile = { consumer_id: string; profiles: ProfileEmail | null };
-type CartWithProfile = { consumer_id: string; profiles: ProfileEmail | null };
+type CartWithProfile = { id: string; consumer_id: string; profiles: ProfileEmail | null };
 
 type ReminderError = { consumer_id: string; error: string };
 type ReminderResults = {
@@ -59,16 +59,72 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
     .eq('status', 'pending')
     .limit(10000); // Reasonable limit: max 10k pending orders per day
 
-  // OPTIMIZED: Query carts with items using EXISTS subquery to reduce memory
-  // Prevents OOM with 50k+ users - only returns distinct carts, not all cart_items
-  const { data: cartsWithItems } = await supabaseClient
-    .from('shopping_carts')
-    .select(`
-      consumer_id,
-      profiles (email),
-      cart_items!inner(id)
-    `)
-    .limit(10000); // Reasonable limit: max 10k active carts
+  // OPTIMIZED: Query carts with items in batches of distinct carts
+  // Prevents OOM with 50k+ users and ensures we get actual cart count, not joined row count
+  const MAX_CARTS_LIMIT = 10000;
+  const CART_BATCH_SIZE = 1000;
+  const cartsWithItems: CartWithProfile[] = [];
+  const seenCartIds = new Set<string>(); // Global deduplication across all batches
+  let hasMore = true;
+  let lastCartId: string | null = null;
+
+  while (hasMore && cartsWithItems.length < MAX_CARTS_LIMIT) {
+    // Query distinct carts that have items, ordered by ID for stable pagination
+    const query = supabaseClient
+      .from('shopping_carts')
+      .select(`
+        id,
+        consumer_id,
+        profiles (email),
+        cart_items!inner(id)
+      `)
+      .order('id', { ascending: true })
+      .limit(CART_BATCH_SIZE);
+
+    // Apply cursor pagination if not first batch
+    if (lastCartId) {
+      query.gt('id', lastCartId);
+    }
+
+    const { data: batch, error } = await query;
+
+    if (error) {
+      console.error(`[${ctx.requestId}] Error fetching cart batch:`, error);
+      hasMore = false;
+      break;
+    }
+
+    if (!batch || batch.length === 0) {
+      hasMore = false;
+      break;
+    }
+
+    // Deduplicate carts in this batch (since inner join creates multiple rows per cart)
+    for (const row of batch) {
+      const cart = row as CartWithProfile;
+      
+      if (!seenCartIds.has(cart.id)) {
+        seenCartIds.add(cart.id);
+        cartsWithItems.push(cart);
+        
+        // Stop if we've reached the target limit
+        if (cartsWithItems.length >= MAX_CARTS_LIMIT) {
+          hasMore = false;
+          break;
+        }
+      }
+    }
+
+    // Update cursor for next iteration using the last row we saw
+    // This is necessary even for duplicates to avoid re-querying the same rows
+    const lastRowInBatch = batch[batch.length - 1] as CartWithProfile;
+    lastCartId = lastRowInBatch.id;
+    
+    // Stop if we got a partial batch (no more rows available)
+    if (batch.length < CART_BATCH_SIZE) {
+      hasMore = false;
+    }
+  }
 
   ctx.metrics.mark('consumers_fetched');
 

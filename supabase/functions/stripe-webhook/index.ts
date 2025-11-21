@@ -389,16 +389,34 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
       // Retrieve balance transactions for this payout to find associated transfers
       let transferIds: string[] = [];
       try {
-        const balanceTransactions = await stripe.balanceTransactions.list({
-          payout: payout.id,
-          type: 'transfer',
-          limit: 100
-        });
+        // Fetch balance transactions with pagination to handle payouts with many transfers
+        const allTransferIds: string[] = [];
+        let hasMore = true;
+        let startingAfter: string | undefined;
         
-        transferIds = balanceTransactions.data
-          .map(txn => txn.source as string)
-          .filter(id => id && id.startsWith('tr_'));
+        while (hasMore) {
+          const balanceTransactions = await stripe.balanceTransactions.list({
+            payout: payout.id,
+            type: 'transfer',
+            limit: 100,
+            ...(startingAfter && { starting_after: startingAfter })
+          });
+          
+          const pageTransferIds = balanceTransactions.data
+            .map(txn => txn.source as string)
+            .filter(id => id && id.startsWith('tr_'));
+          
+          allTransferIds.push(...pageTransferIds);
+          
+          hasMore = balanceTransactions.has_more;
+          if (hasMore && balanceTransactions.data.length > 0) {
+            startingAfter = balanceTransactions.data[balanceTransactions.data.length - 1].id;
+          } else {
+            hasMore = false;
+          }
+        }
         
+        transferIds = allTransferIds;
         console.log(`[${ctx.requestId}] Found ${transferIds.length} transfer(s) for payout ${payout.id}`);
       } catch (stripeError) {
         console.error(`[${ctx.requestId}] ❌ Failed to fetch balance transactions: ${stripeError}`);
@@ -406,7 +424,7 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
       }
 
       if (transferIds.length === 0) {
-        console.warn(`[${ctx.requestId}] ⚠️ No transfers found for payout: ${payout.id}`);
+        console.warn(`[${ctx.requestId}] ⚠️ No transfers found for payout ${payout.id}. This payout may not be related to our platform transfers.`);
         break;
       }
 

@@ -15,7 +15,9 @@ npx playwright install chromium
 
 ### Environment
 
-Tests run against `http://localhost:5173` by default. The Playwright config automatically starts the dev server before running tests.
+Tests run against `http://localhost:8080` by default. The Playwright config automatically starts the dev server before running tests.
+
+**Note:** If you encounter a different port, verify the `use.baseURL` and `webServer.url` settings in `playwright.config.ts` to ensure they match your development server configuration.
 
 ## Running Tests
 

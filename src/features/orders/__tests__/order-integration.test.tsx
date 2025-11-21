@@ -19,8 +19,9 @@ vi.mock('@/integrations/supabase/client', () => ({
 }));
 
 vi.mock('@/contexts/AuthContext', () => ({
-  useAuth: vi.fn(() => createMockAuthContext({ 
-    user: { id: 'user-123', email: 'test@example.com' } 
+  AuthProvider: ({ children }: { children: React.ReactNode }) => children,
+  useAuth: vi.fn(() => createMockAuthContext({
+    user: { id: 'user-123', email: 'test@example.com' }
   })),
 }));
 

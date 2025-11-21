@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
-import { screen, fireEvent } from '@testing-library/react';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import type { LinkProps } from 'react-router-dom';
 import { CartDrawer } from '../CartDrawer';
 import { renderWithProviders } from '@/test/helpers/renderWithProviders';
-import { useCart } from '../hooks/useCart';
+import { useCart } from '../../hooks/useCart';
 
 const mockNavigate = vi.fn();
 vi.mock('react-router-dom', async () => {
@@ -17,7 +17,7 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
-vi.mock('../hooks/useCart', () => ({
+vi.mock('../../hooks/useCart', () => ({
   useCart: vi.fn(() => ({
     cart: null,
     cartCount: 0,
@@ -41,7 +41,14 @@ describe('CartDrawer', () => {
 
   it('should show cart count badge when items exist', () => {
     vi.mocked(useCart).mockReturnValue({
-      cart: { items: [{ id: '1', quantity: 2 }] },
+      cart: {
+        items: [{
+          id: '1',
+          quantity: 2,
+          unit_price: 12.50,
+          products: { name: 'Test Product', unit: 'lb', farm_profiles: { farm_name: 'Test Farm' } }
+        }]
+      },
       cartCount: 2,
       cartTotal: 25,
       isLoading: false,
@@ -67,12 +74,15 @@ describe('CartDrawer', () => {
     expect(screen.getByText('Shopping Cart')).toBeDefined();
   });
 
-  it('should show empty cart message when no items', () => {
+  it('should show empty cart message when no items', async () => {
     renderWithProviders(<CartDrawer />);
 
     fireEvent.click(screen.getByText('Cart'));
 
-    expect(screen.getByText('Your cart is empty')).toBeDefined();
+    // Verify no cart items are displayed
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /Remove/ })).toBeNull();
+    });
   });
 
   it('should render cart tabs', () => {

@@ -15,22 +15,23 @@ vi.mock('@/integrations/supabase/client', () => ({
 }));
 
 vi.mock('@/contexts/AuthContext', () => ({
-  useAuth: vi.fn(() => createMockAuthContext({ 
-    user: { id: 'user-123', email: 'test@example.com' } 
+  AuthProvider: ({ children }: { children: ReactNode }) => children,
+  useAuth: vi.fn(() => createMockAuthContext({
+    user: { id: 'user-123', email: 'test@example.com' }
   })),
 }));
 
 const wrapper = ({ children }: { children: ReactNode }) => {
   const queryClient = createTestQueryClient();
-  const Wrapper = () => (
-    QueryClientProvider({ 
-      client: queryClient, 
-      children: BrowserRouter({ 
-        children: AuthProvider({ children }) 
-      }) 
-    })
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <AuthProvider>
+          {children}
+        </AuthProvider>
+      </BrowserRouter>
+    </QueryClientProvider>
   );
-  return Wrapper();
 };
 
 describe('useCart', () => {

@@ -484,14 +484,57 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
       console.log(`[${ctx.requestId}] Payout failed: ${payout.id}`);
       ctx.metrics.mark('payout_failed');
 
-      // Update payouts table to mark as failed
+      // Retrieve balance transactions for this payout to find associated transfers
+      const transferIds: string[] = [];
+      try {
+        // Fetch balance transactions with pagination to handle payouts with many transfers
+        let hasMore = true;
+        let startingAfter: string | undefined;
+        
+        while (hasMore) {
+          const balanceTransactions = await stripe.balanceTransactions.list({
+            payout: payout.id,
+            type: 'transfer',
+            limit: 100,
+            ...(startingAfter && { starting_after: startingAfter })
+          });
+          
+          // Break if no data to prevent infinite loop
+          if (balanceTransactions.data.length === 0) {
+            break;
+          }
+          
+          const pageTransferIds = balanceTransactions.data
+            .filter(txn => txn.source && typeof txn.source === 'string' && txn.source.startsWith('tr_'))
+            .map(txn => txn.source as string);
+          
+          transferIds.push(...pageTransferIds);
+          
+          hasMore = balanceTransactions.has_more;
+          if (hasMore) {
+            startingAfter = balanceTransactions.data[balanceTransactions.data.length - 1].id;
+          }
+        }
+        
+        console.log(`[${ctx.requestId}] Found ${transferIds.length} transfer(s) for payout ${payout.id}`);
+      } catch (stripeError) {
+        console.error(`[${ctx.requestId}] ❌ Failed to fetch balance transactions: ${stripeError}`);
+        // Continue with empty array - will log warning below
+      }
+
+      if (transferIds.length === 0) {
+        console.warn(`[${ctx.requestId}] ⚠️ No transfers found for payout ${payout.id}. This payout may not be related to our platform transfers.`);
+        break;
+      }
+
+      // Update payouts table to mark as failed for all associated transfers
       const { data: payoutRecords, error: payoutError } = await supabase
         .from('payouts')
         .update({
           status: 'failed',
           // Store failure reason in a note (if payouts table has such field)
         })
-        .eq('stripe_transfer_id', payout.id)
+        .in('stripe_transfer_id', transferIds)
         .select('id, recipient_id, recipient_type, amount, order_id');
 
       if (payoutError) {
@@ -500,7 +543,7 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
       }
 
       if (!payoutRecords || payoutRecords.length === 0) {
-        console.warn(`[${ctx.requestId}] ⚠️ Payout not found in database: ${payout.id}`);
+        console.warn(`[${ctx.requestId}] ⚠️ No payout records found in database for transfers: ${transferIds.join(', ')}`);
         break;
       }
 
@@ -518,6 +561,14 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
           .limit(5); // Send to first 5 admins
 
         if (adminRoles && adminRoles.length > 0) {
+          // Build description with all affected payouts
+          const totalAmount = payoutRecords.reduce((sum, record) => sum + parseFloat(String(record.amount)), 0);
+          const recipientSummary = payoutRecords.length === 1 
+            ? `${payoutRecords[0].recipient_type} (ID: ${payoutRecords[0].recipient_id})`
+            : `${payoutRecords.length} recipients (${payoutRecords.map(r => r.recipient_type).join(', ')})`;
+          
+          const description = `Payout failed for ${recipientSummary}.\n\nTotal Amount: $${totalAmount.toFixed(2)}\nAffected Payouts: ${payoutRecords.length}\nStripe Payout ID: ${payout.id}\nFailure: ${failureMessage}\n\nAction required: Please investigate and retry the payout(s) manually if needed.`;
+          
           // Send alert to each admin
           for (const admin of adminRoles) {
             await supabase.functions.invoke('send-notification', {
@@ -529,8 +580,8 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
                   category: 'payout_failure',
                   severity: 'high',
                   reporter_type: 'system',
-                  description: `Payout failed for ${payoutRecords[0].recipient_type} (ID: ${payoutRecords[0].recipient_id}).\n\nAmount: $${payoutRecords[0].amount}\nStripe Payout ID: ${payout.id}\nFailure: ${failureMessage}\n\nAction required: Please investigate and retry the payout manually if needed.`,
-                  issue_id: payoutRecords[0].id
+                  description,
+                  issue_id: payoutRecords[0].id // Link to first payout for reference
                 }
               }
             });

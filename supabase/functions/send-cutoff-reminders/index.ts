@@ -118,9 +118,13 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
       }
     }
 
-    // Update cursor using the last processed cart ID (not last in batch)
-    if (hasMore && lastProcessedCartId) {
+    // Update cursor for next iteration
+    if (lastProcessedCartId) {
       lastCartId = lastProcessedCartId;
+    }
+    
+    // Only continue if we haven't reached the limit and got a full batch
+    if (hasMore) {
       hasMore = batch.length === CART_BATCH_SIZE;
     }
   }

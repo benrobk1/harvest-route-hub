@@ -10,6 +10,11 @@
 --
 -- SOLUTION: Add targeted composite and single-column indexes to optimize
 -- the most critical query patterns for enterprise-scale performance.
+--
+-- IMPORTANT: This migration uses CREATE INDEX CONCURRENTLY to avoid locking
+-- the tables during index creation. CONCURRENTLY cannot be used inside a
+-- transaction block. Ensure your migration tool executes this file outside
+-- of a transaction (Supabase CLI does this automatically for migrations).
 
 -- ============================================================================
 -- INDEX 1: Shopping cart lookups by consumer_id
@@ -19,7 +24,7 @@
 -- CURRENT: Sequential scan (no index on referencing FK column)
 -- IMPACT: O(n) scan of 50k rows per lookup
 
-CREATE INDEX IF NOT EXISTS idx_shopping_carts_consumer_id
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_shopping_carts_consumer_id
 ON public.shopping_carts(consumer_id);
 
 COMMENT ON INDEX idx_shopping_carts_consumer_id IS
@@ -36,7 +41,7 @@ COMMENT ON INDEX idx_shopping_carts_consumer_id IS
 -- CURRENT: Partial indexes exist separately but not optimized for combined filter
 -- IMPACT: Cannot use index-only scan, requires table access
 
-CREATE INDEX IF NOT EXISTS idx_products_approved_available
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_products_approved_available
 ON public.products(approved, available_quantity)
 WHERE approved = true AND available_quantity > 0;
 
@@ -50,7 +55,7 @@ COMMENT ON INDEX idx_products_approved_available IS
 -- FREQUENCY: Every order display, checkout validation (~800/min at scale)
 -- IMPACT: Critical for order details page and checkout flow
 
-CREATE INDEX IF NOT EXISTS idx_order_items_order_id
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_order_items_order_id
 ON public.order_items(order_id);
 
 COMMENT ON INDEX idx_order_items_order_id IS
@@ -67,7 +72,7 @@ COMMENT ON INDEX idx_order_items_order_id IS
 -- NOTE: idx_delivery_batches_date_status already exists,
 -- but driver_id is also frequently filtered. Add composite index for better selectivity.
 
-CREATE INDEX IF NOT EXISTS idx_delivery_batches_date_driver
+CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_delivery_batches_date_driver
 ON public.delivery_batches(delivery_date, driver_id)
 WHERE driver_id IS NULL;
 

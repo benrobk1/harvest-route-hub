@@ -50,9 +50,16 @@ export type OrderItemSummary = {
 export const formatOrderItems = (items: OrderItemSummary[]): string => {
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const itemNames = items.map(item => item.products.name).slice(0, 2).join(', ');
-  return items.length > 2 
-    ? `${itemNames}, +${items.length - 2} more (${itemCount} items total)`
-    : `${itemNames} (${itemCount} items)`;
+  
+  if (items.length > 2) {
+    return `${itemNames}, +${items.length - 2} more (${itemCount} items total)`;
+  }
+  
+  if (itemNames) {
+    return `${itemNames} (${itemCount} items)`;
+  }
+  
+  return `(${itemCount} items)`;
 };
 
 /**

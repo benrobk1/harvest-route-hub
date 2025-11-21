@@ -7,7 +7,7 @@ test.describe('Consumer Referral System', () => {
     await auth.signUp('consumer');
 
     // Navigate to profile
-    await navigateAndWait(page, '/profile/consumer');
+    await navigateAndWait(page, '/consumer/profile');
 
     // Wait for profile to load
     await waitForPageReady(page);
@@ -55,7 +55,7 @@ test.describe('Consumer Referral System', () => {
     await auth.signUp('consumer');
 
     // Navigate to profile
-    await navigateAndWait(page, '/profile/consumer');
+    await navigateAndWait(page, '/consumer/profile');
 
     // Look for referral stats with flexible selectors
     const referralStats = page.locator(
@@ -74,7 +74,7 @@ test.describe('Consumer Referral System', () => {
     await auth.signUp('consumer');
 
     // Navigate to profile
-    await navigateAndWait(page, '/profile/consumer');
+    await navigateAndWait(page, '/consumer/profile');
 
     // Look for credits display with flexible selectors
     const creditsDisplay = page.locator(
@@ -93,10 +93,10 @@ test.describe('Consumer Referral System', () => {
     await auth.signUp('consumer');
 
     // Navigate to profile
-    await navigateAndWait(page, '/profile/consumer');
+    await navigateAndWait(page, '/consumer/profile');
 
     // Verify profile page loaded
-    await expect(page).toHaveURL(/\/profile\/consumer/);
+    await expect(page).toHaveURL(/\/consumer\/profile/);
 
     // Verify profile content is visible
     const profileContent = page.locator(

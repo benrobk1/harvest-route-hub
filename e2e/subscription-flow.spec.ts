@@ -7,7 +7,7 @@ test.describe('Subscription Flow', () => {
     await auth.signUp('consumer');
 
     // Navigate to profile
-    await navigateAndWait(page, '/profile/consumer');
+    await navigateAndWait(page, '/consumer/profile');
 
     // Wait for profile page to load
     await waitForPageReady(page);
@@ -47,7 +47,7 @@ test.describe('Subscription Flow', () => {
     await auth.signUp('consumer');
 
     // Navigate to profile
-    await navigateAndWait(page, '/profile/consumer');
+    await navigateAndWait(page, '/consumer/profile');
 
     // Look for subscribe button or subscription management
     const subscribeButton = page.locator(

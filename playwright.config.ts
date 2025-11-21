@@ -6,6 +6,7 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 2 : undefined,
+  globalSetup: './e2e/support/global-setup.ts',
   reporter: [
     ['html'],
     ['json', { outputFile: 'test-results/results.json' }],
@@ -16,7 +17,7 @@ export default defineConfig({
     timeout: 10000,
   },
   use: {
-    baseURL: 'http://localhost:5173',
+    baseURL: 'http://localhost:8080',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
@@ -32,7 +33,10 @@ export default defineConfig({
   ],
   webServer: {
     command: 'npm run dev',
-    url: 'http://localhost:5173',
+    url: 'http://localhost:8080',
     reuseExistingServer: !process.env.CI,
+    timeout: 120000, // 2 minutes to allow for slow starts
+    stdout: 'pipe',
+    stderr: 'pipe',
   },
 });

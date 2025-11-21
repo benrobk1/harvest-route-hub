@@ -10,10 +10,15 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+dev-dist
 *.local
 
 # Test coverage
 coverage/
+
+# Playwright test artifacts
+playwright-report/
+test-results/
 
 # Editor directories and files
 .vscode/*

@@ -54,27 +54,22 @@ export class OrderCancellationService {
       return;
     }
 
-    for (const item of orderItems) {
-      // Get current product quantity
-      const { data: product } = await this.supabase
-        .from('products')
-        .select('available_quantity')
-        .eq('id', item.product_id)
-        .single();
+    // OPTIMIZED: Restore inventory in parallel (was N+1 with SELECT+UPDATE per item)
+    // Critical for 50k+ orders - eliminates unnecessary SELECTs and parallelizes UPDATEs
+    // Uses SQL increment to avoid race conditions
+    const restorePromises = orderItems.map(item =>
+      this.supabase.rpc('increment_product_quantity', {
+        p_product_id: item.product_id,
+        p_quantity_delta: item.quantity
+      })
+    );
 
-      if (product) {
-        // Increment product quantity back
-        const { error } = await this.supabase
-          .from('products')
-          .update({ 
-            available_quantity: product.available_quantity + item.quantity
-          })
-          .eq('id', item.product_id);
+    const results = await Promise.all(restorePromises);
+    const failures = results.filter(r => r.error);
 
-        if (error) {
-          throw new Error(`INVENTORY_RESTORE_FAILED: ${error.message}`);
-        }
-      }
+    if (failures.length > 0) {
+      console.error('Inventory restore errors:', failures);
+      throw new Error(`INVENTORY_RESTORE_FAILED: ${failures.length} items failed to restore`);
     }
   }
 

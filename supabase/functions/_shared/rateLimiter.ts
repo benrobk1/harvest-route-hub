@@ -12,40 +12,34 @@ export async function checkRateLimit(
   config: RateLimitConfig
 ): Promise<{ allowed: boolean; retryAfter?: number }> {
   const now = Date.now();
-  const windowStart = now - config.windowMs;
+  const windowStart = new Date(now - config.windowMs).toISOString();
   const key = `${config.keyPrefix}:${userId}`;
 
-  // Get recent requests from rate_limits table
-  const { data: recentRequests, error } = await supabaseAdmin
-    .from('rate_limits')
-    .select('created_at')
-    .eq('key', key)
-    .gte('created_at', new Date(windowStart).toISOString());
+  // OPTIMIZED: Single atomic DB operation instead of 3 separate queries
+  // Reduces load from 3 ops/request to 1 op/request (3x improvement)
+  // Critical for 50k+ user scalability
+  const { data, error } = await supabaseAdmin.rpc('check_and_record_rate_limit', {
+    p_key: key,
+    p_window_start: windowStart,
+    p_max_requests: config.maxRequests,
+  });
 
   if (error) {
     console.error('Rate limit check error:', error);
     return { allowed: true }; // Fail open on errors
   }
 
-  const requestCount = recentRequests?.length || 0;
+  const result = data?.[0];
+  if (!result) {
+    console.error('Rate limit function returned no data');
+    return { allowed: true }; // Fail open
+  }
 
-  if (requestCount >= config.maxRequests) {
-    const oldestRequest = new Date(recentRequests[0].created_at).getTime();
+  if (!result.allowed) {
+    const oldestRequest = new Date(result.oldest_request_time).getTime();
     const retryAfter = Math.ceil((oldestRequest + config.windowMs - now) / 1000);
     return { allowed: false, retryAfter };
   }
-
-  // Log this request
-  await supabaseAdmin
-    .from('rate_limits')
-    .insert({ key, created_at: new Date().toISOString() });
-
-  // Clean up old entries for this key
-  await supabaseAdmin
-    .from('rate_limits')
-    .delete()
-    .eq('key', key)
-    .lt('created_at', new Date(windowStart).toISOString());
 
   return { allowed: true };
 }

@@ -279,15 +279,25 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
 
         console.log(`[${requestId}] Created ${batchStops.length} optimized stops`);
 
-        // Generate box codes
-        for (let i = 0; i < createdStops.length; i++) {
-          const stop = createdStops[i];
-          const boxCode = `B${nextBatchNumber}-${stop.sequence_number}`;
-          
-          await supabase
-            .from('orders')
-            .update({ box_code: boxCode })
-            .eq('id', stop.order_id);
+        // OPTIMIZED: Generate box codes in parallel (was sequential N+1 query)
+        // Critical for 50k+ orders - reduces time from O(n*latency) to O(latency)
+        if (createdStops.length > 0) {
+          const updatePromises = createdStops.map(stop => {
+            const boxCode = `B${nextBatchNumber}-${stop.sequence_number}`;
+            return supabase
+              .from('orders')
+              .update({ box_code: boxCode })
+              .eq('id', stop.order_id);
+          });
+
+          // Execute all updates in parallel
+          const results = await Promise.all(updatePromises);
+
+          // Check for errors
+          const errors = results.filter(r => r.error);
+          if (errors.length > 0) {
+            console.error(`[${requestId}] Box code update errors:`, errors.length, 'failed');
+          }
         }
 
         // Get detailed route

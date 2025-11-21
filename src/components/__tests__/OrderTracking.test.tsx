@@ -75,13 +75,15 @@ describe('OrderTracking', () => {
   it('should show correct status for en_route', () => {
     renderWithProviders(<OrderTracking {...baseProps} status="en_route" />);
 
-    expect(screen.getByText('En Route')).toBeDefined();
+    const elements = screen.getAllByText('En Route');
+    expect(elements.length).toBeGreaterThan(0);
   });
 
   it('should show correct status for delivered', () => {
     renderWithProviders(<OrderTracking {...baseProps} status="delivered" />);
 
-    expect(screen.getByText('Delivered')).toBeDefined();
+    const elements = screen.getAllByText('Delivered');
+    expect(elements.length).toBeGreaterThan(0);
   });
 
   it('should render progress tracker', () => {

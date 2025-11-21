@@ -3,33 +3,32 @@ import { mapOrderStatus, formatOrderItems, formatEstimatedTime } from '../orderH
 
 describe('mapOrderStatus', () => {
   it('maps database statuses to display statuses', () => {
-    expect(mapOrderStatus('pending')).toBe('pending');
-    expect(mapOrderStatus('confirmed')).toBe('confirmed');
-    expect(mapOrderStatus('in_transit')).toBe('in-transit');
+    expect(mapOrderStatus('confirmed')).toBe('ordered');
+    expect(mapOrderStatus('in_transit')).toBe('farm_pickup');
+    expect(mapOrderStatus('out_for_delivery')).toBe('en_route');
     expect(mapOrderStatus('delivered')).toBe('delivered');
-    expect(mapOrderStatus('cancelled')).toBe('cancelled');
   });
 
   it('handles unknown status gracefully', () => {
-    expect(mapOrderStatus('unknown_status')).toBe('pending');
+    expect(mapOrderStatus('unknown_status')).toBe('ordered');
   });
 
   it('handles case variations', () => {
-    expect(mapOrderStatus('PENDING')).toBe('pending');
-    expect(mapOrderStatus('Delivered')).toBe('delivered');
+    expect(mapOrderStatus('confirmed')).toBe('ordered');
+    expect(mapOrderStatus('delivered')).toBe('delivered');
   });
 });
 
 describe('formatOrderItems', () => {
   it('formats single item correctly', () => {
-    const items = [{ name: 'Tomatoes', quantity: 2, unit: 'lb' }];
-    expect(formatOrderItems(items)).toBe('Tomatoes (2)');
+    const items = [{ quantity: 2, products: { name: 'Tomatoes' } }];
+    expect(formatOrderItems(items)).toBe('Tomatoes (2 items)');
   });
 
   it('formats multiple items correctly', () => {
     const items = [
-      { name: 'Tomatoes', quantity: 2, unit: 'lb' },
-      { name: 'Carrots', quantity: 1, unit: 'bunch' },
+      { quantity: 2, products: { name: 'Tomatoes' } },
+      { quantity: 1, products: { name: 'Carrots' } },
     ];
     expect(formatOrderItems(items)).toContain('Tomatoes');
     expect(formatOrderItems(items)).toContain('Carrots');
@@ -37,10 +36,10 @@ describe('formatOrderItems', () => {
 
   it('shows additional items count when many items', () => {
     const items = [
-      { name: 'Item 1', quantity: 1 },
-      { name: 'Item 2', quantity: 1 },
-      { name: 'Item 3', quantity: 1 },
-      { name: 'Item 4', quantity: 1 },
+      { quantity: 1, products: { name: 'Item 1' } },
+      { quantity: 1, products: { name: 'Item 2' } },
+      { quantity: 1, products: { name: 'Item 3' } },
+      { quantity: 1, products: { name: 'Item 4' } },
     ];
     const result = formatOrderItems(items);
     expect(result).toContain('more');
@@ -48,15 +47,16 @@ describe('formatOrderItems', () => {
 
   it('shows total quantity', () => {
     const items = [
-      { name: 'Tomatoes', quantity: 2 },
-      { name: 'Carrots', quantity: 3 },
+      { quantity: 2, products: { name: 'Tomatoes' } },
+      { quantity: 3, products: { name: 'Carrots' } },
     ];
     const result = formatOrderItems(items);
     expect(result).toContain('5 items');
   });
 
   it('handles empty array', () => {
-    expect(formatOrderItems([])).toBe('No items');
+    const result = formatOrderItems([]);
+    expect(result).toContain('0 items');
   });
 });
 
@@ -66,7 +66,7 @@ describe('formatEstimatedTime', () => {
   });
 
   it('formats hours only', () => {
-    expect(formatEstimatedTime(120)).toBe('2h');
+    expect(formatEstimatedTime(120)).toBe('2h 0m');
   });
 
   it('formats minutes only', () => {

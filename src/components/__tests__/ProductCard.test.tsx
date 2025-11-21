@@ -21,6 +21,7 @@ describe('ProductCard', () => {
     unit: 'lb',
     available_quantity: 50,
     harvest_date: null,
+    farm_profile_id: 'farm-1',
     farm_profiles: {
       id: 'farm-1',
       farm_name: 'Green Acres Farm',

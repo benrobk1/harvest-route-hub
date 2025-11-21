@@ -49,21 +49,15 @@ test.describe('Driver Workflow', () => {
     // Navigate to available routes
     await navigateAndWait(page, '/driver/available-routes');
 
-    // Verify available routes page loaded
-    const routesPageLoaded = await page.waitForURL(/\/driver\/available/, { timeout: 10000 }).catch(() => false);
+    // Assert that navigation to available routes succeeded
+    await expect(page).toHaveURL(/\/driver\/available/, { timeout: 10000 });
 
-    if (routesPageLoaded) {
-      // Look for routes content
-      const routesContent = page.locator(
-        'h1, h2, text=/available/i, text=/route/i, text=/batch/i'
-      ).first();
+    // Verify routes content is visible
+    const routesContent = page.locator(
+      'h1, h2, text=/available/i, text=/route/i, text=/batch/i'
+    ).first();
 
-      await expect(routesContent).toBeVisible({ timeout: 10000 });
-    } else {
-      // Fallback: verify dashboard is accessible
-      const dashboardLoaded = await page.locator('h1, h2').first().isVisible();
-      expect(dashboardLoaded).toBeTruthy();
-    }
+    await expect(routesContent).toBeVisible({ timeout: 10000 });
   });
 
   test('driver can access payout details', async ({ page, auth }) => {

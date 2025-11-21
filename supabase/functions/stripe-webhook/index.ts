@@ -401,6 +401,11 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
             ...(startingAfter && { starting_after: startingAfter })
           });
           
+          // Break if no data to prevent infinite loop
+          if (balanceTransactions.data.length === 0) {
+            break;
+          }
+          
           const pageTransferIds = balanceTransactions.data
             .filter(txn => txn.source && typeof txn.source === 'string' && txn.source.startsWith('tr_'))
             .map(txn => txn.source as string);
@@ -408,7 +413,7 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
           transferIds.push(...pageTransferIds);
           
           hasMore = balanceTransactions.has_more;
-          if (hasMore && balanceTransactions.data.length > 0) {
+          if (hasMore) {
             startingAfter = balanceTransactions.data[balanceTransactions.data.length - 1].id;
           }
         }
@@ -458,6 +463,14 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
           .limit(5); // Send to first 5 admins
 
         if (adminRoles && adminRoles.length > 0) {
+          // Build description with all affected payouts
+          const totalAmount = payoutRecords.reduce((sum, record) => sum + Number(record.amount), 0);
+          const recipientSummary = payoutRecords.length === 1 
+            ? `${payoutRecords[0].recipient_type} (ID: ${payoutRecords[0].recipient_id})`
+            : `${payoutRecords.length} recipients (${payoutRecords.map(r => r.recipient_type).join(', ')})`;
+          
+          const description = `Payout failed for ${recipientSummary}.\n\nTotal Amount: $${totalAmount.toFixed(2)}\nAffected Payouts: ${payoutRecords.length}\nStripe Payout ID: ${payout.id}\nFailure: ${failureMessage}\n\nAction required: Please investigate and retry the payout(s) manually if needed.`;
+          
           // Send alert to each admin
           for (const admin of adminRoles) {
             await supabase.functions.invoke('send-notification', {
@@ -469,8 +482,8 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
                   category: 'payout_failure',
                   severity: 'high',
                   reporter_type: 'system',
-                  description: `Payout failed for ${payoutRecords[0].recipient_type} (ID: ${payoutRecords[0].recipient_id}).\n\nAmount: $${payoutRecords[0].amount}\nStripe Payout ID: ${payout.id}\nFailure: ${failureMessage}\n\nAction required: Please investigate and retry the payout manually if needed.`,
-                  issue_id: payoutRecords[0].id
+                  description,
+                  issue_id: payoutRecords[0].id // Link to first payout for reference
                 }
               }
             });

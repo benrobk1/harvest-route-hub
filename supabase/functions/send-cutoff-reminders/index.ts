@@ -24,7 +24,7 @@ type Context = RequestIdContext & CORSContext & MetricsContext & SupabaseService
 
 type ProfileEmail = { email: string | null };
 type OrderWithProfile = { consumer_id: string; profiles: ProfileEmail | null };
-type CartWithProfile = { consumer_id: string; profiles: ProfileEmail | null };
+type CartWithProfile = { id: string; consumer_id: string; profiles: ProfileEmail | null };
 
 type ReminderError = { consumer_id: string; error: string };
 type ReminderResults = {
@@ -94,15 +94,15 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
     // Deduplicate carts in this batch (since inner join creates multiple rows per cart)
     const seenCartIds = new Set<string>();
     for (const row of batch) {
-      const cartId = (row as any).id;
-      if (!seenCartIds.has(cartId)) {
-        seenCartIds.add(cartId);
-        cartsWithItems.push(row as CartWithProfile);
+      const cart = row as CartWithProfile;
+      if (!seenCartIds.has(cart.id)) {
+        seenCartIds.add(cart.id);
+        cartsWithItems.push(cart);
       }
     }
 
     // Update cursor and check if we got a full batch
-    lastCartId = (batch[batch.length - 1] as any).id;
+    lastCartId = (batch[batch.length - 1] as CartWithProfile).id;
     hasMore = batch.length === CART_BATCH_SIZE;
   }
 

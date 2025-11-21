@@ -46,23 +46,27 @@ test.describe('Farmer Workflow', () => {
       'button:has-text("Add"), button:has-text("New"), button:has-text("Create"), a:has-text("Add Product")'
     ).first();
 
-    const addButtonExists = await addButton.isVisible({ timeout: 5000 }).catch(() => false);
+    let addButtonExists = false;
+    try {
+      await addButton.waitFor({ state: 'visible', timeout: 5000 });
+      addButtonExists = true;
+    } catch {
+      // Button not found, will verify page loaded instead
+    }
 
     if (addButtonExists) {
       await addButton.click();
-      await page.waitForTimeout(1000);
 
-      // Should show product form dialog or page
+      // Wait for product form dialog or page to appear
       const formContent = page.locator(
         'input[name="name"], input[placeholder*="name" i], text=/product name/i, text=/add product/i'
       ).first();
 
-      const formVisible = await formContent.isVisible({ timeout: 5000 }).catch(() => false);
-      expect(formVisible).toBeTruthy();
+      await expect(formContent).toBeVisible({ timeout: 5000 });
     } else {
       // If no add button, just verify inventory page loaded
-      const pageLoaded = await page.locator('h1, h2').first().isVisible();
-      expect(pageLoaded).toBeTruthy();
+      const pageHeading = page.locator('h1, h2').first();
+      await expect(pageHeading).toBeVisible();
     }
   });
 
@@ -96,21 +100,24 @@ test.describe('Farmer Workflow', () => {
       'button:has-text("Import"), button:has-text("Upload"), a:has-text("Import")'
     ).first();
 
-    const importExists = await importButton.isVisible({ timeout: 5000 }).catch(() => false);
+    let importExists = false;
+    try {
+      await importButton.waitFor({ state: 'visible', timeout: 5000 });
+      importExists = true;
+    } catch {
+      // Button not found, will verify page loaded instead
+    }
 
     if (importExists) {
       await importButton.click();
-      await page.waitForTimeout(1000);
 
-      // Should show import dialog with CSV mention
+      // Wait for import dialog with CSV mention to appear
       const csvContent = page.locator('text=/csv/i, text=/import/i, text=/upload/i').first();
-      const dialogVisible = await csvContent.isVisible({ timeout: 5000 }).catch(() => false);
-
-      expect(dialogVisible).toBeTruthy();
+      await expect(csvContent).toBeVisible({ timeout: 5000 });
     } else {
       // If no import button, just verify inventory page loaded
-      const pageLoaded = await page.locator('h1, h2').first().isVisible();
-      expect(pageLoaded).toBeTruthy();
+      const pageHeading = page.locator('h1, h2').first();
+      await expect(pageHeading).toBeVisible();
     }
   });
 

@@ -46,7 +46,7 @@ ON public.products(approved, available_quantity)
 WHERE approved = true AND available_quantity > 0;
 
 COMMENT ON INDEX idx_products_approved_available IS
-  'Partial index for active products in shop. Enables index-only scans for the most common product query pattern.';
+  'Partial index for active products in shop. Enables efficient index scans for the most common product query pattern.';
 
 -- ============================================================================
 -- INDEX 3: Order items by order_id (if missing)

@@ -56,7 +56,7 @@ describe('formatOrderItems', () => {
 
   it('handles empty array', () => {
     const result = formatOrderItems([]);
-    expect(result).toContain('0 items');
+    expect(result).toBe('(0 items)');
   });
 });
 

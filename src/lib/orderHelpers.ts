@@ -52,7 +52,7 @@ export const formatOrderItems = (items: OrderItemSummary[]): string => {
   const itemNames = items.map(item => item.products.name).slice(0, 2).join(', ');
   return items.length > 2 
     ? `${itemNames}, +${items.length - 2} more (${itemCount} items total)`
-    : `${itemNames} (${itemCount} items)`;
+    : `${itemNames} (${itemCount} items)`.trim();
 };
 
 /**

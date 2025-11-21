@@ -86,7 +86,13 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
 
     const { data: batch, error } = await query;
 
-    if (error || !batch || batch.length === 0) {
+    if (error) {
+      console.error(`[${ctx.requestId}] Error fetching cart batch:`, error);
+      hasMore = false;
+      break;
+    }
+
+    if (!batch || batch.length === 0) {
       hasMore = false;
       break;
     }
@@ -98,12 +104,20 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
       if (!seenCartIds.has(cart.id)) {
         seenCartIds.add(cart.id);
         cartsWithItems.push(cart);
+        
+        // Stop if we've reached the target limit
+        if (cartsWithItems.length >= 10000) {
+          hasMore = false;
+          break;
+        }
       }
     }
 
     // Update cursor and check if we got a full batch
-    lastCartId = (batch[batch.length - 1] as CartWithProfile).id;
-    hasMore = batch.length === CART_BATCH_SIZE;
+    if (hasMore) {
+      lastCartId = (batch[batch.length - 1] as CartWithProfile).id;
+      hasMore = batch.length === CART_BATCH_SIZE;
+    }
   }
 
   ctx.metrics.mark('consumers_fetched');

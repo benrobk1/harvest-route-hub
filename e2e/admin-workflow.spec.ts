@@ -32,11 +32,13 @@ test.describe('Admin Workflow', () => {
       'h1:has-text("User"), h2:has-text("Approval"), text=/approval/i, text=/pending/i, text=/user/i'
     ).first();
 
-    // Wait for content or empty state
-    const contentVisible = await approvalsContent.isVisible({ timeout: 10000 }).catch(() => false);
-    const pageHeading = await page.locator('h1, h2').first().isVisible();
-
-    expect(contentVisible || pageHeading).toBeTruthy();
+    // Wait for content or empty state with proper wait APIs
+    try {
+      await expect(approvalsContent).toBeVisible({ timeout: 10_000 });
+    } catch (_error) {
+      const heading = page.locator('h1, h2').first();
+      await expect(heading).toBeVisible({ timeout: 10_000 });
+    }
   });
 
   test('should access product approval page', async ({ page, auth }) => {

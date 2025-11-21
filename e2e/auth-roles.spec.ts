@@ -13,8 +13,8 @@ test.describe('Role-Based Access Control', () => {
     await page.goto('/consumer/shop');
     await waitForPageReady(page);
 
-    // Should be redirected or blocked (not on consumer shop)
-    await page.waitForTimeout(2000);
+    // Wait for redirect to complete (should not stay on consumer shop)
+    await page.waitForURL((url) => !url.pathname.includes('/consumer/shop'), { timeout: 5000 }).catch(() => {});
 
     // Verify either redirected back to farmer area or see access denied
     const url = page.url();
@@ -34,8 +34,8 @@ test.describe('Role-Based Access Control', () => {
     await page.goto('/admin/dashboard');
     await waitForPageReady(page);
 
-    // Should be redirected or blocked
-    await page.waitForTimeout(2000);
+    // Wait for redirect to complete (should not stay on admin dashboard)
+    await page.waitForURL((url) => !url.pathname.includes('/admin/dashboard'), { timeout: 5000 }).catch(() => {});
 
     // Verify not on admin dashboard
     const url = page.url();
@@ -55,8 +55,8 @@ test.describe('Role-Based Access Control', () => {
     await page.goto('/farmer/dashboard');
     await waitForPageReady(page);
 
-    // Should be redirected or blocked
-    await page.waitForTimeout(2000);
+    // Wait for redirect to complete (should not stay on farmer dashboard)
+    await page.waitForURL((url) => !url.pathname.includes('/farmer/dashboard'), { timeout: 5000 }).catch(() => {});
 
     // Verify not on farmer dashboard
     const url = page.url();
@@ -75,8 +75,8 @@ test.describe('Role-Based Access Control', () => {
     await page.goto('/admin/dashboard');
     await waitForPageReady(page);
 
-    // Should redirect to auth or home
-    await page.waitForTimeout(2000);
+    // Wait for redirect to complete (should not stay on admin dashboard)
+    await page.waitForURL((url) => !url.pathname.includes('/admin/dashboard'), { timeout: 5000 }).catch(() => {});
 
     const url = page.url();
     const isRedirected = url.includes('/auth') || url === new URL('/', page.url()).href || !url.includes('/admin/dashboard');

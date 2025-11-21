@@ -386,14 +386,38 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
       console.log(`[${ctx.requestId}] Payout failed: ${payout.id}`);
       ctx.metrics.mark('payout_failed');
 
-      // Update payouts table to mark as failed
+      // Retrieve balance transactions for this payout to find associated transfers
+      let transferIds: string[] = [];
+      try {
+        const balanceTransactions = await stripe.balanceTransactions.list({
+          payout: payout.id,
+          type: 'transfer',
+          limit: 100
+        });
+        
+        transferIds = balanceTransactions.data
+          .map(txn => txn.source as string)
+          .filter(id => id && id.startsWith('tr_'));
+        
+        console.log(`[${ctx.requestId}] Found ${transferIds.length} transfer(s) for payout ${payout.id}`);
+      } catch (stripeError) {
+        console.error(`[${ctx.requestId}] ❌ Failed to fetch balance transactions: ${stripeError}`);
+        // Continue with empty array - will log warning below
+      }
+
+      if (transferIds.length === 0) {
+        console.warn(`[${ctx.requestId}] ⚠️ No transfers found for payout: ${payout.id}`);
+        break;
+      }
+
+      // Update payouts table to mark as failed for all associated transfers
       const { data: payoutRecords, error: payoutError } = await supabase
         .from('payouts')
         .update({
           status: 'failed',
           // Store failure reason in a note (if payouts table has such field)
         })
-        .eq('stripe_transfer_id', payout.id)
+        .in('stripe_transfer_id', transferIds)
         .select('id, recipient_id, recipient_type, amount, order_id');
 
       if (payoutError) {
@@ -402,7 +426,7 @@ const handler = async (req: Request, ctx: Context): Promise<Response> => {
       }
 
       if (!payoutRecords || payoutRecords.length === 0) {
-        console.warn(`[${ctx.requestId}] ⚠️ Payout not found in database: ${payout.id}`);
+        console.warn(`[${ctx.requestId}] ⚠️ No payout records found in database for transfers: ${transferIds.join(', ')}`);
         break;
       }
 

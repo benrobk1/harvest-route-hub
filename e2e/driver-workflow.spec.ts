@@ -71,7 +71,7 @@ test.describe('Driver Workflow', () => {
     await auth.signUp('driver');
 
     // Navigate to payout details
-    await navigateAndWait(page, '/driver/payout-details');
+    await navigateAndWait(page, '/driver/payouts');
 
     // Verify payout page loaded or redirected appropriately
     const payoutContent = page.locator(
@@ -107,7 +107,7 @@ test.describe('Driver Workflow', () => {
     await auth.signUp('driver');
 
     // Navigate to driver profile
-    await navigateAndWait(page, '/profile/driver');
+    await navigateAndWait(page, '/driver/profile');
 
     // Verify profile page loaded
     const profileContent = page.locator(
